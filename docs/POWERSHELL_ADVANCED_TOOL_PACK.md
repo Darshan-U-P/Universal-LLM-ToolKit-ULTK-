@@ -24,7 +24,7 @@ Install the original pack and the advanced pack independently:
         allowed_computers=frozenset({"srv01.example.internal"}),
         allowed_session_commands=frozenset({
             "Get-Process", "Get-Service", "Get-ComputerInfo", "Get-Date",
-            "Select-Object", "Sort-Object", "Where-Object", "Measure-Object",
+            "Select-Object", "Sort-Object", "Measure-Object",
             "Write-Output",
         }),
         allowed_remote_commands=frozenset({"Get-Service", "Get-Process", "Get-EventLog"}),
@@ -61,6 +61,7 @@ Install the original pack and the advanced pack independently:
             },
             "allowed_audit_subcategories": frozenset({"Logon", "Logoff"}),
             "allow_security_policy_changes": False,
+            "allow_audit_disable": False,
         },
     )
 
@@ -71,9 +72,10 @@ advanced_policy is host application configuration. Do not populate it from an LL
 ### 1. Persistent interactive PowerShell sessions
 
 - session_open, session_list, session_execute, session_workflow, session_variables, session_get_variable, session_close.
+- A session can also own persistent remote PSSessions through remote_session_open, remote_session_invoke and remote_session_close.
 - Each session owns a separate long-running PowerShell process and runspace. Session variables persist between calls and are isolated from other sessions.
-- session_workflow accepts up to 20 steps, validates every step before executing any step, then executes sequentially in the same runspace.
-- Session commands must be explicitly host-allowlisted by exact cmdlet name. Only cmdlets are accepted; aliases, functions, dynamic command names and non-cmdlet command types are rejected.
+- session_workflow accepts up to 20 steps, validates every step before executing any step, then executes sequentially in the same runspace. Runtime failures can occur after earlier steps have completed; this is not a transaction and side effects are not rolled back.
+- Session commands must be explicitly host-allowlisted by exact cmdlet name. Only cmdlets are accepted; aliases, functions, dynamic command names and non-cmdlet command types are rejected. A session may be opened solely for persistent remoting when local command allowlists are empty.
 - The parser rejects member access, method invocation, type expressions, subexpressions, scriptblocks, redirection, function/class definitions, loops and control-flow constructs. Assignments are limited to session variables. Several high-impact cmdlets are hard-blocked even if accidentally allowlisted.
 - Sessions are in-memory processes, not durable runspaces: process/service restart destroys them. The host must associate each session ID with an authenticated principal, enforce ownership on every call, expire abandoned sessions and close them on logout.
 
@@ -82,9 +84,9 @@ This is a deliberately restricted interactive command environment, not a general
 ### 2. Authorized PowerShell remoting
 
 - remote_invoke invokes one exact host-allowlisted cmdlet on an exact host-allowlisted computer.
-- Uses WS-Management Invoke-Command, with UseSSL enabled by default and configurable per call.
-- Uses the Windows integrated authentication context of the ULTK process. No model-provided credentials, Basic authentication or arbitrary scriptblocks are accepted.
-- Remote cmdlet names and parameter keys/values are bounded. The remote endpoint, firewall, WinRM listener, authentication, and machine identity remain host/administrator responsibilities.
+- One-shot remote_invoke uses WS-Management Invoke-Command. Persistent remote_session_open creates a PSSession, remote_session_invoke reuses it, and remote_session_close removes it. UseSSL is enabled by default and configurable at session creation.
+- Uses the Windows integrated authentication context of the ULTK process. No model-provided credentials, Basic authentication or arbitrary scriptblocks are accepted. Persistent remote PSSessions are owned by a local ULTK session and are removed on explicit close or best-effort local session shutdown.
+- Remote cmdlet names and parameter keys/values are bounded. Remote hosts and cmdlets must be host-allowlisted; dynamic code execution and remote session-control cmdlets are blocked. The remote endpoint, firewall, WinRM listener, authentication, and machine identity remain host/administrator responsibilities.
 - Remote command/module execution occurs on the remote host with the ULTK identity's remoting privileges. Treat allowlisted remote cmdlets and modules as trusted executable code.
 
 ### 3. Registry writes
@@ -117,7 +119,7 @@ This is a deliberately restricted interactive command environment, not a general
 ### 7. Disks, partitions and volumes
 
 - Inspect disks, partitions and volumes.
-- Set a host-allowlisted disk online/offline, initialize a host-allowlisted RAW disk as GPT/MBR, create a bounded partition, and resize a partition within Windows-reported supported bounds.
+- Set a host-allowlisted disk online/offline, initialize a host-allowlisted RAW disk as GPT/MBR, create a bounded partition, resize a partition within Windows-reported supported bounds, assign an allowlisted drive letter, and change an allowlisted volume label.
 - Mutations require allow_storage_mutations=True and exact host-allowlisted disk numbers.
 - Formatting, partition deletion, disk cleaning, secure erase, dynamic disk conversion and storage-pool administration are not exposed in this increment. Disk/partition operations can cause data loss; require human approval and backups.
 
@@ -152,7 +154,7 @@ This is a deliberately restricted interactive command environment, not a general
 ### 12. Windows security policy
 
 - Inspect Windows audit policy and Microsoft Defender protection status.
-- Change success/failure audit settings only for host-allowlisted audit subcategories and only when allow_security_policy_changes=True.
+- Change success/failure audit settings only for host-allowlisted audit subcategories and only when allow_security_policy_changes=True. Disabling either audit outcome also requires the separate allow_audit_disable=True opt-in; by default the tool only enables auditing.
 - Enable selected Defender hardening features (PUA protection, Controlled Folder Access and Network Protection). Weakening settings are not exposed.
 - Security policy changes require explicit capabilities and human approval. Local policy, domain GPO and Defender Tamper Protection may override or reject changes.
 
