@@ -171,7 +171,7 @@ The provider and plugin branches extend the REST integration branch; media exten
 - [ ] Optional script execution requires host-pinned script IDs and SHA-256 hashes; verify race resistance between hash check and execution, symlink/junction behavior, and script-root permissions.
 - [ ] Verify PowerShell 7 and Windows PowerShell 5.1 behavior, encoded command parsing, UTF-8 output, JSON serialization of CIM objects, arrays/null/singletons and error stream handling.
 - [ ] Verify Windows-only cmdlets and optional NetTCPIP/NetSecurity/ScheduledTasks modules across Windows 10/11 and Server SKUs; confirm missing cmdlets fail cleanly.
-- [ ] Verify environment filtering; current environment listing may disclose credentials or tokens present in inherited process environment and should be restricted to host-approved names before production.
+- [ ] Verify environment filtering; environment values are now returned only for host-allowlisted names (empty by default); verify this remains fail-closed and add secret-pattern redaction before production.
 - [ ] Verify service and scheduled-task mutations with least-privilege identities, approval gates, UAC boundaries and protected/system services.
 - [ ] Verify registry path validation, provider-path injection resistance and 32/64-bit registry view behavior.
 - [ ] Verify event-log query performance, Security log access-denied handling and message/output caps.
