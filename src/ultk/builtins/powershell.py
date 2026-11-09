@@ -97,6 +97,8 @@ class PowerShellToolPack:
     def _run(self, source: str, payload: dict[str, Any] | None = None,
              *, timeout: int | None = None,
              extra_environment: Mapping[str, str] | None = None) -> dict[str, Any]:
+        import threading
+
         payload_b64 = base64.b64encode(
             json.dumps(payload or {}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         ).decode("ascii")
@@ -120,19 +122,55 @@ class PowerShellToolPack:
             if not key.startswith("ULTK_") or not isinstance(value, str) or "\x00" in value:
                 raise ToolExecutionError("Extra PowerShell environment values must use trusted ULTK_ names.")
             env[key] = value
+
         try:
-            result = subprocess.run(command, cwd=self.root, env=env, stdin=subprocess.DEVNULL,
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                    shell=False, timeout=timeout or self.timeout, check=False)
-        except subprocess.TimeoutExpired as exc:
-            raise ToolExecutionError("PowerShell operation timed out.") from exc
+            process = subprocess.Popen(
+                command, cwd=self.root, env=env, stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, close_fds=True,
+            )
         except OSError as exc:
             raise ToolExecutionError(f"Unable to start PowerShell ({type(exc).__name__}).") from exc
-        stdout = result.stdout[:self.max_output].decode("utf-8", errors="replace")
-        stderr = result.stderr[:self.max_output].decode("utf-8", errors="replace")
-        return {"return_code": result.returncode, "stdout": stdout, "stderr": stderr,
-                "output_truncated": len(result.stdout) > self.max_output or len(result.stderr) > self.max_output}
 
+        captured = {"stdout": bytearray(), "stderr": bytearray()}
+        truncated = {"stdout": False, "stderr": False}
+
+        def drain(name: str, stream: Any) -> None:
+            while True:
+                chunk = stream.read(8192)
+                if not chunk:
+                    return
+                remaining = self.max_output + 1 - len(captured[name])
+                if remaining > 0:
+                    captured[name].extend(chunk[:remaining])
+                if len(chunk) > max(remaining, 0) or len(captured[name]) > self.max_output:
+                    truncated[name] = True
+
+        readers = [
+            threading.Thread(target=drain, args=("stdout", process.stdout), daemon=True),
+            threading.Thread(target=drain, args=("stderr", process.stderr), daemon=True),
+        ]
+        for reader in readers:
+            reader.start()
+        try:
+            return_code = process.wait(timeout=timeout or self.timeout)
+        except subprocess.TimeoutExpired as exc:
+            process.kill()
+            process.wait()
+            for reader in readers:
+                reader.join(timeout=2)
+            raise ToolExecutionError("PowerShell operation timed out; the process was terminated.") from exc
+        finally:
+            for reader in readers:
+                reader.join(timeout=2)
+            if process.stdout:
+                process.stdout.close()
+            if process.stderr:
+                process.stderr.close()
+
+        stdout = bytes(captured["stdout"][:self.max_output]).decode("utf-8", errors="replace")
+        stderr = bytes(captured["stderr"][:self.max_output]).decode("utf-8", errors="replace")
+        return {"return_code": return_code, "stdout": stdout, "stderr": stderr,
+                "output_truncated": truncated["stdout"] or truncated["stderr"]}
     @staticmethod
     def _string(value: str, label: str, max_length: int = 2048) -> str:
         if not isinstance(value, str) or not value.strip() or len(value) > max_length or "\x00" in value:
