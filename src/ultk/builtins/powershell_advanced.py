@@ -472,7 +472,8 @@ class AdvancedPowerShellToolPack:
             "Enable-LocalUser", "Disable-LocalUser", "Enable-NetFirewallRule", "Disable-NetFirewallRule",
             "Enable-ADAccount", "Disable-ADAccount", "Set-Partition", "Set-Volume", "Set-MpPreference",
             "Import-Module", "Import-PSSession", "Export-PSSession", "New-Module", "Add-PSSnapin",
-            "Invoke-Item", "Start-ThreadJob", "Register-WmiEvent",
+            "Invoke-Item", "Start-ThreadJob", "Register-WmiEvent", "Write-Host", "Start-Transcript",
+            "Stop-Transcript", "Set-PSDebug", "Set-StrictMode", "Clear-Host",
         }
         forbidden_folded = {command.casefold() for command in forbidden_commands}
         if any(command.casefold() in forbidden_folded for command in allowed_session_commands):
@@ -492,7 +493,8 @@ class AdvancedPowerShellToolPack:
                           "invoke-command", "new-pssession", "remove-pssession", "stop-computer",
                           "restart-computer", "new-object", "add-member", "import-module", "import-pssession",
                           "export-pssession", "new-module", "add-pssnapin", "invoke-item", "start-job",
-                          "start-threadjob", "register-objectevent", "register-wmievent"}
+                          "start-threadjob", "register-objectevent", "register-wmievent", "write-host",
+                          "start-transcript", "stop-transcript", "set-psdebug", "set-strictmode", "clear-host"}
         if any(command.casefold() in remote_blocked for command in allowed_remote_commands):
             raise ToolExecutionError("Remote cmdlet allowlist includes a blocked code-execution or session-control command.")
         self.allowed_remote_commands = frozenset(allowed_remote_commands)
