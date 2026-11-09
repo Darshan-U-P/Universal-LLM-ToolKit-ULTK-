@@ -802,6 +802,139 @@ class AdvancedPowerShellToolPack:
             "@{name=$data.name;path=$data.path;deleted=$true}",
             {"name": name, "path": path}, timeout=self.timeout)
 
+
+    def local_group_create(self, name: str, description: str = "") -> dict[str, Any]:
+        self._windows("local group management")
+        group = self._group(name)
+        description = self._value(description, "group description", 256) if description else ""
+        return self.base._run(
+            "New-LocalGroup -Name $data.name -Description $data.description -ErrorAction Stop | "
+            "Select-Object Name,Description,SID",
+            {"name": group, "description": description}, timeout=self.timeout)
+
+    def local_group_remove(self, name: str) -> dict[str, Any]:
+        self._windows("local group management")
+        group = self._group(name)
+        return self.base._run(
+            "Remove-LocalGroup -Name $data.name -ErrorAction Stop;@{name=$data.name;removed=$true}",
+            {"name": group}, timeout=self.timeout)
+
+    def ad_user_state(self, distinguished_name: str, enabled: bool) -> dict[str, Any]:
+        self._windows("Active Directory user management")
+        if distinguished_name not in self.allowed_ad_members:
+            raise ToolExecutionError("AD user DN must be host-allowlisted.")
+        command = "Enable-ADAccount" if enabled else "Disable-ADAccount"
+        return self.base._run(
+            f"Import-Module ActiveDirectory -ErrorAction Stop;{command} -Identity $data.dn -ErrorAction Stop;"
+            "Get-ADUser -Identity $data.dn | Select-Object SamAccountName,Enabled,DistinguishedName",
+            {"dn": distinguished_name}, timeout=self.timeout)
+
+    def ad_user_remove(self, distinguished_name: str) -> dict[str, Any]:
+        self._windows("Active Directory user deletion")
+        if distinguished_name not in self.allowed_ad_members:
+            raise ToolExecutionError("AD user DN must be host-allowlisted.")
+        return self.base._run(
+            "Import-Module ActiveDirectory -ErrorAction Stop;"
+            "Remove-ADUser -Identity $data.dn -Confirm:$false -ErrorAction Stop;"
+            "@{distinguished_name=$data.dn;removed=$true}",
+            {"dn": distinguished_name}, timeout=self.timeout)
+
+    def ad_group_create(self, name: str, path: str, scope: str, category: str) -> dict[str, Any]:
+        self._windows("Active Directory group creation")
+        if scope not in {"Global", "DomainLocal", "Universal"} or category not in {"Security", "Distribution"}:
+            raise ToolExecutionError("Invalid AD group scope or category.")
+        if path not in self.allowed_gpo_targets:
+            raise ToolExecutionError("AD group creation path must be a host-allowlisted OU DN.")
+        group_name = self._value(name, "AD group name", 128)
+        return self.base._run(
+            "Import-Module ActiveDirectory -ErrorAction Stop;"
+            "New-ADGroup -Name $data.name -Path $data.path -GroupScope $data.scope "
+            "-GroupCategory $data.category -ErrorAction Stop | "
+            "Select-Object Name,GroupScope,GroupCategory,DistinguishedName",
+            {"name": group_name, "path": path, "scope": scope, "category": category},
+            timeout=self.timeout)
+
+    def ad_group_remove(self, group_dn: str) -> dict[str, Any]:
+        self._windows("Active Directory group deletion")
+        if group_dn not in self.allowed_ad_groups:
+            raise ToolExecutionError("AD group DN must be host-allowlisted.")
+        return self.base._run(
+            "Import-Module ActiveDirectory -ErrorAction Stop;"
+            "Remove-ADGroup -Identity $data.dn -Confirm:$false -ErrorAction Stop;"
+            "@{distinguished_name=$data.dn;removed=$true}",
+            {"dn": group_dn}, timeout=self.timeout)
+
+    def gpo_remove(self, name: str, domain: str) -> dict[str, Any]:
+        self._windows("Group Policy deletion")
+        self._ad_domain(domain)
+        if name not in self.allowed_gpos:
+            raise ToolExecutionError("GPO name must be host-allowlisted.")
+        return self.base._run(
+            "Import-Module GroupPolicy -ErrorAction Stop;"
+            "Remove-GPO -Name $data.name -Domain $data.domain -Confirm:$false -ErrorAction Stop;"
+            "@{name=$data.name;deleted=$true}",
+            {"name": name, "domain": domain}, timeout=self.timeout)
+
+    def gpo_registry_set(self, name: str, domain: str, key: str, value_name: str,
+                         value: Any, value_type: str) -> dict[str, Any]:
+        self._windows("Group Policy registry settings")
+        self._ad_domain(domain)
+        if name not in self.allowed_gpos or key not in self.allowed_gpo_registry_keys:
+            raise ToolExecutionError("GPO name and registry policy key must be host-allowlisted.")
+        if value_type not in {"String", "DWord", "QWord", "ExpandString", "MultiString"}:
+            raise ToolExecutionError("Unsupported Group Policy registry value type.")
+        if value_type in {"String", "ExpandString"} and not isinstance(value, str):
+            raise ToolExecutionError("String policy values require text.")
+        if value_type in {"DWord", "QWord"} and (type(value) is not int or value < 0):
+            raise ToolExecutionError("Numeric policy values require a non-negative integer.")
+        if value_type == "MultiString" and (not isinstance(value, list) or any(not isinstance(item, str) for item in value)):
+            raise ToolExecutionError("MultiString policy values require a list of strings.")
+        value_name = self._value(value_name, "policy value name", 256)
+        return self.base._run(
+            "Import-Module GroupPolicy -ErrorAction Stop;"
+            "Set-GPRegistryValue -Name $data.name -Domain $data.domain -Key $data.key "
+            "-ValueName $data.value_name -Type $data.type -Value $data.value -ErrorAction Stop | "
+            "Select-Object DisplayName,Id",
+            {"name": name, "domain": domain, "key": key, "value_name": value_name,
+             "type": value_type, "value": value}, timeout=self.timeout)
+
+    def package_install(self, name: str, version: str, source: str) -> dict[str, Any]:
+        self._windows("package installation")
+        versions = self.allowed_package_versions.get(name)
+        if name not in self.allowed_packages or versions is None or version not in versions or source not in self.allowed_sources:
+            raise ToolExecutionError("Package name, version and source must be explicitly host-allowlisted.")
+        return self.base._run(
+            "Install-Package -Name $data.name -RequiredVersion $data.version -Source $data.source "
+            "-Force -ErrorAction Stop | Select-Object Name,Version,ProviderName,Source",
+            {"name": name, "version": version, "source": source}, timeout=120)
+
+    def package_remove(self, name: str, version: str) -> dict[str, Any]:
+        self._windows("package removal")
+        versions = self.allowed_package_versions.get(name)
+        if name not in self.allowed_packages or versions is None or version not in versions:
+            raise ToolExecutionError("Package name and version must be host-allowlisted.")
+        return self.base._run(
+            "Uninstall-Package -Name $data.name -RequiredVersion $data.version -Force -ErrorAction Stop;"
+            "@{name=$data.name;version=$data.version;removed=$true}",
+            {"name": name, "version": version}, timeout=120)
+
+    def partition_resize(self, disk_number: int, partition_number: int, size_bytes: int) -> dict[str, Any]:
+        self._windows("partition resize")
+        if not self.allow_storage:
+            raise ToolExecutionError("Storage mutations are disabled by host policy.")
+        disk = self._disk(disk_number)
+        if type(partition_number) is not int or partition_number < 1:
+            raise ToolExecutionError("Partition number must be positive.")
+        if type(size_bytes) is not int or not 1_048_576 <= size_bytes <= 2_000_000_000_000:
+            raise ToolExecutionError("Partition size must be between 1 MiB and 2 TB.")
+        return self.base._run(
+            "$part=Get-Partition -DiskNumber $data.disk -PartitionNumber $data.partition -ErrorAction Stop;"
+            "$supported=Get-PartitionSupportedSize -DiskNumber $data.disk -PartitionNumber $data.partition;"
+            "if($data.size -lt $supported.SizeMin -or $data.size -gt $supported.SizeMax){throw 'Requested size is outside supported resize bounds.'};"
+            "Resize-Partition -DiskNumber $data.disk -PartitionNumber $data.partition -Size $data.size -ErrorAction Stop | "
+            "Select-Object DiskNumber,PartitionNumber,Size",
+            {"disk": disk, "partition": partition_number, "size": size_bytes}, timeout=self.timeout)
+
     def security_inspect(self) -> dict[str, Any]:
         self._windows("security policy inspection")
         return self.base._run(
