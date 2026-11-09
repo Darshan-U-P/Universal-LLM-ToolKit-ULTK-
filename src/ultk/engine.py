@@ -66,3 +66,9 @@ class ToolEngine:
         self.register_tools(
             create_filesystem_tools(root_dir, max_file_bytes=max_file_bytes)
         )
+
+    def install_system_tools(self) -> None:
+        """Install read-only operating-system and process inspection tools."""
+        from ultk.builtins.system import create_system_tools
+
+        self.register_tools(create_system_tools())
