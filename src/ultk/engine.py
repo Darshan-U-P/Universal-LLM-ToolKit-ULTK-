@@ -298,6 +298,47 @@ class ToolEngine:
             allowed_environment_names=allowed_environment_names,
         ))
 
+    def install_advanced_powershell_tools(
+        self,
+        *,
+        executable: str | Path | None = None,
+        working_root: str | Path = ".",
+        timeout_seconds: int = 30,
+        max_output_bytes: int = 200_000,
+        allowed_modules: frozenset[str] = frozenset(),
+        allowed_computers: frozenset[str] = frozenset(),
+        allowed_session_commands: frozenset[str] = frozenset(),
+        allowed_remote_commands: frozenset[str] = frozenset(),
+        advanced_policy: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Install isolated PowerShell sessions and advanced, host-scoped Windows administration.
+
+        advanced_policy contains the resource allowlists and opt-in switches accepted by
+        create_advanced_powershell_tools. It is host configuration, never model input.
+        """
+        from ultk.builtins.powershell import PowerShellToolPack
+        from ultk.builtins.powershell_advanced import create_advanced_powershell_tools
+
+        base = PowerShellToolPack(
+            executable=executable,
+            working_root=working_root,
+            timeout_seconds=timeout_seconds,
+            max_output_bytes=max_output_bytes,
+            allowed_modules=allowed_modules,
+            allowed_computers=allowed_computers,
+        )
+        options = dict(advanced_policy or {})
+        reserved = {"base", "allowed_session_commands", "allowed_computers", "allowed_remote_commands"}
+        if reserved.intersection(options):
+            raise ValueError("advanced_policy cannot override core PowerShell host configuration.")
+        self.register_tools(create_advanced_powershell_tools(
+            base=base,
+            allowed_session_commands=allowed_session_commands,
+            allowed_computers=allowed_computers,
+            allowed_remote_commands=allowed_remote_commands,
+            **options,
+        ))
+
     def install_development_tools(self, *, project_root: str | Path,
                                   allowed_executables: dict[str, str] | None = None) -> None:
         from ultk.builtins.development import create_development_tools
