@@ -1002,6 +1002,8 @@ class AdvancedPowerShellToolPack:
         self._require_module("ActiveDirectory")
         self._ad_domain(domain)
         account = self._name(sam_account_name, "AD sAMAccountName")
+        if len(account) > 20:
+            raise ToolExecutionError("AD sAMAccountName cannot exceed 20 characters.")
         display = self._value(name, "AD user display name", 256)
         if path not in self.allowed_gpo_targets:
             raise ToolExecutionError("AD user creation path must be a host-allowlisted OU DN.")
