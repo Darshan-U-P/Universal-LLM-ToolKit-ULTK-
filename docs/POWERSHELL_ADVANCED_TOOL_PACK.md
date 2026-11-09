@@ -63,6 +63,7 @@ Install the original pack and the advanced pack independently:
             "allowed_audit_subcategories": frozenset({"Logon", "Logoff"}),
             "allow_security_policy_changes": False,
             "allow_audit_disable": False,
+            "approved_security_templates": {},
         },
     )
 
@@ -140,7 +141,7 @@ This is a deliberately restricted interactive command environment, not a general
 ### 10. Active Directory and Group Policy
 
 - List AD users/groups within a host-allowlisted domain and domain DN search base.
-- Enable, disable or remove host-allowlisted AD users; create/remove host-allowlisted groups; add/remove exact host-allowlisted group/member DNs.
+- Create, enable, disable or remove host-allowlisted AD users; create/remove host-allowlisted groups; add/remove exact host-allowlisted group/member DNs. AD user creation uses the same host-injected password secret as local account provisioning.
 - List, create and delete host-allowlisted GPOs; link/unlink them only to exact host-allowlisted OU targets; set registry policy values only under host-allowlisted GPO names and registry policy keys.
 - Requires trusted RSAT ActiveDirectory and GroupPolicy modules and a domain identity with appropriately scoped rights. Domain, group, member, GPO, OU and policy-key allowlists must be configured by the host.
 - This increment does not provide arbitrary LDAP filters, arbitrary DN targeting, domain-controller discovery, forest-wide schema changes, replication management, or arbitrary GPO script deployment.
@@ -154,14 +155,29 @@ This is a deliberately restricted interactive command environment, not a general
 
 ### 12. Windows security policy
 
-- Inspect Windows audit policy and Microsoft Defender protection status.
+- Inspect local security policy exported by secedit, account policy, audit policy, Defender status/preferences and firewall profiles.
 - Change success/failure audit settings only for host-allowlisted audit subcategories and only when allow_security_policy_changes=True. Disabling either audit outcome also requires the separate allow_audit_disable=True opt-in; by default the tool only enables auditing.
+- Apply local security policy only from host-approved INF templates pinned by SHA-256, copied to private staging and limited to host-approved secedit areas. No model-authored INF path or policy content is accepted.
 - Enable selected Defender hardening features (PUA protection, Controlled Folder Access and Network Protection). Weakening settings are not exposed.
 - Security policy changes require explicit capabilities and human approval. Local policy, domain GPO and Defender Tamper Protection may override or reject changes.
 
+### Host-pinned security template configuration
+
+The approved_security_templates host policy maps a template ID to a relative INF file, SHA-256 digest and approved secedit areas. Example shape:
+
+    "approved_security_templates": {
+        "workstation-baseline": {
+            "path": "security/workstation-baseline.inf",
+            "sha256": "HOST_COMPUTED_64_HEX_SHA256",
+            "areas": ["securitypolicy", "user_rights"]
+        }
+    }
+
+The file must reside under working_root, contain no symlink path components, be at most 1 MB and match its pinned hash. The tool stages and re-hashes a private copy before calling secedit. Applying any template also requires allow_security_policy_changes=True and the host's approval policy. Keep templates in version control, review them before approval and update the hash whenever the content changes.
+
 ## Authorization and operational requirements
 
-Each tool declares its own capability, including powershell:session:execute, powershell:remoting:execute, powershell:registry:write, powershell:firewall:create, powershell:identity:*, powershell:updates:install, powershell:storage:*, powershell:certificates:*, powershell:modules:install, powershell:active_directory:*, powershell:gpo:*, powershell:tasks:* and powershell:security:*.
+Each tool declares its own capability, including powershell:session:execute, powershell:remoting:execute, powershell:remoting:session:*, powershell:registry:write, powershell:firewall:create, powershell:identity:*, powershell:updates:install, powershell:storage:*, powershell:certificates:*, powershell:modules:install, powershell:active_directory:*, powershell:gpo:*, powershell:tasks:* and powershell:security:*.
 
 Configure production policy to require human approval for all state-changing operations, especially remote commands, registry/firewall changes, identity changes, Windows Update, storage, certificate deletion, package installation, AD/GPO changes, scheduled task changes and security policy. A capability name is not itself an approval mechanism; the host PermissionPolicy must enforce the approval flow.
 
