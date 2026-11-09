@@ -10,8 +10,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
-from ultk.exceptions import ToolExecutionError
 from ultk.builtins._common import FunctionTool, object_schema
+from ultk.exceptions import ToolExecutionError
 
 
 def _validate_public_url(url: str) -> str:
