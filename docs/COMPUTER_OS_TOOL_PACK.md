@@ -11,6 +11,9 @@ The computer_os pack complements the existing computer, computer_advanced, syste
         filesystem_root=r"C:\ULTK-Managed",
         state_database=r"C:\ULTK-State\computer-os.sqlite3",
         allowed_services=frozenset({"Spooler"}),
+        allowed_acl_sids=frozenset({"S-1-5-18"}),
+        allow_windows_acl_changes=False,
+        allowed_eject_devices=frozenset(),
         allow_posix_chmod=True,
         allow_posix_chown=False,
     )
@@ -29,6 +32,8 @@ The filesystem root confines metadata and POSIX permission operations. Service m
 | Accessibility | Windows UI Automation inspection and element click; Linux AT-SPI inspection |
 | Services | Read service inventory on Windows/Linux/macOS; allowlisted start/stop/restart on Windows/Linux |
 | Filesystem permissions | Metadata, POSIX chmod, optional host-enabled chown; paths confined to filesystem_root |
+| Windows ACL | Inspect ACLs and optionally grant R/RX/M to a host-allowlisted numeric SID on one object |
+| USB ejection | Allowlisted safe power-off/eject on Linux and macOS; Windows eject is not implemented |
 | Hardware | CPU, memory, disks, thermal sensors and battery where supported |
 | Devices | USB inventory through pyudev (Linux), pnputil (Windows) or system_profiler (macOS) |
 | Networking | Interface addresses, state, MTU and link speed |
@@ -61,8 +66,8 @@ Event watches are durable watch definitions. They do not start background daemon
 - Keyboard shortcuts and sequences have key, step, text and delay bounds. Desktop automation can still trigger consequential actions in the foreground application; use narrow capabilities and host approval.
 - Service mutations require an exact host-configured allowlist. The host must require approval for stop/restart/start operations.
 - Filesystem metadata and permission changes are confined to a host-configured root. Symlinks are rejected for chmod/chown. Path checks do not eliminate filesystem TOCTOU races; this is not an OS sandbox.
-- POSIX ownership changes are disabled by default. Windows ACL editing is not provided here; use separately governed Windows administration tools.
-- Hardware inventory may reveal device identifiers. USB serial numbers are returned only by the Linux pyudev backend; restrict access appropriately.
+- POSIX ownership changes are disabled by default. Windows ACL grants are disabled by default, require host opt-in and an exact SID allowlist, and are limited to R/RX/M on a single object. Windows ACL inheritance and recursive grants are not changed.
+- Hardware inventory may reveal device identifiers. USB serial numbers are returned only by the Linux pyudev backend; restrict access appropriately. Linux/macOS safe eject requires an exact host allowlist of device paths. Eject can interrupt I/O and must require human approval. Windows device ejection is not implemented.
 - Event log access may require elevated privileges and can expose sensitive operational data. Output and event counts are bounded.
 - The pack does not elevate privileges and cannot bypass OS permissions.
 
