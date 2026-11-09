@@ -7,7 +7,7 @@ This is a planned taxonomy, not an implementation inventory. Each tool must be i
 | Core | provider/model discovery, registry, schemas, dispatch, retries, telemetry |
 | Computer/OS | filesystem, process management, terminal, clipboard, desktop interaction |
 | Web | search, URL fetch, browser, scraper, downloads, monitoring |
-| Development | editor, isolated code runner, compiler, debugger, tests, Git, API testing |
+| Development | editor, isolated code runner, compiler, debugger, tests, Git repository inspection, branch/index/commit/diff/merge/conflict/history/remote workflows, API testing |
 | Data | SQL/NoSQL, CSV/XLSX, JSON/XML, ETL, vector DB, visualization |
 | Documents | PDF, DOCX, PPTX, XLSX, OCR, conversion, document search |
 | Communication | email, calendar, contacts, notifications, SMS, messaging |
