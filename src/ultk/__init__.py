@@ -8,13 +8,14 @@ from ultk.models import AssistantTurn, ToolCallRequest, ToolContext, ToolResult,
 from ultk.orchestration import WorkflowEngine, WorkflowStep
 from ultk.permissions import AllowListPolicy, DenyAllPolicy, PermissionPolicy
 from ultk.providers.base import ProviderAdapter
+from ultk.providers.openai_compatible import OpenAICompatibleProvider
 from ultk.registry import ToolRegistry
 from ultk.tool import Tool
 from ultk.toolkit import ToolKit
 
 __all__ = [
     "AgentRuntime", "AllowListPolicy", "ApprovalPolicy", "AssistantTurn",
-    "DenyAllPolicy", "PermissionPolicy", "ProviderAdapter", "SQLiteApprovalStore",
+    "DenyAllPolicy", "OpenAICompatibleProvider", "PermissionPolicy", "ProviderAdapter", "SQLiteApprovalStore",
     "SQLiteAuditLogger", "Tool", "ToolCallRequest", "ToolContext", "ToolEngine",
     "ToolKit", "ToolRegistry", "ToolResult", "ToolSpec", "WorkflowEngine", "WorkflowStep",
 ]
