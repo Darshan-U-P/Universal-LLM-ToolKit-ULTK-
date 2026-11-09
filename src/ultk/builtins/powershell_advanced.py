@@ -444,6 +444,7 @@ class AdvancedPowerShellToolPack:
         allowed_ad_domains: frozenset[str] = frozenset(),
         allowed_ad_group_dns: frozenset[str] = frozenset(),
         allowed_ad_member_dns: frozenset[str] = frozenset(),
+        allowed_ad_ous: frozenset[str] = frozenset(),
         allowed_gpo_names: frozenset[str] = frozenset(),
         allowed_gpo_targets: frozenset[str] = frozenset(),
         allowed_gpo_registry_keys: frozenset[str] = frozenset(),
@@ -523,6 +524,7 @@ class AdvancedPowerShellToolPack:
         self.allowed_ad_domains = frozenset(item.casefold() for item in allowed_ad_domains)
         self.allowed_ad_groups = frozenset(allowed_ad_group_dns)
         self.allowed_ad_members = frozenset(allowed_ad_member_dns)
+        self.allowed_ad_ous = frozenset(allowed_ad_ous)
         self.allowed_gpos = frozenset(allowed_gpo_names)
         self.allowed_gpo_targets = frozenset(allowed_gpo_targets)
         self.allowed_gpo_registry_keys = frozenset(allowed_gpo_registry_keys)
@@ -1042,8 +1044,8 @@ class AdvancedPowerShellToolPack:
         if len(account) > 20:
             raise ToolExecutionError("AD sAMAccountName cannot exceed 20 characters.")
         display = self._value(name, "AD user display name", 256)
-        if path not in self.allowed_gpo_targets:
-            raise ToolExecutionError("AD user creation path must be a host-allowlisted OU DN.")
+        if path not in self.allowed_ad_ous:
+            raise ToolExecutionError("AD user creation path must be a host-allowlisted AD OU DN.")
         domain_dn = ",".join(f"DC={part}" for part in domain.split("."))
         if not path.casefold().endswith(domain_dn.casefold()):
             raise ToolExecutionError("AD user creation OU must belong to the selected allowlisted domain.")
@@ -1093,8 +1095,8 @@ class AdvancedPowerShellToolPack:
         self._require_module("ActiveDirectory")
         if scope not in {"Global", "DomainLocal", "Universal"} or category not in {"Security", "Distribution"}:
             raise ToolExecutionError("Invalid AD group scope or category.")
-        if path not in self.allowed_gpo_targets:
-            raise ToolExecutionError("AD group creation path must be a host-allowlisted OU DN.")
+        if path not in self.allowed_ad_ous:
+            raise ToolExecutionError("AD group creation path must be a host-allowlisted AD OU DN.")
         group_name = self._value(name, "AD group name", 128)
         expected_dn = f"CN={group_name},{path}"
         if expected_dn not in self.allowed_ad_groups:
@@ -1349,6 +1351,7 @@ def create_advanced_powershell_tools(
     allowed_ad_domains: frozenset[str] = frozenset(),
     allowed_ad_group_dns: frozenset[str] = frozenset(),
     allowed_ad_member_dns: frozenset[str] = frozenset(),
+    allowed_ad_ous: frozenset[str] = frozenset(),
     allowed_gpo_names: frozenset[str] = frozenset(),
     allowed_gpo_targets: frozenset[str] = frozenset(),
     allowed_gpo_registry_keys: frozenset[str] = frozenset(),
@@ -1378,7 +1381,7 @@ def create_advanced_powershell_tools(
         allowed_package_versions=allowed_package_versions,
         allowed_package_sources=allowed_package_sources, allowed_ad_domains=allowed_ad_domains,
         allowed_ad_group_dns=allowed_ad_group_dns, allowed_ad_member_dns=allowed_ad_member_dns,
-        allowed_gpo_names=allowed_gpo_names, allowed_gpo_targets=allowed_gpo_targets,
+        allowed_ad_ous=allowed_ad_ous, allowed_gpo_names=allowed_gpo_names, allowed_gpo_targets=allowed_gpo_targets,
         allowed_gpo_registry_keys=allowed_gpo_registry_keys,
         allowed_task_names=allowed_task_names, allowed_task_paths=allowed_task_paths,
         approved_task_templates=approved_task_templates,
