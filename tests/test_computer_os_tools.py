@@ -89,9 +89,25 @@ def test_event_watch_persistence(pack: ComputerOSPack) -> None:
     assert pack.list_event_watches() == []
 
 
-def test_keyboard_shortcut_rejects_unapproved_key(pack: ComputerOSPack) -> None:
+def test_keyboard_shortcut_rejects_secure_attention_sequence(pack: ComputerOSPack) -> None:
     with pytest.raises(ToolExecutionError):
         pack.keyboard_shortcut(["ctrl", "alt", "delete"])
+
+
+def test_keyboard_sequence_prevalidates_all_hotkeys(pack: ComputerOSPack) -> None:
+    with pytest.raises(ToolExecutionError):
+        pack.keyboard_sequence([{"action": "type", "text": "should not be sent"},
+                                {"action": "hotkey", "keys": ["ctrl", "alt", "delete"]}])
+
+
+def test_device_eject_requires_exact_host_allowlist(pack: ComputerOSPack) -> None:
+    with pytest.raises(ToolExecutionError):
+        pack.eject_device("/dev/sdb")
+
+
+def test_windows_acl_mutation_is_disabled_by_default(pack: ComputerOSPack) -> None:
+    with pytest.raises(ToolExecutionError):
+        pack.grant_windows_acl("some-file", "S-1-5-18", "RX")
 
 
 def test_tool_factory_registers_all_expected_domains(tmp_path: Path) -> None:
