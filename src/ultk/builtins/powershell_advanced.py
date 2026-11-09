@@ -321,8 +321,8 @@ class PersistentPowerShellSessions:
         if len(json.dumps(values, ensure_ascii=False)) > 16_000:
             raise ToolExecutionError("Remote parameter payload exceeds 16 KB.")
         return {"session_id": session_id, **self._request(
-            session_id, "remote_invoke", remote_session_id=remote_session_id,
-            command=command, parameters=values,
+            session_id, "remote_invoke", request_timeout=min(120, max(self.timeout, 60)),
+            remote_session_id=remote_session_id, command=command, parameters=values,
         )}
 
     def close_remote_session(self, session_id: str, remote_session_id: str) -> dict[str, Any]:
