@@ -50,15 +50,17 @@ acceptance, purchases, publishing and other high-impact website actions.
 
 ## Security boundaries and known limitations
 
-- CAPTCHA is detected, not solved, outsourced or bypassed. Authentication uses saved
-  browser storage and heuristic selectors; there is no universal login/MFA solver.
-- Browser profiles store Playwright storage-state JSON on disk. Cookie values and local
+- CAPTCHA is detected, not solved, outsourced or bypassed. Authentication uses saved browser storage and heuristic selectors. In headed mode, a human
+  handoff can keep a visible browser open while a host-supplied login indicator is awaited;
+  it does not automate credentials or prove account identity.
+- Browser profiles use Chromium persistent user-data directories on disk. Cookie values and local
   storage may contain bearer credentials. Protect the profile directory with OS ACLs,
   encryption at rest and per-user ownership; do not place it in a shared repository.
 - Tabs are restored by URL plus saved cookies/storage, not by restoring the exact live
   JavaScript heap, open network sockets, in-flight requests or complete browser process.
-- Browser contexts are created per tool call. This pack is not a persistent interactive
-  Chrome process or a full Chrome DevTools Protocol replacement.
+- Chromium contexts are created per tool call, but the profile's persistent user-data directory
+  retains cookies and local storage. Live tabs, JavaScript heaps, open sockets and browser
+  process state are not preserved. This is not a full Chrome DevTools Protocol replacement.
 - Extensions must be supplied by the host as trusted directories with a manifest. They
   run with browser privileges; extension signing, marketplace discovery, update policy
   and permission review are outside this pack.
