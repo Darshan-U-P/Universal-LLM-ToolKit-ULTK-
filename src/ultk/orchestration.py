@@ -25,7 +25,9 @@ class WorkflowStep:
 def _collect_references(value: Any) -> set[str]:
     references: set[str] = set()
     if isinstance(value, dict):
-        if set(value) == {"$ref"} and isinstance(value["$ref"], str):
+        if set(value) == {"$ref"}:
+            if not isinstance(value["$ref"], str) or not value["$ref"]:
+                raise WorkflowError("Workflow $ref must be a non-empty string.")
             references.add(value["$ref"].partition("#")[0])
         else:
             for item in value.values():
@@ -193,6 +195,13 @@ class WorkflowEngine:
             for step_id, result in zip(runnable, batch, strict=True):
                 results[step_id] = result
                 pending.remove(step_id)
+                if result.metadata.get("truncated"):
+                    result = ToolResult(
+                        result.call_id, result.tool_name,
+                        "Tool output was truncated; dependent workflow steps cannot consume it.",
+                        True, {"truncated": True},
+                    )
+                    results[step_id] = result
                 if not result.is_error:
                     try:
                         completed[step_id] = json.loads(result.content)
