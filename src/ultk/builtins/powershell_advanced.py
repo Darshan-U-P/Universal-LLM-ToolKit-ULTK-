@@ -991,6 +991,34 @@ class AdvancedPowerShellToolPack:
             "Remove-LocalGroup -Name $data.name -ErrorAction Stop;@{name=$data.name;removed=$true}",
             {"name": group}, timeout=self.timeout)
 
+    def ad_user_create(self, sam_account_name: str, name: str, domain: str,
+                       path: str, description: str = "") -> dict[str, Any]:
+        self._windows("Active Directory user creation")
+        self._require_module("ActiveDirectory")
+        self._ad_domain(domain)
+        account = self._name(sam_account_name, "AD sAMAccountName")
+        display = self._value(name, "AD user display name", 256)
+        if path not in self.allowed_gpo_targets:
+            raise ToolExecutionError("AD user creation path must be a host-allowlisted OU DN.")
+        expected_dn = f"CN={display},{path}"
+        if expected_dn not in self.allowed_ad_members:
+            raise ToolExecutionError("New AD user distinguished name must be host-allowlisted.")
+        if not self.password_env or not os.environ.get(self.password_env):
+            raise ToolExecutionError("Host-configured account password environment variable is missing or empty.")
+        password = os.environ[self.password_env]
+        if not 12 <= len(password) <= 256 or "\x00" in password:
+            raise ToolExecutionError("Host-provided account password must be 12–256 characters.")
+        details = self._value(description, "AD user description", 256) if description else ""
+        return self.base._run(
+            "$secure=ConvertTo-SecureString $env:ULTK_LOCAL_USER_PASSWORD -AsPlainText -Force;"
+            "New-ADUser -SamAccountName $data.sam -Name $data.name -Path $data.path "
+            "-AccountPassword $secure -Enabled $true -Description $data.description -ErrorAction Stop;"
+            "Get-ADUser -Identity $data.sam | Select-Object SamAccountName,Name,Enabled,DistinguishedName",
+            {"sam": account, "name": display, "path": path, "description": details},
+            timeout=self.timeout,
+            extra_environment={"ULTK_LOCAL_USER_PASSWORD": password},
+        )
+
     def ad_user_state(self, distinguished_name: str, enabled: bool) -> dict[str, Any]:
         self._windows("Active Directory user management")
         self._require_module("ActiveDirectory")
@@ -1356,6 +1384,7 @@ def create_advanced_powershell_tools(
     # Active Directory and Group Policy.
     add("powershell.ad_list_users", "List bounded AD users within a host-allowlisted domain/search base.", {"domain": s, "search_base": s}, ["domain", "search_base"], "powershell:read:active_directory", pack.ad_users, 60)
     add("powershell.ad_list_groups", "List bounded AD groups within a host-allowlisted domain/search base.", {"domain": s, "search_base": s}, ["domain", "search_base"], "powershell:read:active_directory", pack.ad_groups, 60)
+    add("powershell.ad_create_user", "Create one AD user whose expected DN and OU are host-allowlisted, using a host-injected password secret.", {"sam_account_name": name, "name": s, "domain": s, "path": s, "description": {"type": "string", "maxLength": 256}}, ["sam_account_name", "name", "domain", "path"], "powershell:active_directory:user:create", pack.ad_user_create, 60)
     add("powershell.ad_enable_user", "Enable one host-allowlisted Active Directory user DN.", {"distinguished_name": s}, ["distinguished_name"], "powershell:active_directory:user:write", lambda distinguished_name: pack.ad_user_state(distinguished_name, True), 60)
     add("powershell.ad_disable_user", "Disable one host-allowlisted Active Directory user DN.", {"distinguished_name": s}, ["distinguished_name"], "powershell:active_directory:user:disable", lambda distinguished_name: pack.ad_user_state(distinguished_name, False), 60)
     add("powershell.ad_remove_user", "Remove one host-allowlisted Active Directory user DN.", {"distinguished_name": s}, ["distinguished_name"], "powershell:active_directory:user:delete", pack.ad_user_remove, 60)
