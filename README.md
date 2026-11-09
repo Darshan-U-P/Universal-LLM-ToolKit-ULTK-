@@ -2,7 +2,7 @@
 
 A provider-independent, extensible tool execution framework for compatible large language models.
 
-**Status:** Architecture and foundation stage. This repository describes the target architecture and roadmap; it does not yet contain a production agent runtime or the complete tool catalog.
+**Status:** Pre-alpha, partial implementation. Core runtime contracts and several built-in tool packs are present on sequential feature branches, but these branches are not yet integrated, comprehensively tested, or production-ready. See [the verification ledger](docs/VERIFICATION_LEDGER.md) for known failures and deferred checks.
 
 ## Vision
 
@@ -19,6 +19,18 @@ Connect an LLM to a governed, discoverable ecosystem of tools through one consis
 - Local and remote execution modes with distinct security boundaries.
 - Structured telemetry with secret redaction.
 - Honest provider capability negotiation; not all models support native tool calling.
+
+## Implemented foundations (not yet fully validated)
+
+Feature branches currently contain:
+- Core provider-neutral tool contracts, registry, JSON Schema validation, capability policies, bounded dispatcher and mock provider.
+- Filesystem, system inspection, terminal/process, computer/GUI, browser and development tool packs.
+- Persistent approval requests, exact-argument one-time approval, SQLite audit hash chain and dependency-aware workflow DAG execution.
+- Bounded CSV/JSON and SQLite database tools.
+- Read-only text extraction for TXT/Markdown, PDF, DOCX, PPTX and XLSX.
+- Host-configured HTTPS REST endpoints with host-held credentials and opt-in mutation methods.
+
+This list is an implementation snapshot, not a claim that the features have passed final integration tests. See [docs/VERIFICATION_LEDGER.md](docs/VERIFICATION_LEDGER.md).
 
 ## Architecture
 
@@ -57,7 +69,7 @@ Cross-cutting services: configuration and secret references, session state, opti
 
 ## Planned tool domains
 
-This taxonomy is a roadmap, not an implementation inventory.
+The taxonomy below remains a roadmap; a domain may have only partial initial support.
 
 | Domain | Planned capabilities |
 |---|---|
@@ -74,7 +86,7 @@ This taxonomy is a roadmap, not an implementation inventory.
 | Integrations | REST, GraphQL, WebSocket, OAuth, webhooks, MCP, third-party SDKs |
 | Productivity/business | tasks, projects, notes, reminders, knowledge bases, commerce, analytics |
 | Security | credential references, authentication, authorization, sandboxing, audit, redaction |
-| Advanced agents | delegation, multi-agent coordination, reflection, scheduling, resumable jobs |
+| Advanced agents | delegation, multi-agent coordination, reflection, resumable jobs |
 
 ## Proposed layout
 
@@ -183,8 +195,4 @@ This is an illustrative target API, not an implemented interface in this archite
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [Architecture](docs/ARCHITECTURE.md), [Roadmap](docs/ROADMAP.md), [Tool Catalog](docs/TOOL_CATALOG.md), [Security](docs/SECURITY.md), and [Plugin Development](docs/PLUGIN_DEVELOPMENT.md).
-
-## License
-
-A license will be selected and added before the first implementation release.
+See [CONTRIBUTING.md](CONTRIBUTING.md), [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), and the [verification ledger](docs/VERIFICATION_LEDGER.md).
