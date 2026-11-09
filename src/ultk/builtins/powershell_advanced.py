@@ -7,11 +7,14 @@ host-side resource allowlists. No generic model-supplied script runner is expose
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import queue
 import re
 import subprocess
+import shutil
+import tempfile
 import threading
 import uuid
 from pathlib import Path
@@ -431,6 +434,7 @@ class AdvancedPowerShellToolPack:
         allowed_audit_subcategories: frozenset[str] = frozenset(),
         allow_security_policy_changes: bool = False,
         allow_audit_disable: bool = False,
+        approved_security_templates: Mapping[str, Mapping[str, Any]] | None = None,
         timeout_seconds: int = 30,
     ) -> None:
         self.base = base
@@ -504,6 +508,7 @@ class AdvancedPowerShellToolPack:
         self.allowed_audit = frozenset(allowed_audit_subcategories)
         self.allow_security = allow_security_policy_changes
         self.allow_audit_disable = allow_audit_disable
+        self.security_templates = {key: dict(value) for key, value in (approved_security_templates or {}).items()}
         self.sessions = PersistentPowerShellSessions(
             base.executable, base.root, allowed_session_commands, min(base.timeout, timeout_seconds),
             base.max_output, self.allowed_computers, self.allowed_remote_commands,
@@ -1244,6 +1249,7 @@ def create_advanced_powershell_tools(
     allowed_audit_subcategories: frozenset[str] = frozenset(),
     allow_security_policy_changes: bool = False,
     allow_audit_disable: bool = False,
+    approved_security_templates: Mapping[str, Mapping[str, Any]] | None = None,
     timeout_seconds: int = 30,
 ) -> tuple[FunctionTool, ...]:
     """Build the advanced PowerShell tool families under explicit host configuration."""
@@ -1270,6 +1276,7 @@ def create_advanced_powershell_tools(
         allowed_audit_subcategories=allowed_audit_subcategories,
         allow_security_policy_changes=allow_security_policy_changes,
         allow_audit_disable=allow_audit_disable,
+        approved_security_templates=approved_security_templates,
         timeout_seconds=timeout_seconds,
     )
     tools: list[FunctionTool] = []
