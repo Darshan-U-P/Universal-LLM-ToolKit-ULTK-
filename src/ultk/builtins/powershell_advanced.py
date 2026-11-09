@@ -625,6 +625,8 @@ class AdvancedPowerShellToolPack:
 
     def firewall_state(self, name: str, enabled: bool) -> dict[str, Any]:
         self._windows("firewall management")
+        if type(enabled) is not bool:
+            raise ToolExecutionError("enabled must be boolean.")
         rule_name = self._firewall_name(name)
         command = "Enable-NetFirewallRule" if enabled else "Disable-NetFirewallRule"
         return self.base._run(
@@ -678,6 +680,8 @@ class AdvancedPowerShellToolPack:
 
     def local_user_enabled(self, name: str, enabled: bool) -> dict[str, Any]:
         self._windows("local user management")
+        if type(enabled) is not bool:
+            raise ToolExecutionError("enabled must be boolean.")
         user = self._user(name)
         command = "Enable-LocalUser" if enabled else "Disable-LocalUser"
         return self.base._run(f"{command} -Name $data.name -ErrorAction Stop | Select-Object Name,Enabled",
@@ -691,6 +695,8 @@ class AdvancedPowerShellToolPack:
 
     def local_group_member(self, user_name: str, group_name: str, add: bool) -> dict[str, Any]:
         self._windows("local group management")
+        if type(add) is not bool:
+            raise ToolExecutionError("add must be boolean.")
         user, group = self._user(user_name), self._group(group_name)
         command = "Add-LocalGroupMember" if add else "Remove-LocalGroupMember"
         return self.base._run(
@@ -750,6 +756,8 @@ class AdvancedPowerShellToolPack:
 
     def disk_online(self, number: int, online: bool) -> dict[str, Any]:
         self._windows("disk state management")
+        if type(online) is not bool:
+            raise ToolExecutionError("online must be boolean.")
         if not self.allow_storage:
             raise ToolExecutionError("Storage mutations are disabled by host policy.")
         disk = self._disk(number)
@@ -917,6 +925,8 @@ class AdvancedPowerShellToolPack:
 
     def gpo_link(self, name: str, target: str, domain: str, enabled: bool) -> dict[str, Any]:
         self._windows("Group Policy linking")
+        if type(enabled) is not bool:
+            raise ToolExecutionError("enabled must be boolean.")
         self._require_module("GroupPolicy")
         self._ad_domain(domain)
         if name not in self.allowed_gpos or target not in self.allowed_gpo_targets:
@@ -1258,6 +1268,8 @@ class AdvancedPowerShellToolPack:
 
     def audit_policy_set(self, subcategory: str, success: bool, failure: bool) -> dict[str, Any]:
         self._windows("audit policy management")
+        if type(success) is not bool or type(failure) is not bool:
+            raise ToolExecutionError("success and failure must be booleans.")
         if not self.allow_security or subcategory not in self.allowed_audit:
             raise ToolExecutionError("Security policy changes are disabled or subcategory is not host-allowlisted.")
         if (not success or not failure) and not self.allow_audit_disable:
