@@ -78,15 +78,15 @@ def _keyboard(action: str, text: str | None = None, key: str | None = None) -> d
 
 
 def _windows() -> list[dict[str, Any]]:
-    pygetwindow = _optional("pygetwindow")
+    pywinctl = _optional("pywinctl")
     return [{"title": w.title[:300], "left": w.left, "top": w.top,
              "width": w.width, "height": w.height, "active": w.isActive}
-            for w in pygetwindow.getAllWindows() if w.title][:100]
+            for w in pywinctl.getAllWindows() if w.title][:100]
 
 
 def _activate_window(title_contains: str) -> dict[str, str]:
-    pygetwindow = _optional("pygetwindow")
-    matches = [w for w in pygetwindow.getAllWindows()
+    pywinctl = _optional("pywinctl")
+    matches = [w for w in pywinctl.getAllWindows()
                if title_contains.casefold() in w.title.casefold()]
     if len(matches) != 1:
         raise ToolExecutionError("Window selector must match exactly one visible window.")
@@ -116,7 +116,7 @@ def _environment_get(name: str, allowed_names: list[str]) -> dict[str, Any]:
 def create_computer_tools(*, image_root: str | Path = "./screenshots",
                           allowed_apps: dict[str, str] | None = None,
                           allowed_environment_names: tuple[str, ...] = ()) -> tuple[FunctionTool, ...]:
-    """Create computer tools. Dependencies pyautogui, pyperclip and pygetwindow are optional."""
+    """Create computer tools. Dependencies pyautogui, pyperclip and pywinctl are optional."""
     root = str(Path(image_root).expanduser().resolve())
     apps = dict(allowed_apps or {})
     env_names = list(allowed_environment_names)
