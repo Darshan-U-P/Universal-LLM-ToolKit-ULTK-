@@ -158,6 +158,8 @@ def _request(endpoint: Mapping[str, Any], method: str, path: str,
     if body is not None:
         try:
             data = json.dumps(body, ensure_ascii=False, allow_nan=False).encode("utf-8")
+            if len(data) > max_response_bytes:
+                raise ToolExecutionError("JSON request body exceeds the configured size limit.")
         except (TypeError, ValueError) as exc:
             raise ToolExecutionError("Request body must be JSON serializable.") from exc
         headers["Content-Type"] = "application/json"
