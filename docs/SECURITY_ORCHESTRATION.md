@@ -20,7 +20,7 @@ policy = ApprovalPolicy(
 
 The first invocation creates a pending request and returns an error result containing `approval_id`. A trusted application surface displays the request to an authorized person and calls `store.decide(id, approved=True, actor="...")`. The model retries the same tool with the exact arguments. Approval is one-time, session-bound, tool-bound, argument-digest-bound and expires. Changed arguments require new approval. The library deliberately exposes no approval-decision tool to the model.
 
-The approval store persists hashes and metadata, not raw argument values. The application must present a safe, redacted summary and authenticate the approving actor.
+The approval store persists hashes and metadata, not raw argument values. Configure `on_request` on `ApprovalPolicy` (or `ToolEngine.require_approval`) to notify a trusted host UI with an in-memory `ApprovalNotice` containing the exact action context. The host must present a safe, redacted summary and authenticate the approving actor. The callback runs in the dispatch path; keep it bounded and do not let it execute the protected action.
 
 ## Audit trail
 
