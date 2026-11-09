@@ -95,7 +95,8 @@ class PowerShellToolPack:
             self.approved_scripts[script_id] = candidate
 
     def _run(self, source: str, payload: dict[str, Any] | None = None,
-             *, timeout: int | None = None) -> dict[str, Any]:
+             *, timeout: int | None = None,
+             extra_environment: Mapping[str, str] | None = None) -> dict[str, Any]:
         payload_b64 = base64.b64encode(
             json.dumps(payload or {}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         ).decode("ascii")
@@ -115,6 +116,10 @@ class PowerShellToolPack:
         env = {key: value for key, value in os.environ.items()
                if key.upper() in {"SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATH", "PATHEXT", "PSMODULEPATH"}}
         env["POWERSHELL_TELEMETRY_OPTOUT"] = "1"
+        for key, value in (extra_environment or {}).items():
+            if not key.startswith("ULTK_") or not isinstance(value, str) or "\x00" in value:
+                raise ToolExecutionError("Extra PowerShell environment values must use trusted ULTK_ names.")
+            env[key] = value
         try:
             result = subprocess.run(command, cwd=self.root, env=env, stdin=subprocess.DEVNULL,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
