@@ -199,6 +199,8 @@ print(result.text)
 
 This is an illustrative target API, not an implemented interface in this architecture-only milestone. An LLM API key configures the model connection; third-party services may require separate credentials and permissions.
 
+A dedicated PowerShell-native tool pack is available on the PowerShell feature branch, covering Windows administration, processes, services, networking, registry reads, event logs, scheduled tasks, modules and host-pinned scripts.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), and the [verification ledger](docs/VERIFICATION_LEDGER.md).
