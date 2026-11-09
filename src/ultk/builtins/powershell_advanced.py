@@ -240,7 +240,8 @@ class PersistentPowerShellSessions:
         return {"session_id": session_id, "label": record["label"], "status": "open",
                 "allowed_commands": sorted(self.allowed_commands)}
 
-    def _request(self, session_id: str, action: str, **payload: Any) -> dict[str, Any]:
+    def _request(self, session_id: str, action: str, *, request_timeout: int | None = None,
+                 **payload: Any) -> dict[str, Any]:
         with self._lock:
             record = self._sessions.get(session_id)
         if record is None:
@@ -256,7 +257,7 @@ class PersistentPowerShellSessions:
             try:
                 process.stdin.write(request + "\n")
                 process.stdin.flush()
-                line = record["responses"].get(timeout=self.timeout)
+                line = record["responses"].get(timeout=request_timeout or self.timeout)
             except (BrokenPipeError, OSError) as exc:
                 raise ToolExecutionError("PowerShell session pipe failed.") from exc
             except queue.Empty as exc:
@@ -284,7 +285,8 @@ class PersistentPowerShellSessions:
             raise ToolExecutionError("use_ssl must be boolean.")
         local = self.open(label)
         try:
-            remote = self._request(local["session_id"], "remote_open", computer=host, use_ssl=use_ssl)
+            remote = self._request(local["session_id"], "remote_open", request_timeout=min(120, max(self.timeout, 60)),
+                                   computer=host, use_ssl=use_ssl)
         except ToolExecutionError:
             self.close(local["session_id"])
             raise
