@@ -162,9 +162,9 @@ class PowerShellToolPack:
         finally:
             for reader in readers:
                 reader.join(timeout=2)
-            if process.stdout:
+            if not readers[0].is_alive() and process.stdout:
                 process.stdout.close()
-            if process.stderr:
+            if not readers[1].is_alive() and process.stderr:
                 process.stderr.close()
 
         stdout = bytes(captured["stdout"][:self.max_output]).decode("utf-8", errors="replace")
