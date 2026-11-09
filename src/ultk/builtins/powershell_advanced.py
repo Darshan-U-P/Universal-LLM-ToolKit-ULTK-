@@ -304,6 +304,7 @@ class AdvancedPowerShellToolPack:
         allowed_update_kbs: frozenset[str] = frozenset(),
         allow_windows_update_install: bool = False,
         allowed_disk_numbers: frozenset[int] = frozenset(),
+        allowed_drive_letters: frozenset[str] = frozenset(),
         allow_storage_mutations: bool = False,
         allowed_certificate_stores: frozenset[str] = frozenset({"Cert:\\CurrentUser\\My"}),
         allowed_certificate_thumbprints: frozenset[str] = frozenset(),
@@ -322,6 +323,7 @@ class AdvancedPowerShellToolPack:
         approved_task_templates: Mapping[str, Mapping[str, str]] | None = None,
         allowed_audit_subcategories: frozenset[str] = frozenset(),
         allow_security_policy_changes: bool = False,
+        allow_audit_disable: bool = False,
         timeout_seconds: int = 30,
     ) -> None:
         self.base = base
@@ -358,6 +360,9 @@ class AdvancedPowerShellToolPack:
         self.allowed_kbs = frozenset(item.upper() for item in allowed_update_kbs)
         self.allow_update_install = allow_windows_update_install
         self.allowed_disks = frozenset(allowed_disk_numbers)
+        self.allowed_drive_letters = frozenset(item.upper() for item in allowed_drive_letters)
+        if any(not re.fullmatch(r"[D-Z]", item) for item in self.allowed_drive_letters):
+            raise ToolExecutionError("Drive-letter allowlist must contain letters D through Z.")
         self.allow_storage = allow_storage_mutations
         self.allowed_cert_stores = frozenset(allowed_certificate_stores)
         self.allowed_cert_thumbprints = frozenset(item.replace(" ", "").upper() for item in allowed_certificate_thumbprints)
@@ -376,6 +381,7 @@ class AdvancedPowerShellToolPack:
         self.task_templates = {key: dict(value) for key, value in (approved_task_templates or {}).items()}
         self.allowed_audit = frozenset(allowed_audit_subcategories)
         self.allow_security = allow_security_policy_changes
+        self.allow_audit_disable = allow_audit_disable
         self.sessions = PersistentPowerShellSessions(
             base.executable, base.root, allowed_session_commands, min(base.timeout, timeout_seconds),
             base.max_output,
@@ -968,6 +974,37 @@ class AdvancedPowerShellToolPack:
             "Select-Object DiskNumber,PartitionNumber,Size",
             {"disk": disk, "partition": partition_number, "size": size_bytes}, timeout=self.timeout)
 
+
+    def partition_set_drive_letter(self, disk_number: int, partition_number: int,
+                                    drive_letter: str) -> dict[str, Any]:
+        self._windows("partition drive-letter management")
+        if not self.allow_storage:
+            raise ToolExecutionError("Storage mutations are disabled by host policy.")
+        disk = self._disk(disk_number)
+        if type(partition_number) is not int or partition_number < 1:
+            raise ToolExecutionError("Partition number must be positive.")
+        letter = self._value(drive_letter, "drive letter", 1).upper()
+        if letter not in self.allowed_drive_letters:
+            raise ToolExecutionError("Drive letter is not host-allowlisted.")
+        return self.base._run(
+            "Set-Partition -DiskNumber $data.disk -PartitionNumber $data.partition "
+            "-NewDriveLetter $data.letter -ErrorAction Stop | "
+            "Select-Object DiskNumber,PartitionNumber,DriveLetter",
+            {"disk": disk, "partition": partition_number, "letter": letter}, timeout=self.timeout)
+
+    def volume_set_label(self, drive_letter: str, label: str) -> dict[str, Any]:
+        self._windows("volume label management")
+        if not self.allow_storage:
+            raise ToolExecutionError("Storage mutations are disabled by host policy.")
+        letter = self._value(drive_letter, "drive letter", 1).upper()
+        if letter not in self.allowed_drive_letters:
+            raise ToolExecutionError("Drive letter is not host-allowlisted.")
+        title = self._value(label, "volume label", 32)
+        return self.base._run(
+            "Set-Volume -DriveLetter $data.letter -NewFileSystemLabel $data.label -ErrorAction Stop | "
+            "Select-Object DriveLetter,FileSystemLabel,FileSystem,HealthStatus",
+            {"letter": letter, "label": title}, timeout=self.timeout)
+
     def security_inspect(self) -> dict[str, Any]:
         self._windows("security policy inspection")
         return self.base._run(
@@ -981,6 +1018,8 @@ class AdvancedPowerShellToolPack:
         self._windows("audit policy management")
         if not self.allow_security or subcategory not in self.allowed_audit:
             raise ToolExecutionError("Security policy changes are disabled or subcategory is not host-allowlisted.")
+        if (not success or not failure) and not self.allow_audit_disable:
+            raise ToolExecutionError("Disabling audit categories requires the separate allow_audit_disable host opt-in.")
         success_arg = "enable" if success else "disable"
         failure_arg = "enable" if failure else "disable"
         return self.base._run(
@@ -1015,6 +1054,7 @@ def create_advanced_powershell_tools(
     allowed_update_kbs: frozenset[str] = frozenset(),
     allow_windows_update_install: bool = False,
     allowed_disk_numbers: frozenset[int] = frozenset(),
+    allowed_drive_letters: frozenset[str] = frozenset(),
     allow_storage_mutations: bool = False,
     allowed_certificate_stores: frozenset[str] = frozenset({"Cert:\\CurrentUser\\My"}),
     allowed_certificate_thumbprints: frozenset[str] = frozenset(),
@@ -1033,6 +1073,7 @@ def create_advanced_powershell_tools(
     approved_task_templates: Mapping[str, Mapping[str, str]] | None = None,
     allowed_audit_subcategories: frozenset[str] = frozenset(),
     allow_security_policy_changes: bool = False,
+    allow_audit_disable: bool = False,
 ) -> tuple[FunctionTool, ...]:
     """Build the advanced PowerShell tool families under explicit host configuration."""
     pack = AdvancedPowerShellToolPack(
@@ -1043,7 +1084,8 @@ def create_advanced_powershell_tools(
         allowed_local_users=allowed_local_users, allowed_local_groups=allowed_local_groups,
         local_user_password_env=local_user_password_env, allowed_update_kbs=allowed_update_kbs,
         allow_windows_update_install=allow_windows_update_install,
-        allowed_disk_numbers=allowed_disk_numbers, allow_storage_mutations=allow_storage_mutations,
+        allowed_disk_numbers=allowed_disk_numbers, allowed_drive_letters=allowed_drive_letters,
+        allow_storage_mutations=allow_storage_mutations,
         allowed_certificate_stores=allowed_certificate_stores,
         allowed_certificate_thumbprints=allowed_certificate_thumbprints,
         allowed_install_modules=allowed_install_modules, allowed_package_names=allowed_package_names,
@@ -1056,6 +1098,7 @@ def create_advanced_powershell_tools(
         approved_task_templates=approved_task_templates,
         allowed_audit_subcategories=allowed_audit_subcategories,
         allow_security_policy_changes=allow_security_policy_changes,
+        allow_audit_disable=allow_audit_disable,
     )
     tools: list[FunctionTool] = []
 
@@ -1145,6 +1188,8 @@ def create_advanced_powershell_tools(
     add("powershell.list_volumes", "List Windows volumes and free space.", empty, [], "powershell:read:storage", pack.volumes)
     add("powershell.set_disk_online", "Bring one host-allowlisted disk online or offline.", {"disk_number": {"type": "integer", "minimum": 0}, "online": {"type": "boolean"}}, ["disk_number", "online"], "powershell:storage:state", pack.disk_online)
     add("powershell.initialize_disk", "Initialize only a host-allowlisted RAW disk as GPT or MBR.", {"disk_number": {"type": "integer", "minimum": 0}, "partition_style": {"type": "string", "enum": ["GPT", "MBR"]}}, ["disk_number", "partition_style"], "powershell:storage:initialize", pack.disk_initialize)
+    add("powershell.set_partition_drive_letter", "Assign a host-allowlisted drive letter to a partition on a host-allowlisted disk.", {"disk_number": {"type": "integer", "minimum": 0}, "partition_number": {"type": "integer", "minimum": 1}, "drive_letter": {"type": "string", "pattern": "^[D-Zd-z]$"}}, ["disk_number", "partition_number", "drive_letter"], "powershell:storage:partition:driveletter", pack.partition_set_drive_letter)
+    add("powershell.set_volume_label", "Change the label of a host-allowlisted volume drive letter.", {"drive_letter": {"type": "string", "pattern": "^[D-Zd-z]$"}, "label": {"type": "string", "minLength": 1, "maxLength": 32}}, ["drive_letter", "label"], "powershell:storage:volume:label", pack.volume_set_label)
     add("powershell.resize_partition", "Resize a partition only within the size bounds reported by Windows Storage cmdlets.", {"disk_number": {"type": "integer", "minimum": 0}, "partition_number": {"type": "integer", "minimum": 1}, "size_bytes": {"type": "integer", "minimum": 1048576, "maximum": 2000000000000}}, ["disk_number", "partition_number", "size_bytes"], "powershell:storage:partition:resize", pack.partition_resize)
     add("powershell.create_partition", "Create a bounded partition on one host-allowlisted disk; formatting is not exposed.", {"disk_number": {"type": "integer", "minimum": 0}, "size_bytes": {"type": "integer", "minimum": 1048576, "maximum": 2000000000000}, "drive_letter": {"type": ["string", "null"], "pattern": "^[D-Zd-z]$"}}, ["disk_number", "size_bytes"], "powershell:storage:partition:create", pack.partition_create)
 
