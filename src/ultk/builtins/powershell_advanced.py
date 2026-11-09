@@ -1402,11 +1402,13 @@ def create_advanced_powershell_tools(
     def remote(computer: str, command: str, parameters: dict[str, Any] | None = None,
                use_ssl: bool = True) -> dict[str, Any]:
         pack._windows("PowerShell remoting")
-        host = pack._value(computer, "remote computer", 255)
+        host = _computer_name(pack._value(computer, "remote computer", 255))
         if host.casefold() not in pack.allowed_computers:
             raise ToolExecutionError("Remote computer is not host-allowlisted.")
         if type(use_ssl) is not bool:
             raise ToolExecutionError("use_ssl must be boolean.")
+        if not use_ssl and not pack.allow_insecure_remoting:
+            raise ToolExecutionError("Non-SSL WinRM requires the separate allow_insecure_remoting host opt-in.")
         if command not in pack.allowed_remote_commands:
             raise ToolExecutionError("Remote cmdlet is not host-allowlisted.")
         if command.casefold() in {"invoke-expression", "add-type", "start-process", "set-executionpolicy", "invoke-command", "new-pssession"}:
