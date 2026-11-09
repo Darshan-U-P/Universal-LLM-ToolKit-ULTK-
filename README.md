@@ -33,6 +33,7 @@ Feature branches currently contain:
 - An explicitly trusted Python entry-point plugin SDK/manager with metadata-only discovery and enable/disable lifecycle.
 - Bounded Pillow image operations and host-configured FFmpeg/ffprobe media processing.
 - A host-configured TLS SMTP email sender with recipient allowlists and plain-text messages.
+- A dedicated Git repository tool pack for inspection, branch lifecycle, staging/commits, diffs, merge/conflict workflows, history, tags and allowlisted HTTPS remotes.
 
 This list is an implementation snapshot, not a claim that the features have passed final integration tests. See [docs/VERIFICATION_LEDGER.md](docs/VERIFICATION_LEDGER.md).
 
