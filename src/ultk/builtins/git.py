@@ -123,10 +123,9 @@ class GitRepository:
     @staticmethod
     def _safe_remote_url(url: str) -> str:
         parsed = urlsplit(url)
-        if parsed.username or parsed.password:
-            host = parsed.hostname or ""
-            port = f":{parsed.port}" if parsed.port else ""
-            return f"{parsed.scheme}://[credentials-redacted]@{host}{port}{parsed.path}"
+        if "@" in parsed.netloc:
+            host = parsed.netloc.rsplit("@", 1)[-1]
+            return f"{parsed.scheme}://[credentials-redacted]@{host}{parsed.path}"
         return url
 
     def inspect(self) -> dict[str, Any]:
