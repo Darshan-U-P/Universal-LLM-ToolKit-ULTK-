@@ -4,8 +4,8 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import os
-import tempfile
 import socket
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -13,8 +13,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
-from ultk.exceptions import ToolExecutionError
 from ultk.builtins._common import FunctionTool, object_schema
+from ultk.exceptions import ToolExecutionError
 
 
 def _validate_public_url(url: str) -> str:
