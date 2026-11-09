@@ -61,6 +61,7 @@ def _validate_endpoint(alias: str, config: Mapping[str, Any]) -> dict[str, Any]:
         "hostname": parsed.hostname.casefold(),
         "port": parsed.port or 443,
         "prefixes": prefixes,
+        "base_path": parsed.path.rstrip("/"),
         "write_methods": methods,
         "token_env": token_env,
         "token_header": str(config.get("token_header", "Authorization")),
@@ -82,7 +83,9 @@ def _build_url(endpoint: Mapping[str, Any], path: str,
         raise ToolExecutionError("API path traversal is not allowed.")
     relative = decoded_path.lstrip("/")
     if not any(
-        relative == prefix.rstrip("/") or relative.startswith(prefix.rstrip("/") + "/")
+        not prefix
+        or relative == prefix.rstrip("/")
+        or relative.startswith(prefix.rstrip("/") + "/")
         for prefix in endpoint["prefixes"]
     ):
         raise ToolExecutionError("API path is outside the configured path prefixes.")
@@ -116,9 +119,15 @@ def _allowed_redirect(endpoint: Mapping[str, Any], url: str) -> bool:
         or parsed.password is not None
     ):
         return False
-    path = urllib.parse.unquote(parsed.path).lstrip("/")
+    path = urllib.parse.unquote(parsed.path)
+    base_path = str(endpoint["base_path"])
+    if base_path and not (path == base_path or path.startswith(base_path + "/")):
+        return False
+    relative_path = path[len(base_path):].lstrip("/")
     return any(
-        path == prefix.rstrip("/") or path.startswith(prefix.rstrip("/") + "/")
+        not prefix
+        or relative_path == prefix.rstrip("/")
+        or relative_path.startswith(prefix.rstrip("/") + "/")
         for prefix in endpoint["prefixes"]
     )
 
