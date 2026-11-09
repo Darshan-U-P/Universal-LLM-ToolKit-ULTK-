@@ -355,6 +355,10 @@ class AdvancedPowerShellToolPack:
         forbidden_folded = {command.casefold() for command in forbidden_commands}
         if any(command.casefold() in forbidden_folded for command in allowed_session_commands):
             raise ToolExecutionError("Persistent session allowlist includes a blocked high-risk cmdlet.")
+        if not 1 <= timeout_seconds <= 120:
+            raise ToolExecutionError("Advanced PowerShell timeout must be between 1 and 120 seconds.")
+        if local_user_password_env is not None and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", local_user_password_env):
+            raise ToolExecutionError("Local user password environment variable name is invalid.")
         self.timeout = timeout_seconds
         self.allowed_computers = frozenset(item.casefold() for item in allowed_computers)
         if any(not _NAME.fullmatch(command) for command in allowed_remote_commands):
@@ -488,6 +492,8 @@ class AdvancedPowerShellToolPack:
             raise ToolExecutionError("Invalid firewall direction or action.")
         if protocol not in {"TCP", "UDP", "Any"} or profile not in {"Domain", "Private", "Public", "Any"}:
             raise ToolExecutionError("Invalid firewall protocol or profile.")
+        if type(enabled) is not bool or (protocol == "Any" and (local_port is not None or remote_port is not None)):
+            raise ToolExecutionError("Firewall enabled must be boolean; ports require TCP or UDP.")
         for port in (local_port, remote_port):
             if port is not None and (type(port) is not int or not 1 <= port <= 65535):
                 raise ToolExecutionError("Firewall ports must be integers from 1 to 65535.")
@@ -826,10 +832,12 @@ class AdvancedPowerShellToolPack:
             raise ToolExecutionError("Days are only valid for weekly schedules.")
         template = self.task_templates[template_id]
         executable = template.get("executable", "")
-        if not executable or not Path(executable).is_absolute():
-            raise ToolExecutionError("Approved task template must specify an absolute executable path.")
+        if not executable or not Path(executable).is_absolute() or not Path(executable).is_file():
+            raise ToolExecutionError("Approved task template must specify an existing absolute executable file.")
         arguments = template.get("arguments", "")
         working = template.get("working_directory", str(self.base.root))
+        if not isinstance(arguments, str) or len(arguments) > 2000 or not isinstance(working, str) or not Path(working).is_absolute() or not Path(working).is_dir():
+            raise ToolExecutionError("Approved task template arguments or working directory are invalid.")
         payload = {"name": name, "path": task_path, "executable": executable, "arguments": arguments,
                    "working": working, "schedule": schedule, "at": at, "days": week_days}
         return self.base._run(
@@ -1152,6 +1160,8 @@ def create_advanced_powershell_tools(
         host = pack._value(computer, "remote computer", 255)
         if host.casefold() not in pack.allowed_computers:
             raise ToolExecutionError("Remote computer is not host-allowlisted.")
+        if type(use_ssl) is not bool:
+            raise ToolExecutionError("use_ssl must be boolean.")
         if command not in pack.allowed_remote_commands:
             raise ToolExecutionError("Remote cmdlet is not host-allowlisted.")
         if command.casefold() in {"invoke-expression", "add-type", "start-process", "set-executionpolicy", "invoke-command", "new-pssession"}:
