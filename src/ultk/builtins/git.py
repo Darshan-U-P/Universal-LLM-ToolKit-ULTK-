@@ -47,6 +47,7 @@ class GitRepository:
                 "-c", "diff.external=",
                 "-c", "protocol.allow=never",
                 "-c", "protocol.https.allow=always",
+                "-c", "http.followRedirects=false",
                 "--no-pager", *args,
             ]
             env = os.environ.copy()
@@ -111,20 +112,28 @@ class GitRepository:
 
     def _remote(self, remote: str) -> tuple[str, str]:
         name = self._name(remote, "remote name")
-        url = self._run(["remote", "get-url", name])["stdout"].strip()
+        fetch_urls = self._run(["remote", "get-url", name])["stdout"].splitlines()
+        push_urls = self._run(["remote", "get-url", "--push", name])["stdout"].splitlines()
+        if len(fetch_urls) != 1 or len(push_urls) != 1:
+            raise ToolExecutionError("Remote must have exactly one fetch URL and one push URL.")
+        self._validate_remote_url(fetch_urls[0])
+        self._validate_remote_url(push_urls[0])
+        return name, fetch_urls[0]
+
+    @staticmethod
+    def _safe_remote_url(url: str) -> str:
         parsed = urlsplit(url)
-        host = (parsed.hostname or "").casefold().rstrip(".")
-        if parsed.scheme != "https" or not host or parsed.username or parsed.password:
-            raise ToolExecutionError("Remote URL must be HTTPS and must not embed credentials.")
-        if parsed.port not in (None, 443) or host not in self.allowed_remote_hosts:
-            raise ToolExecutionError("Remote host is not in the host-configured HTTPS allowlist.")
-        return name, url
+        if parsed.username or parsed.password:
+            host = parsed.hostname or ""
+            port = f":{parsed.port}" if parsed.port else ""
+            return f"{parsed.scheme}://[credentials-redacted]@{host}{port}{parsed.path}"
+        return url
 
     def inspect(self) -> dict[str, Any]:
         status = self._run(["status", "--porcelain=v1", "--branch", "-z"])
         branch = self._run(["branch", "--show-current"])["stdout"].strip()
         head = self._run(["rev-parse", "HEAD"])["stdout"].strip()
-        remotes = self._run(["remote", "-v"])["stdout"].splitlines()
+        remotes = self.remotes()["remotes"]
         branches = self._run(["for-each-ref", "--format=%(refname:short)%09%(objectname:short)%09%(upstream:short)", "refs/heads", "refs/remotes"])["stdout"].splitlines()
         return {
             "root": str(self.root), "branch": branch or None, "detached": not bool(branch),
@@ -253,16 +262,25 @@ class GitRepository:
         return {"tags": self._run(["tag", "--list", "--format=%(refname:short)%09%(objectname:short)%09%(subject)"])["stdout"].splitlines()}
 
     def remotes(self) -> dict[str, Any]:
-        return {"remotes": self._run(["remote", "-v"])["stdout"].splitlines()}
+        names = self._run(["remote"])["stdout"].splitlines()
+        records = []
+        for name in names:
+            urls = self._run(["remote", "get-url", "--all", name])["stdout"].splitlines()
+            records.append({"name": name, "urls": [self._safe_remote_url(url) for url in urls]})
+        return {"remotes": records}
 
     def _validate_remote_url(self, url: str) -> None:
         if not isinstance(url, str) or len(url) > 2000:
             raise ToolExecutionError("Invalid remote URL.")
-        parsed = urlsplit(url)
+        try:
+            parsed = urlsplit(url)
+            port = parsed.port
+        except ValueError as exc:
+            raise ToolExecutionError("Malformed remote URL.") from exc
         host = (parsed.hostname or "").casefold().rstrip(".")
-        if parsed.scheme != "https" or not host or parsed.username or parsed.password:
-            raise ToolExecutionError("Only HTTPS remote URLs without embedded credentials are supported.")
-        if parsed.port not in (None, 443) or host not in self.allowed_remote_hosts:
+        if parsed.scheme != "https" or not host or parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ToolExecutionError("Only HTTPS remote URLs without credentials, query or fragment are supported.")
+        if port not in (None, 443) or host not in self.allowed_remote_hosts:
             raise ToolExecutionError("Remote host is not in the host-configured HTTPS allowlist.")
 
     def add_remote(self, name: str, url: str) -> dict[str, Any]:
