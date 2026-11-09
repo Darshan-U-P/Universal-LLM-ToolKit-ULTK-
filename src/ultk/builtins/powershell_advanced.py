@@ -183,8 +183,8 @@ class PersistentPowerShellSessions:
         )
 
     def open(self, label: str) -> dict[str, Any]:
-        if not self.allowed_commands and not self.allowed_remote_commands:
-            raise ToolExecutionError("Persistent sessions are disabled until the host configures local or remote cmdlet allowlists.")
+        if not self.allowed_commands and (not self.allowed_remote_commands or not self.allowed_computers):
+            raise ToolExecutionError("Persistent sessions require local cmdlet allowlists or both remote host and cmdlet allowlists.")
         if not isinstance(label, str) or not label.strip() or len(label) > 100:
             raise ToolExecutionError("Session label must be 1–100 characters.")
         encoded = base64.b64encode(self._wrapper().encode("utf-16le")).decode("ascii")
