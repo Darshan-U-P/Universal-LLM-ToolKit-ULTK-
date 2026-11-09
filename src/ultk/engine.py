@@ -108,6 +108,10 @@ class ToolEngine:
             max_rows=max_rows,
         ))
 
+    def install_email_tools(self, **configuration: Any) -> None:
+        from ultk.builtins.communications import create_email_tools
+        self.register_tools(create_email_tools(**configuration))
+
     def install_media_tools(
         self,
         *,
