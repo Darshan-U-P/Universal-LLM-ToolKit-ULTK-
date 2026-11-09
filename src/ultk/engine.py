@@ -97,6 +97,20 @@ class ToolEngine:
             max_rows=max_rows,
         ))
 
+    def install_document_tools(
+        self,
+        *,
+        root_dir: str | Path,
+        max_file_bytes: int = 20_000_000,
+        max_output_chars: int = 50_000,
+    ) -> None:
+        from ultk.builtins.documents import create_document_tools
+        self.register_tools(create_document_tools(
+            root_dir=root_dir,
+            max_file_bytes=max_file_bytes,
+            max_output_chars=max_output_chars,
+        ))
+
     def install_filesystem_tools(self, root_dir: str | Path, *,
                                  max_file_bytes: int = 2_000_000) -> None:
         from ultk.builtins.filesystem import create_filesystem_tools
