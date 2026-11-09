@@ -227,6 +227,23 @@ class ToolEngine:
         self.register_tools(create_advanced_browser_tools(
             session_root=session_root, monitor_database=monitor_database, notifier=notifier))
 
+    def install_git_tools(
+        self,
+        *,
+        repository_root: str | Path,
+        allowed_remote_hosts: set[str] | frozenset[str] = frozenset(),
+        timeout_seconds: int = 30,
+        max_output_bytes: int = 200_000,
+    ) -> None:
+        """Install repository-scoped Git tools with explicit HTTPS remote allowlisting."""
+        from ultk.builtins.git import create_git_tools
+        self.register_tools(create_git_tools(
+            repository_root=repository_root,
+            allowed_remote_hosts=allowed_remote_hosts,
+            timeout_seconds=timeout_seconds,
+            max_output_bytes=max_output_bytes,
+        ))
+
     def install_development_tools(self, *, project_root: str | Path,
                                   allowed_executables: dict[str, str] | None = None) -> None:
         from ultk.builtins.development import create_development_tools
