@@ -619,6 +619,8 @@ class AdvancedPowerShellToolPack:
     def registry_remove_key(self, path: str) -> dict[str, Any]:
         self._windows("registry write")
         registry_path = self._registry_path(path)
+        if registry_path.rstrip("\\").casefold() in self.allowed_registry_roots:
+            raise ToolExecutionError("Refusing to remove the host-configured registry policy root.")
         return self.base._run(
             "Remove-Item -LiteralPath $data.path -ErrorAction Stop;"
             "@{path=$data.path;removed=$true}",
