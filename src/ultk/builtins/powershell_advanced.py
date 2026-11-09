@@ -1104,8 +1104,8 @@ class AdvancedPowerShellToolPack:
             raise ToolExecutionError("Unsupported Group Policy registry value type.")
         if value_type in {"String", "ExpandString"} and not isinstance(value, str):
             raise ToolExecutionError("String policy values require text.")
-        if value_type in {"DWord", "QWord"} and (type(value) is not int or value < 0):
-            raise ToolExecutionError("Numeric policy values require a non-negative integer.")
+        if value_type in {"DWord", "QWord"} and (type(value) is not int or not 0 <= value <= (2**32 - 1 if value_type == "DWord" else 2**64 - 1)):
+            raise ToolExecutionError("Numeric policy values require an in-range non-negative integer.")
         if value_type == "MultiString" and (not isinstance(value, list) or any(not isinstance(item, str) for item in value)):
             raise ToolExecutionError("MultiString policy values require a list of strings.")
         value_name = self._value(value_name, "policy value name", 256)
