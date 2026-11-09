@@ -22,7 +22,7 @@ dependencies = ["jsonschema>=4.22", "psutil>=6.0"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5", "mypy>=1.10"]
 computer = ["pyautogui>=0.9.54", "pyperclip>=1.9", "PyWinCtl>=0.4.01"]
 browser = ["playwright>=1.48"]
-devtools = ["pytest>=8.0", "ruff>=0.5", "mypy>=1.10"]
+devtools = ["pytest>=8.0", "ruff>=0.5", "mypy>=1.10"]\ndocuments = ["pypdf>=5.0", "python-docx>=1.1", "python-pptx>=1.0", "openpyxl>=3.1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ultk"]
