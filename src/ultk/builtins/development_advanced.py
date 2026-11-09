@@ -58,9 +58,16 @@ class RestrictedInterpreter:
                ast.Mod: operator.mod, ast.Pow: operator.pow}
     _compare = {ast.Eq: operator.eq, ast.NotEq: operator.ne, ast.Lt: operator.lt,
                 ast.LtE: operator.le, ast.Gt: operator.gt, ast.GtE: operator.ge}
+    @staticmethod
+    def _safe_range(*args):
+        values = list(range(*args))
+        if len(values) > 10000:
+            raise ToolExecutionError("Interpreter range is limited to 10000 values.")
+        return values
+
     _builtins = {"abs": abs, "round": round, "min": min, "max": max,
                  "sum": sum, "len": len, "sorted": sorted,
-                 "range": lambda *a: list(range(*a))}
+                 "range": _safe_range.__func__}
 
     def __init__(self):
         self.sessions: dict[str, dict[str, Any]] = {}
@@ -68,7 +75,11 @@ class RestrictedInterpreter:
     def execute(self, session_id: str, source: str) -> dict[str, Any]:
         if not session_id or len(session_id) > 80 or len(source) > 2000:
             raise ToolExecutionError("Invalid session identifier or statement size.")
+        if session_id not in self.sessions and len(self.sessions) >= 1000:
+            raise ToolExecutionError("Interpreter session limit reached.")
         env = self.sessions.setdefault(session_id, {})
+        if len(env) >= 100 and "=" in source and source.split("=", 1)[0].strip() not in env:
+            raise ToolExecutionError("Interpreter variable limit reached.")
         try:
             tree = ast.parse(source, mode="exec")
             if len(tree.body) != 1:
@@ -107,9 +118,14 @@ class RestrictedInterpreter:
             return {self._eval(k, env): self._eval(v, env) for k, v in zip(node.keys, node.values)}
         if isinstance(node, ast.BinOp) and type(node.op) in self._binary:
             left, right = self._eval(node.left, env), self._eval(node.right, env)
-            if isinstance(node.op, ast.Pow) and abs(right) > 100:
+            if isinstance(node.op, ast.Pow) and (not isinstance(right, (int, float)) or abs(right) > 12):
                 raise ToolExecutionError("Exponent is too large.")
-            return self._binary[type(node.op)](left, right)
+            result = self._binary[type(node.op)](left, right)
+            if isinstance(result, (str, list, tuple, dict)) and len(result) > 10000:
+                raise ToolExecutionError("Interpreter result collection is too large.")
+            if isinstance(result, int) and result.bit_length() > 4096:
+                raise ToolExecutionError("Interpreter integer result is too large.")
+            return result
         if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub, ast.Not)):
             value = self._eval(node.operand, env)
             return +value if isinstance(node.op, ast.UAdd) else (-value if isinstance(node.op, ast.USub) else not value)
