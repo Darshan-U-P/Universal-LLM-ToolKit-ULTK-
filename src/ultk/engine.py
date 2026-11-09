@@ -199,6 +199,27 @@ class ToolEngine:
         from ultk.builtins.process_management import create_process_management_tools
         self.register_tools(create_process_management_tools())
 
+    def install_computer_os_tools(
+        self,
+        *,
+        filesystem_root: str | Path = ".",
+        state_database: str | Path = "./ultk_computer_os.sqlite3",
+        allowed_services: frozenset[str] = frozenset(),
+        allow_posix_chmod: bool = True,
+        allow_posix_chown: bool = False,
+        max_output_bytes: int = 200_000,
+    ) -> None:
+        """Install persistent desktop context and cross-platform OS administration tools."""
+        from ultk.builtins.computer_os import create_computer_os_tools
+        self.register_tools(create_computer_os_tools(
+            filesystem_root=filesystem_root,
+            state_database=state_database,
+            allowed_services=allowed_services,
+            allow_posix_chmod=allow_posix_chmod,
+            allow_posix_chown=allow_posix_chown,
+            max_output_bytes=max_output_bytes,
+        ))
+
     def install_computer_tools(self, *, image_root: str | Path = "./screenshots",
                                allowed_apps: dict[str, str] | None = None,
                                allowed_environment_names: tuple[str, ...] = ()) -> None:
