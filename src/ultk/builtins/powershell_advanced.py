@@ -451,6 +451,11 @@ class AdvancedPowerShellToolPack:
         self.allowed_computers = frozenset(item.casefold() for item in allowed_computers)
         if any(not _NAME.fullmatch(command) for command in allowed_remote_commands):
             raise ToolExecutionError("Remote cmdlet allowlist contains an invalid command name.")
+        remote_blocked = {"invoke-expression", "add-type", "start-process", "set-executionpolicy",
+                          "invoke-command", "new-pssession", "remove-pssession", "stop-computer",
+                          "restart-computer", "new-object", "add-member"}
+        if any(command.casefold() in remote_blocked for command in allowed_remote_commands):
+            raise ToolExecutionError("Remote cmdlet allowlist includes a blocked code-execution or session-control command.")
         self.allowed_remote_commands = frozenset(allowed_remote_commands)
         self.allowed_registry_roots = frozenset(item.rstrip("\\").casefold() for item in allowed_registry_roots)
         self.allowed_firewall_names = frozenset(allowed_firewall_rule_names)
