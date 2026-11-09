@@ -30,6 +30,7 @@ The new increments are deliberately sequential and remain unmerged:
 | Plugin SDK/manager | `feat/plugin-sdk-and-manager` | Metadata-only entry-point discovery, host trust allowlist, API compatibility checks, enable/disable lifecycle |
 | Media processing | `feat/media-processing-tool-pack` | Bounded Pillow image tools and host-configured FFmpeg/ffprobe operations |
 | Email | `feat/secure-email-tool-pack` | Host-configured TLS SMTP sender, exact/domain recipient allowlists, plain-text only |
+| Git Tool Pack | `feat/git-toolkit-comprehensive` | Repository inspection, branch/index/commit/diff/merge/conflict/history and HTTPS allowlisted remote operations |
 
 The provider and plugin branches extend the REST integration branch; media extends the plugin branch; email extends media. These are feature branches, not pull requests. Final integration and validation will happen after implementation work is complete.
 
