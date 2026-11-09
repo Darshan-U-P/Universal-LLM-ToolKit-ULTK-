@@ -163,3 +163,20 @@ The provider and plugin branches extend the REST integration branch; media exten
 - [ ] Verify remote pull/push semantics and credentials on real GitHub/GitLab test repositories; push is an externally visible mutation and must require host approval.
 - [ ] Review whether repository-local config can execute filters or credential helpers; untrusted repositories require OS sandboxing.
 - [ ] Confirm capability policies can separately gate each mutating operation.
+
+
+### Dedicated PowerShell Tool Pack — branch feat/dedicated-powershell-tool-pack
+- [ ] Implementation added in src/ultk/builtins/powershell.py; tests authored in tests/test_powershell_tools.py; tests and CI deliberately not run.
+- [ ] Dedicated fixed-cmdlet operations: location/environment, OS/computer/hotfix, process/service, IP/TCP/DNS/firewall, registry read, event logs, scheduled tasks, module discovery, WS-Man reachability, PowerShell script parsing.
+- [ ] Optional script execution requires host-pinned script IDs and SHA-256 hashes; verify race resistance between hash check and execution, symlink/junction behavior, and script-root permissions.
+- [ ] Verify PowerShell 7 and Windows PowerShell 5.1 behavior, encoded command parsing, UTF-8 output, JSON serialization of CIM objects, arrays/null/singletons and error stream handling.
+- [ ] Verify Windows-only cmdlets and optional NetTCPIP/NetSecurity/ScheduledTasks modules across Windows 10/11 and Server SKUs; confirm missing cmdlets fail cleanly.
+- [ ] Verify environment filtering; current environment listing may disclose credentials or tokens present in inherited process environment and should be restricted to host-approved names before production.
+- [ ] Verify service and scheduled-task mutations with least-privilege identities, approval gates, UAC boundaries and protected/system services.
+- [ ] Verify registry path validation, provider-path injection resistance and 32/64-bit registry view behavior.
+- [ ] Verify event-log query performance, Security log access-denied handling and message/output caps.
+- [ ] Verify timeout and child-process cleanup; subprocess.run timeout kills the PowerShell process but may leave child processes spawned by approved scripts.
+- [ ] Verify module discovery does not trigger unsafe module auto-loading; host-allowlisted modules must be treated as trusted executable code.
+- [ ] Verify WS-Man test behavior, host allowlisting, authentication configuration and network egress controls. General-purpose remote command execution is not implemented.
+- [ ] Confirm script execution capability powershell:script:execute and all service/task mutation capabilities are approval-gated by production host policy.
+- [ ] Validate on the user's Windows 11 environment; no Windows integration tests or CI have been run for this increment.
