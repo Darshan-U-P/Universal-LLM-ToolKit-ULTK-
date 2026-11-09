@@ -22,6 +22,24 @@ def _url(value: str) -> str:
     _validate_public_url(value)
     return value
 
+def _form_snapshot(page, selector: str) -> dict[str, Any]:
+    raw = page.locator(selector).first.evaluate("""el => {
+      if(el.tagName!=='FORM') throw new Error('not a form');
+      return {action:el.action,method:(el.method||'get').toUpperCase(),
+        fields:Array.from(el.elements).filter(x=>x.name).slice(0,100).map(x=>({
+          name:x.name,type:x.type||x.tagName.toLowerCase(),required:!!x.required,
+          value:String(x.value||''),checked:!!x.checked,
+          selected_values:x.tagName==='SELECT' ? Array.from(x.selectedOptions).map(o=>o.value) : []
+        }))};
+    }""")
+    for field in raw["fields"]:
+        if field["type"] in {"password", "hidden", "file"}:
+            secret = field.pop("value", "")
+            field["value"] = "[redacted]"
+            field["value_sha256"] = hashlib.sha256(secret.encode("utf-8")).hexdigest()
+    return raw
+
+
 class BrowserControlPlane:
     def __init__(self, root: str | Path, *, headless: bool = True,
                  max_profiles: int = 20, max_tabs: int = _MAX_TABS,
@@ -319,13 +337,7 @@ class BrowserControlPlane:
     def form_preview(self, profile: str, selector: str):
         if not selector or len(selector)>500: raise ToolExecutionError("A bounded form selector is required.")
         def run(ctx,pages,active):
-            snapshot = pages[active].locator(selector).first.evaluate("""el => {
-              if(el.tagName!=='FORM') throw new Error('not a form');
-              return {action:el.action,method:(el.method||'get').toUpperCase(),
-                fields:Array.from(el.elements).filter(x=>x.name).slice(0,100).map(x=>({
-                  name:x.name,type:x.type||x.tagName.toLowerCase(),required:!!x.required,
-                  value:x.type==='password'?'[redacted]':String(x.value||'').slice(0,300)}))};
-            }""")
+            snapshot = _form_snapshot(pages[active], selector)
             fingerprint = hashlib.sha256(json.dumps(snapshot,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
             return {**snapshot, "form_sha256": fingerprint}
         return self._with_context(profile,run)
@@ -335,14 +347,8 @@ class BrowserControlPlane:
             raise ToolExecutionError("A bounded form selector and SHA-256 preview fingerprint are required.")
         def run(ctx,pages,active):
             page=pages[active]; form=page.locator(selector).first
-            snapshot=form.evaluate("""el => {
-              if(el.tagName!=='FORM') throw new Error('not a form');
-              const u=new URL(el.action||location.href,location.href);
-              return {action:u.href,method:(el.method||'get').toUpperCase(),
-                fields:Array.from(el.elements).filter(x=>x.name).slice(0,100).map(x=>({
-                  name:x.name,type:x.type||x.tagName.toLowerCase(),required:!!x.required,
-                  value:x.type==='password'?'[redacted]':String(x.value||'').slice(0,300)}))};
-            }""")
+            snapshot=_form_snapshot(page, selector)
+            snapshot["action"] = page.evaluate("(action) => new URL(action, location.href).href", snapshot["action"])
             fingerprint=hashlib.sha256(json.dumps(snapshot,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
             if fingerprint.casefold()!=expected_form_sha256.casefold():
                 raise ToolExecutionError("Form changed after preview; obtain a fresh preview and approval.")
