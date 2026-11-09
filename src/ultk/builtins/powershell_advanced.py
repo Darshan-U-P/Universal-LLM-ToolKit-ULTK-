@@ -1180,6 +1180,63 @@ class AdvancedPowerShellToolPack:
             "Select-Object DriveLetter,FileSystemLabel,FileSystem,HealthStatus",
             {"letter": letter, "label": title}, timeout=self.timeout)
 
+    def _resolve_security_template(self, template_id: str) -> dict[str, Any]:
+        key = self._name(template_id, "security template ID")
+        template = self.security_templates.get(key)
+        if template is None:
+            raise ToolExecutionError("Security template ID is not host-allowlisted.")
+        relative = self._value(template.get("path"), "security template path", 1000)
+        candidate = Path(relative)
+        if candidate.is_absolute() or ".." in candidate.parts or candidate.suffix.casefold() != ".inf":
+            raise ToolExecutionError("Security template must be a relative INF file under working_root.")
+        lexical = self.base.root
+        for part in candidate.parts:
+            lexical = lexical / part
+            if lexical.is_symlink():
+                raise ToolExecutionError("Security template paths cannot contain symlinks.")
+        path = lexical.resolve()
+        if not path.is_relative_to(self.base.root) or not path.is_file() or path.stat().st_size > 1_000_000:
+            raise ToolExecutionError("Security template must be a regular file under working_root and at most 1 MB.")
+        expected = template.get("sha256")
+        if not isinstance(expected, str) or not re.fullmatch(r"[A-Fa-f0-9]{64}", expected):
+            raise ToolExecutionError("Host security template must include a valid SHA-256 pin.")
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual.casefold() != expected.casefold():
+            raise ToolExecutionError("Security template SHA-256 does not match the host-pinned value.")
+        areas = template.get("areas")
+        allowed_areas = {"securitypolicy", "group_mgmt", "user_rights", "regkeys", "filestore", "services"}
+        if not isinstance(areas, (list, tuple, frozenset)) or not 1 <= len(areas) <= len(allowed_areas):
+            raise ToolExecutionError("Security template must declare 1–6 approved secedit areas.")
+        normalized = [str(area).casefold() for area in areas]
+        if len(set(normalized)) != len(normalized) or any(area not in allowed_areas for area in normalized):
+            raise ToolExecutionError("Security template contains duplicate or unsupported secedit areas.")
+        return {"template_id": key, "path": path, "sha256": expected.casefold(),
+                "areas": normalized}
+
+    def apply_security_template(self, template_id: str) -> dict[str, Any]:
+        self._windows("local security policy template application")
+        if not self.allow_security:
+            raise ToolExecutionError("Local security policy changes are disabled by host policy.")
+        template = self._resolve_security_template(template_id)
+        with tempfile.TemporaryDirectory(prefix="ultk-secedit-", dir=self.base.root) as temporary:
+            staging = Path(temporary)
+            staged_inf = staging / "approved-template.inf"
+            database = staging / "policy.sdb"
+            shutil.copyfile(template["path"], staged_inf)
+            staged_hash = hashlib.sha256(staged_inf.read_bytes()).hexdigest()
+            if staged_hash != template["sha256"]:
+                raise ToolExecutionError("Staged security template failed SHA-256 verification.")
+            result = self.base._run(
+                "$arguments=@('/configure','/db',$data.database,'/cfg',$data.path,'/areas') + "
+                "@($data.areas) + @('/quiet');"
+                "& secedit.exe @arguments;"
+                "if($LASTEXITCODE -ne 0){throw 'secedit returned a non-zero exit code'};"
+                "@{configured=$true;exit_code=$LASTEXITCODE}",
+                {"path": str(staged_inf), "database": str(database), "areas": template["areas"]},
+                timeout=120,
+            )
+        return {"template_id": template["template_id"], "sha256": template["sha256"], **result}
+
     def security_inspect(self) -> dict[str, Any]:
         self._windows("security policy inspection")
         return self.base._run(
@@ -1411,6 +1468,7 @@ def create_advanced_powershell_tools(
     add("powershell.delete_scheduled_task", "Delete one host-allowlisted scheduled task.", {"name": name, "task_path": s}, ["name", "task_path"], "powershell:tasks:delete", pack.tasks_delete)
 
     # Security policy.
+    add("powershell.apply_security_template", "Apply one host-approved SHA-256-pinned local security INF template for explicitly approved secedit areas.", {"template_id": name}, ["template_id"], "powershell:security:template:apply", pack.apply_security_template, 130)
     add("powershell.inspect_security_policy", "Inspect Windows audit policy and Defender protection status.", empty, [], "powershell:read:security", pack.security_inspect)
     add("powershell.set_audit_policy", "Enable/disable success/failure auditing for a host-allowlisted audit subcategory.", {"subcategory": s, "success": {"type": "boolean"}, "failure": {"type": "boolean"}}, ["subcategory", "success", "failure"], "powershell:security:audit:write", pack.audit_policy_set)
     add("powershell.harden_defender_setting", "Enable one supported Defender hardening feature; weakening settings are not exposed.", {"setting": {"type": "string", "enum": ["PUAProtection", "EnableControlledFolderAccess", "EnableNetworkProtection"]}}, ["setting"], "powershell:security:defender:write", pack.defender_harden)
