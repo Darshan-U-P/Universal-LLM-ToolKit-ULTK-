@@ -39,10 +39,13 @@ class PersistentScheduler:
             raise ToolExecutionError("Handler is not configured by the host application.")
         if not 60 <= interval_seconds <= 31_536_000:
             raise ToolExecutionError("Intervals must be between 60 seconds and one year.")
+        serialized = json.dumps(payload)
+        if len(serialized.encode("utf-8")) > 10000:
+            raise ToolExecutionError("Scheduled job payload exceeds 10 KB.")
         job_id = uuid.uuid4().hex
         with self._connect() as db:
             db.execute("INSERT INTO jobs VALUES (?, ?, ?, ?, ?, 1, NULL)",
-                       (job_id, handler, json.dumps(payload), interval_seconds,
+                       (job_id, handler, serialized, interval_seconds,
                         time.time() + interval_seconds))
         return {"job_id": job_id, "next_run_in_seconds": interval_seconds}
 
