@@ -28,7 +28,7 @@ def _with_page(root: str, session_id: str, action):
     state = _session_file(directory, session_id)
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(storage_state=str(state) if state.exists() else None)
+        context = browser.new_context(storage_state=str(state) if state.exists() else None, service_workers="block")
         page = context.pages[0] if context.pages else context.new_page()
 
         def guard(route):
