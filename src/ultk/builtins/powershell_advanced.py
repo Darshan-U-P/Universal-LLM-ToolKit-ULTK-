@@ -60,7 +60,7 @@ class PersistentPowerShellSessions:
             "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
             "$WarningPreference='SilentlyContinue';$InformationPreference='SilentlyContinue';"
             f"$allowed=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{commands}'))|ConvertFrom-Json;"
-            f"$forbidden={forbidden};$reserved=@('allowed','forbidden','maxOutput','request','line','ast','tokens','errors','bad','variables','assignments','calls','name','resolved','result','json','value','commandName','arguments','path','variable','assignment','call','node','vars','item','data','ErrorActionPreference','ProgressPreference','WarningPreference','InformationPreference','ExecutionContext','PSDefaultParameterValues');"
+            f"$forbidden={forbidden};$reserved=@('allowed','forbidden','maxOutput','request','line','ast','tokens','errors','bad','variables','assignments','calls','name','resolved','result','json','value','commandName','arguments','path','variable','assignment','call','node','vars','item','data','ErrorActionPreference','ProgressPreference','WarningPreference','InformationPreference','ExecutionContext','PSDefaultParameterValues','host','HOME','PROFILE','PSHOME','PID','PSVersionTable','Error','LASTEXITCODE','MyInvocation','PSScriptRoot','PSCommandPath','PSCmdlet','PSBoundParameters','PSCulture','PSUICulture');"
             f"$maxOutput={self.max_output};"
             "function Send-Response($value) {"
             "$json=ConvertTo-Json -InputObject $value -Depth 8 -Compress;"
@@ -331,10 +331,13 @@ class AdvancedPowerShellToolPack:
             "Set-Disk", "Initialize-Disk", "New-Partition", "Resize-Partition", "Import-Certificate",
             "Remove-GPO", "New-GPO", "New-GPLink", "Remove-GPLink", "Set-GPRegistryValue", "auditpol.exe",
         }
-        if any(command in forbidden_commands for command in allowed_session_commands):
+        forbidden_folded = {command.casefold() for command in forbidden_commands}
+        if any(command.casefold() in forbidden_folded for command in allowed_session_commands):
             raise ToolExecutionError("Persistent session allowlist includes a blocked high-risk cmdlet.")
         self.timeout = timeout_seconds
         self.allowed_computers = frozenset(item.casefold() for item in allowed_computers)
+        if any(not _NAME.fullmatch(command) for command in allowed_remote_commands):
+            raise ToolExecutionError("Remote cmdlet allowlist contains an invalid command name.")
         self.allowed_remote_commands = frozenset(allowed_remote_commands)
         self.allowed_registry_roots = frozenset(item.rstrip("\\").casefold() for item in allowed_registry_roots)
         self.allowed_firewall_names = frozenset(allowed_firewall_rule_names)
@@ -1073,6 +1076,8 @@ def create_advanced_powershell_tools(
             raise ToolExecutionError("Remote computer is not host-allowlisted.")
         if command not in pack.allowed_remote_commands:
             raise ToolExecutionError("Remote cmdlet is not host-allowlisted.")
+        if command.casefold() in {"invoke-expression", "add-type", "start-process", "set-executionpolicy", "invoke-command", "new-pssession"}:
+            raise ToolExecutionError("Remote command is blocked by the ULTK remoting safety policy.")
         values = parameters or {}
         if not isinstance(values, dict) or len(values) > 30:
             raise ToolExecutionError("Remote parameters must be an object with at most 30 entries.")
