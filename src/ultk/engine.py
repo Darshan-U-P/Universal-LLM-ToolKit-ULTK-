@@ -328,7 +328,7 @@ class ToolEngine:
             allowed_computers=allowed_computers,
         )
         options = dict(advanced_policy or {})
-        reserved = {"base", "allowed_session_commands", "allowed_computers", "allowed_remote_commands"}
+        reserved = {"base", "allowed_session_commands", "allowed_computers", "allowed_remote_commands", "timeout_seconds"}
         if reserved.intersection(options):
             raise ValueError("advanced_policy cannot override core PowerShell host configuration.")
         self.register_tools(create_advanced_powershell_tools(
