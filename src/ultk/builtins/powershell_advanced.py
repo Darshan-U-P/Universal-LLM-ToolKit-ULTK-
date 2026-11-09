@@ -37,6 +37,7 @@ class PersistentPowerShellSessions:
         "host", "HOME", "PROFILE", "PSHOME", "PID", "PSVersionTable", "Error", "LASTEXITCODE",
         "MyInvocation", "PSScriptRoot", "PSCommandPath", "PSCmdlet", "PSBoundParameters",
         "PSCulture", "PSUICulture", "remoteSessions", "allowedRemoteCommands", "allowedComputers",
+        "remoteSession", "remoteId", "remoteCommand", "remoteParams", "remoteResult", "remoteParameter",
     })
 
     _FORBIDDEN_AST = [
@@ -80,7 +81,7 @@ class PersistentPowerShellSessions:
             f"$allowedRemoteCommands=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{remote_commands}'))|ConvertFrom-Json;"
             f"$allowedComputers=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{computers}'))|ConvertFrom-Json;"
             "$remoteSessions=@{};"
-            f"$forbidden={forbidden};$reserved=@('allowed','forbidden','maxOutput','reserved','request','line','ast','tokens','errors','bad','variables','assignments','calls','name','resolved','result','json','value','commandName','arguments','path','variable','assignment','call','node','vars','item','data','scripts','scriptText','allResults','failed','stepIndex','stepOutput','status','ErrorActionPreference','ProgressPreference','WarningPreference','InformationPreference','ExecutionContext','PSDefaultParameterValues','host','HOME','PROFILE','PSHOME','PID','PSVersionTable','Error','LASTEXITCODE','MyInvocation','PSScriptRoot','PSCommandPath','PSCmdlet','PSBoundParameters','PSCulture','PSUICulture','remoteSessions','allowedRemoteCommands','allowedComputers');"
+            f"$forbidden={forbidden};$reserved=@('allowed','forbidden','maxOutput','reserved','request','line','ast','tokens','errors','bad','variables','assignments','calls','name','resolved','result','json','value','commandName','arguments','path','variable','assignment','call','node','vars','item','data','scripts','scriptText','allResults','failed','stepIndex','stepOutput','status','ErrorActionPreference','ProgressPreference','WarningPreference','InformationPreference','ExecutionContext','PSDefaultParameterValues','host','HOME','PROFILE','PSHOME','PID','PSVersionTable','Error','LASTEXITCODE','MyInvocation','PSScriptRoot','PSCommandPath','PSCmdlet','PSBoundParameters','PSCulture','PSUICulture','remoteSessions','allowedRemoteCommands','allowedComputers','remoteSession','remoteId','remoteCommand','remoteParams','remoteResult','remoteParameter');"
             f"$maxOutput={self.max_output};"
             "function Send-Response($value) {"
             "$json=ConvertTo-Json -InputObject $value -Depth 8 -Compress;"
@@ -135,6 +136,35 @@ class PersistentPowerShellSessions:
             "$status=if($null -eq $failed){'completed'}else{'failed'};"
             "Send-Response @{ok=$true;workflow_status=$status;steps_completed=$allResults.Count;failed_step=$failed;results=$allResults}"
             "}"
+            "'remote_open' {"
+            "$computer=[string]$request.computer;"
+            "if($allowedComputers -notcontains $computer){throw 'Remote computer is not host-allowlisted.'};"
+            "if($request.use_ssl -isnot [bool]){throw 'use_ssl must be boolean.'};"
+            "$remoteSession=New-PSSession -ComputerName $computer -UseSSL:$request.use_ssl -ErrorAction Stop;"
+            "$remoteId=[guid]::NewGuid().ToString('N');$remoteSessions[$remoteId]=$remoteSession;"
+            "Send-Response @{ok=$true;remote_session_id=$remoteId;computer=$computer;status='open'}"
+            "}"
+            "'remote_invoke' {"
+            "$remoteId=[string]$request.remote_session_id;"
+            "if(-not $remoteSessions.ContainsKey($remoteId)){throw 'Remote session does not exist.'};"
+            "$remoteCommand=[string]$request.command;"
+            "if($allowedRemoteCommands -notcontains $remoteCommand){throw 'Remote cmdlet is not host-allowlisted.'};"
+            "$remoteParams=@{};foreach($remoteParameter in $request.parameters.PSObject.Properties){$remoteParams[$remoteParameter.Name]=$remoteParameter.Value};"
+            "$remoteResult=Invoke-Command -Session $remoteSessions[$remoteId] -ScriptBlock {"
+            "param($commandName,$arguments);$cmd=Get-Command -Name $commandName -CommandType Cmdlet -ErrorAction Stop;& $cmd @arguments"
+            "} -ArgumentList $remoteCommand,$remoteParams -ErrorAction Stop;"
+            "Send-Response @{ok=$true;result=@($remoteResult)}"
+            "}"
+            "'remote_close' {"
+            "$remoteId=[string]$request.remote_session_id;"
+            "if(-not $remoteSessions.ContainsKey($remoteId)){throw 'Remote session does not exist.'};"
+            "Remove-PSSession -Session $remoteSessions[$remoteId] -ErrorAction Stop;$remoteSessions.Remove($remoteId);"
+            "Send-Response @{ok=$true;remote_session_id=$remoteId;status='closed'}"
+            "}"
+            "'remote_close_all' {"
+            "foreach($remoteSession in @($remoteSessions.Values)){Remove-PSSession -Session $remoteSession -ErrorAction SilentlyContinue};"
+            "$remoteSessions.Clear();Send-Response @{ok=$true;status='closed'}"
+            "}"
             "'variables' {"
             "$vars=Get-Variable | Where-Object {$reserved -notcontains $_.Name -and $_.Name -notmatch '^(PS|_|args$|input$)'} | "
             "Select-Object -First 200 Name,Visibility,Options;"
@@ -153,8 +183,8 @@ class PersistentPowerShellSessions:
         )
 
     def open(self, label: str) -> dict[str, Any]:
-        if not self.allowed_commands:
-            raise ToolExecutionError("Persistent sessions are disabled until the host configures allowed_session_commands.")
+        if not self.allowed_commands and not self.allowed_remote_commands:
+            raise ToolExecutionError("Persistent sessions are disabled until the host configures local or remote cmdlet allowlists.")
         if not isinstance(label, str) or not label.strip() or len(label) > 100:
             raise ToolExecutionError("Session label must be 1–100 characters.")
         encoded = base64.b64encode(self._wrapper().encode("utf-16le")).decode("ascii")
