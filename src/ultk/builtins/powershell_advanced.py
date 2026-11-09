@@ -680,15 +680,6 @@ class AdvancedPowerShellToolPack:
             "@{name=$data.name;version=$data.version;removed=$true}",
             {"name": name, "version": version}, timeout=120)
 
-    def package_install(self, name: str, source: str) -> dict[str, Any]:
-        self._windows("package installation")
-        if name not in self.allowed_packages or source not in self.allowed_sources:
-            raise ToolExecutionError("Package name and source must be host-allowlisted.")
-        return self.base._run(
-            "Install-Package -Name $data.name -Source $data.source -Force -ErrorAction Stop | "
-            "Select-Object Name,Version,ProviderName,Source",
-            {"name": name, "source": source}, timeout=120)
-
     def ad_users(self, domain: str, search_base: str) -> dict[str, Any]:
         self._windows("Active Directory")
         self._ad_domain(domain)
