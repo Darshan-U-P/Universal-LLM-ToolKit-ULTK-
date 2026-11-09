@@ -960,8 +960,9 @@ class AdvancedPowerShellToolPack:
         self._windows("scheduled task creation")
         if name not in self.allowed_tasks or template_id not in self.task_templates:
             raise ToolExecutionError("Task name and action template must be host-allowlisted.")
-        if task_path not in self.allowed_task_paths:
-            raise ToolExecutionError("Task path must be host-allowlisted.")
+        task_path = self._value(task_path, "task path", 512)
+        if not task_path.startswith("\\") or ".." in task_path.split("\\") or task_path not in self.allowed_task_paths:
+            raise ToolExecutionError("Task path must be an absolute host-allowlisted Task Scheduler path.")
         if schedule not in {"Once", "Daily", "Weekly"}:
             raise ToolExecutionError("Schedule must be Once, Daily or Weekly.")
         if not isinstance(at, str) or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", at):
