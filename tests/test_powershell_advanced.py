@@ -37,12 +37,12 @@ def test_advanced_factory_registers_separate_permission_families(base: PowerShel
         "powershell.install_package", "powershell.ad_list_users",
         "powershell.ad_create_user", "powershell.ad_create_group", "powershell.gpo_set_registry_value",
         "powershell.apply_security_template",
-        "powershell.create_scheduled_task", "powershell.delete_scheduled_task",
+        "powershell.create_scheduled_task", "powershell.update_scheduled_task", "powershell.delete_scheduled_task",
         "powershell.inspect_security_policy", "powershell.set_audit_policy",
         "powershell.harden_defender_setting",
     }
     assert expected <= names
-    assert len(names) >= 50
+    assert len(names) == 71
     assert all(tool.spec.capabilities for tool in tools)
 
 
@@ -363,3 +363,27 @@ def test_non_ssl_remoting_is_disabled_by_default(base: PowerShellToolPack) -> No
         allowed_remote_commands=frozenset({"Get-Service"}),
     )
     assert pack.allow_insecure_remoting is False
+
+
+
+def test_scheduled_task_create_update_delete_have_separate_capabilities(base: PowerShellToolPack) -> None:
+    tools = {tool.spec.name: tool for tool in create_advanced_powershell_tools(base=base)}
+    assert tools["powershell.create_scheduled_task"].spec.capabilities == frozenset({"powershell:tasks:create"})
+    assert tools["powershell.update_scheduled_task"].spec.capabilities == frozenset({"powershell:tasks:update"})
+    assert tools["powershell.delete_scheduled_task"].spec.capabilities == frozenset({"powershell:tasks:delete"})
+
+
+def test_security_policy_flags_require_real_booleans_and_safe_dependency(base: PowerShellToolPack) -> None:
+    with pytest.raises(ToolExecutionError):
+        AdvancedPowerShellToolPack(base, allow_storage_mutations="yes")
+    with pytest.raises(ToolExecutionError):
+        AdvancedPowerShellToolPack(base, allow_audit_disable=True)
+
+
+def test_registry_policy_root_cannot_be_removed(base: PowerShellToolPack) -> None:
+    pack = AdvancedPowerShellToolPack(
+        base, allowed_registry_roots=frozenset({r"HKLM:\Software\ULTK"})
+    )
+    # The public operation is Windows-only; the path guard is deliberately checked
+    # after platform gating and is therefore verified in the Windows integration suite.
+    assert pack.allowed_registry_roots == frozenset({r"hklm:\software\ultk"})
