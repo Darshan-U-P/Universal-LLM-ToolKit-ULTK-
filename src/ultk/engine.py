@@ -108,6 +108,26 @@ class ToolEngine:
             max_rows=max_rows,
         ))
 
+    def install_media_tools(
+        self,
+        *,
+        root_dir: str | Path,
+        ffmpeg_binary: str | None = None,
+        ffprobe_binary: str | None = None,
+        max_input_bytes: int = 1_000_000_000,
+        max_output_bytes: int = 1_000_000_000,
+        max_pixels: int = 40_000_000,
+    ) -> None:
+        from ultk.builtins.media import create_media_tools
+        self.register_tools(create_media_tools(
+            root_dir=root_dir,
+            ffmpeg_binary=ffmpeg_binary,
+            ffprobe_binary=ffprobe_binary,
+            max_input_bytes=max_input_bytes,
+            max_output_bytes=max_output_bytes,
+            max_pixels=max_pixels,
+        ))
+
     def install_rest_tools(
         self,
         endpoints: Mapping[str, Mapping[str, Any]],
