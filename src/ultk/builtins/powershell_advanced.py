@@ -458,6 +458,17 @@ class AdvancedPowerShellToolPack:
         timeout_seconds: int = 30,
     ) -> None:
         self.base = base
+        for flag_name, flag_value in {
+            "allow_insecure_remoting": allow_insecure_remoting,
+            "allow_windows_update_install": allow_windows_update_install,
+            "allow_storage_mutations": allow_storage_mutations,
+            "allow_security_policy_changes": allow_security_policy_changes,
+            "allow_audit_disable": allow_audit_disable,
+        }.items():
+            if type(flag_value) is not bool:
+                raise ToolExecutionError(f"{flag_name} must be a boolean host policy value.")
+        if allow_audit_disable and not allow_security_policy_changes:
+            raise ToolExecutionError("allow_audit_disable requires allow_security_policy_changes=True.")
         forbidden_commands = {
             "Invoke-Expression", "Add-Type", "Start-Process", "Set-ExecutionPolicy", "Stop-Computer", "Restart-Computer",
             "Remove-Item", "Clear-Content", "Set-Content", "Out-File", "Export-Csv", "Copy-Item", "Move-Item", "Rename-Item",
@@ -698,7 +709,9 @@ class AdvancedPowerShellToolPack:
         password = os.environ[self.password_env]
         if not 12 <= len(password) <= 256 or "\x00" in password:
             raise ToolExecutionError("Host-provided local account password must be 12–256 characters.")
-        display = self._value(description, "user description", 256)
+        if not isinstance(description, str) or len(description) > 256 or "\x00" in description:
+            raise ToolExecutionError("User description must be text of at most 256 characters.")
+        display = description
         return self.base._run(
             "$secure=ConvertTo-SecureString $env:ULTK_LOCAL_USER_PASSWORD -AsPlainText -Force;"
             "New-LocalUser -Name $data.name -Password $secure -Description $data.description "
@@ -816,6 +829,8 @@ class AdvancedPowerShellToolPack:
             raise ToolExecutionError("Partition size must be between 1 MiB and 2 TB.")
         if drive_letter is not None and (not isinstance(drive_letter, str) or not re.fullmatch(r"[D-Z]", drive_letter.upper())):
             raise ToolExecutionError("Drive letter must be D–Z or null.")
+        if drive_letter is not None and drive_letter.upper() not in self.allowed_drive_letters:
+            raise ToolExecutionError("Drive letter is not in the host-configured allowlist.")
         return self.base._run(
             "$params=@{DiskNumber=$data.disk;Size=$data.size;ErrorAction='Stop'};"
             "if($data.letter){$params.DriveLetter=$data.letter[0]};"
@@ -966,8 +981,10 @@ class AdvancedPowerShellToolPack:
             {"name": name, "target": target, "domain": domain}, timeout=self.timeout)
 
     def tasks_create(self, name: str, template_id: str, schedule: str, at: str,
-                     days: list[str] | None = None, task_path: str = "\\") -> dict[str, Any]:
+                     days: list[str] | None = None, task_path: str = "\\", update: bool = False) -> dict[str, Any]:
         self._windows("scheduled task creation")
+        if type(update) is not bool:
+            raise ToolExecutionError("update must be boolean.")
         if name not in self.allowed_tasks or template_id not in self.task_templates:
             raise ToolExecutionError("Task name and action template must be host-allowlisted.")
         task_path = self._value(task_path, "task path", 512)
@@ -993,7 +1010,8 @@ class AdvancedPowerShellToolPack:
         if not isinstance(arguments, str) or len(arguments) > 2000 or not isinstance(working, str) or not Path(working).is_absolute() or not Path(working).is_dir():
             raise ToolExecutionError("Approved task template arguments or working directory are invalid.")
         payload = {"name": name, "path": task_path, "executable": executable, "arguments": arguments,
-                   "working": working, "schedule": schedule, "at": at, "days": week_days}
+                   "working": working, "schedule": schedule, "at": at, "days": week_days,
+                   "update": update}
         return self.base._run(
             "$action=New-ScheduledTaskAction -Execute $data.executable -Argument $data.arguments -WorkingDirectory $data.working;"
             "$clock=[datetime]::Today.Add([timespan]::Parse($data.at));"
@@ -1001,10 +1019,19 @@ class AdvancedPowerShellToolPack:
             "elseif($data.schedule -eq 'Daily'){$trigger=New-ScheduledTaskTrigger -Daily -At $clock}"
             "else{$trigger=New-ScheduledTaskTrigger -Weekly -DaysOfWeek $data.days -At $clock};"
             "$principal=New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited;"
+            "$existing=Get-ScheduledTask -TaskName $data.name -TaskPath $data.path -ErrorAction SilentlyContinue;"
+            "if($data.update){if(-not $existing){throw 'Task does not exist; use create first.'};"
             "Register-ScheduledTask -TaskName $data.name -TaskPath $data.path -Action $action -Trigger $trigger -Principal $principal "
-            "-Description 'ULTK approved task template' -Force -ErrorAction Stop | "
-            "Select-Object TaskName,TaskPath,State",
+            "-Description 'ULTK approved task template' -Force -ErrorAction Stop}"
+            "else{if($existing){throw 'Task already exists; use the update operation.'};"
+            "Register-ScheduledTask -TaskName $data.name -TaskPath $data.path -Action $action -Trigger $trigger -Principal $principal "
+            "-Description 'ULTK approved task template' -ErrorAction Stop} | Select-Object TaskName,TaskPath,State",
             payload, timeout=self.timeout)
+
+    def tasks_update(self, name: str, template_id: str, schedule: str, at: str,
+                     days: list[str] | None = None, task_path: str = "\\") -> dict[str, Any]:
+        """Update an existing host-allowlisted task using a host-approved action template."""
+        return self.tasks_create(name, template_id, schedule, at, days, task_path, update=True)
 
     def tasks_delete(self, name: str, task_path: str) -> dict[str, Any]:
         self._windows("scheduled task deletion")
@@ -1530,6 +1557,7 @@ def create_advanced_powershell_tools(
 
     # Scheduled task templates.
     add("powershell.create_scheduled_task", "Create/update a scheduled task from a host-approved executable template and bounded schedule.", {"name": name, "template_id": name, "schedule": {"type": "string", "enum": ["Once", "Daily", "Weekly"]}, "at": {"type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"}, "days": {"type": "array", "items": {"type": "string"}, "maxItems": 7}, "task_path": s}, ["name", "template_id", "schedule", "at"], "powershell:tasks:create", pack.tasks_create, 60)
+    add("powershell.update_scheduled_task", "Update an existing host-allowlisted scheduled task using a host-approved executable template and bounded schedule.", {"name": name, "template_id": name, "schedule": {"type": "string", "enum": ["Once", "Daily", "Weekly"]}, "at": {"type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"}, "days": {"type": "array", "items": {"type": "string"}, "maxItems": 7}, "task_path": s}, ["name", "template_id", "schedule", "at"], "powershell:tasks:update", pack.tasks_update, 60)
     add("powershell.delete_scheduled_task", "Delete one host-allowlisted scheduled task.", {"name": name, "task_path": s}, ["name", "task_path"], "powershell:tasks:delete", pack.tasks_delete)
 
     # Security policy.
