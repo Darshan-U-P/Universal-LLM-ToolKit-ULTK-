@@ -136,9 +136,12 @@ def test_browser_session_clear_removes_persisted_state(tmp_path: Path) -> None:
     root.mkdir()
     state = root / f"{hashlib.sha256(b'session-1').hexdigest()}.json"
     state.write_text("{}", encoding="utf-8")
+    url_state = state.with_suffix(".url")
+    url_state.write_text("https://example.org", encoding="utf-8")
     result = _clear_session(str(root), "session-1")
     assert result["cleared"] is True
     assert not state.exists()
+    assert not url_state.exists()
 
 
 def test_download_checksum_verification_is_atomic(tmp_path: Path, monkeypatch) -> None:
