@@ -1462,7 +1462,7 @@ def create_advanced_powershell_tools(
             raise ToolExecutionError("Remote cmdlet is not host-allowlisted.")
         if command.casefold() in {"invoke-expression", "add-type", "start-process", "set-executionpolicy", "invoke-command", "new-pssession"}:
             raise ToolExecutionError("Remote command is blocked by the ULTK remoting safety policy.")
-        values = parameters or {}
+        values = {} if parameters is None else parameters
         if not isinstance(values, dict) or len(values) > 30:
             raise ToolExecutionError("Remote parameters must be an object with at most 30 entries.")
         if any(not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", key) or
