@@ -255,6 +255,7 @@ class ToolEngine:
         script_root: str | Path | None = None,
         allowed_modules: frozenset[str] = frozenset(),
         allowed_computers: frozenset[str] = frozenset(),
+        allowed_environment_names: frozenset[str] = frozenset(),
     ) -> None:
         """Install dedicated PowerShell-native tools with host-defined trust policies."""
         from ultk.builtins.powershell import create_powershell_tools
@@ -267,6 +268,7 @@ class ToolEngine:
             script_root=script_root,
             allowed_modules=allowed_modules,
             allowed_computers=allowed_computers,
+            allowed_environment_names=allowed_environment_names,
         ))
 
     def install_development_tools(self, *, project_root: str | Path,
