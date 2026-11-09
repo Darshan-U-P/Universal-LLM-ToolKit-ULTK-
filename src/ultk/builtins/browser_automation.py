@@ -48,6 +48,15 @@ def _with_page(root: str, session_id: str, action):
             browser.close()
 
 
+def _clear_session(root: str, session_id: str) -> dict[str, Any]:
+    directory = Path(root).expanduser().resolve()
+    state = _session_file(directory, session_id)
+    removed = state.exists()
+    if removed:
+        state.unlink()
+    return {"session_id": session_id, "cleared": removed}
+
+
 def _navigate(root: str, session_id: str, url: str) -> dict[str, Any]:
     _validate_public_url(url)
     def action(page):
@@ -196,6 +205,10 @@ def create_advanced_browser_tools(*, session_root: str | Path = "./browser_sessi
                                     "key": {"type": "string"}}, ["session_id","action","selector"]),
                      "browser:interact", lambda session_id,action,selector,value=None,key=None:
                      _interact(root,session_id,action,selector,value,key), timeout=30),
+        FunctionTool("browser.clear_session", "Delete persisted cookies and local storage for a named browser session.",
+                     object_schema({"session_id": {"type": "string", "minLength": 1, "maxLength": 100}},
+                                   ["session_id"]),
+                     "browser:session:manage", lambda session_id: _clear_session(root,session_id)),
         FunctionTool("browser.snapshot", "Read visible text and title from a persistent browser session.",
                      object_schema({"session_id": {"type": "string", "minLength": 1, "maxLength": 100}},
                                    ["session_id"]),
