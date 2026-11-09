@@ -28,10 +28,10 @@ def test_comprehensive_browser_tools_have_unique_names_and_submission_capability
     names = [tool.spec.name for tool in tools]
     assert len(names) == len(set(names))
     assert {
-        "browser.profile_create", "browser.tabs", "browser.popup_capture",
+        "browser.profile_create", "browser.navigate", "browser.snapshot", "browser.tabs", "browser.popup_capture",
         "browser.frame_interact", "browser.cookies", "browser.scrape_structured",
         "browser.network_inspect", "browser.websocket_probe", "browser.test_run",
-        "browser.challenge_detect", "browser.auth_status", "browser.form_preview",
+        "browser.challenge_detect", "browser.auth_status", "browser.auth_handoff", "browser.form_preview",
         "browser.form_submit", "web.change_monitor_add", "web.change_monitor_check",
         "browser.extensions_list",
     }.issubset(set(names))
