@@ -1,6 +1,7 @@
 """JSON Schema validation helpers."""
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from jsonschema import Draft202012Validator, SchemaError, ValidationError
 
