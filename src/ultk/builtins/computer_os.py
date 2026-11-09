@@ -49,9 +49,11 @@ def _optional(module: str) -> Any:
 def _run(argv: list[str], *, timeout: int = 15, output_limit: int = 200_000) -> dict[str, Any]:
     """Run a fixed native command without a shell, with bounded output and timeout."""
     try:
+        safe_env = {key: value for key, value in os.environ.items()
+                    if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP"}}
         result = subprocess.run(
             argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            shell=False, timeout=timeout, check=False,
+            shell=False, timeout=timeout, check=False, env=safe_env,
         )
     except FileNotFoundError as exc:
         raise ToolExecutionError(f"Required platform command is unavailable: {Path(argv[0]).name}") from exc
@@ -105,6 +107,15 @@ class ComputerOSPack:
         if not isinstance(value, str) or not value.strip() or len(value) > limit or "\x00" in value:
             raise ToolExecutionError(f"Invalid {label}.")
         return value.strip()
+
+    def _contains_symlink(self, relative_path: str) -> bool:
+        candidate = Path(relative_path)
+        current = self.root
+        for part in candidate.parts:
+            current = current / part
+            if current.is_symlink():
+                return True
+        return False
 
     def resolve(self, relative_path: str) -> Path:
         value = self._text(relative_path, "relative path", 1000)
@@ -482,9 +493,10 @@ class ComputerOSPack:
         path = self.resolve(relative_path)
         if not path.exists() and not path.is_symlink():
             raise ToolExecutionError("Path does not exist.")
-        stat = path.lstat()
+        lexical = self.root / Path(relative_path)
+        stat = lexical.lstat()
         result: dict[str, Any] = {
-            "path": relative_path, "is_symlink": path.is_symlink(),
+            "path": relative_path, "is_symlink": self._contains_symlink(relative_path),
             "is_directory": path.is_dir(), "size_bytes": stat.st_size,
             "modified_at": stat.st_mtime, "mode_octal": oct(stat.st_mode & 0o7777),
         }
@@ -501,7 +513,7 @@ class ComputerOSPack:
         if type(mode) is not int or not 0 <= mode <= 0o777:
             raise ToolExecutionError("mode must be an integer from 0000 to 0777.")
         path = self.resolve(relative_path)
-        if path.is_symlink() or not path.exists():
+        if self._contains_symlink(relative_path) or not path.exists():
             raise ToolExecutionError("Refusing chmod on missing paths or symlinks.")
         path.chmod(mode)
         return self.file_metadata(relative_path)
@@ -512,7 +524,7 @@ class ComputerOSPack:
         if type(uid) is not int or type(gid) is not int or uid < -1 or gid < -1:
             raise ToolExecutionError("uid and gid must be non-negative integers or -1.")
         path = self.resolve(relative_path)
-        if path.is_symlink() or not path.exists():
+        if self._contains_symlink(relative_path) or not path.exists():
             raise ToolExecutionError("Refusing ownership changes on missing paths or symlinks.")
         os.chown(path, uid, gid, follow_symlinks=False)
         return self.file_metadata(relative_path)
@@ -526,14 +538,14 @@ class ComputerOSPack:
             temperatures = {name: [{"label": item.label, "current": item.current,
                                     "high": item.high, "critical": item.critical}
                                    for item in values[:16]] for name, values in temps.items()}
-        except (AttributeError, OSError):
+        except (AttributeError, OSError, NotImplementedError):
             temperatures = {}
         try:
             battery = psutil.sensors_battery()
             battery_info = None if battery is None else {
                 "percent": battery.percent, "plugged": battery.power_plugged,
                 "seconds_left": battery.secsleft if battery.secsleft >= 0 else None}
-        except (AttributeError, OSError):
+        except (AttributeError, OSError, NotImplementedError):
             battery_info = None
         disks = []
         for part in psutil.disk_partitions(all=False)[:32]:
@@ -602,10 +614,11 @@ class ComputerOSPack:
         return rows[:64]
 
     # Event log snapshots and persistent watch definitions; callers poll on their schedule.
-    def recent_events(self, channel: str, limit: int = 50, since_minutes: int = 60) -> dict[str, Any]:
+    def recent_events(self, channel: str = "", limit: int = 50, since_minutes: int = 60) -> dict[str, Any]:
         if not 1 <= limit <= 200 or not 1 <= since_minutes <= 10080:
             raise ToolExecutionError("limit must be 1–200 and since_minutes 1–10080.")
         if os.name == "nt":
+            channel = channel or "System"
             if channel not in _SAFE_CHANNELS:
                 raise ToolExecutionError("Windows event channel is not allowlisted.")
             result = _run(["wevtutil.exe", "qe", channel, "/c:" + str(limit), "/rd:true", "/f:xml"],
@@ -667,8 +680,10 @@ class ComputerOSPack:
 
     def create_event_watch(self, channel: str, description: str) -> dict[str, Any]:
         label = self._text(description, "watch description", 200)
-        if os.name == "nt" and channel not in _SAFE_CHANNELS:
-            raise ToolExecutionError("Windows event channel is not allowlisted.")
+        if os.name == "nt":
+            channel = channel or "System"
+            if channel not in _SAFE_CHANNELS:
+                raise ToolExecutionError("Windows event channel is not allowlisted.")
         if platform.system() == "Linux" and channel not in {"", "system", "user", "kernel"}:
             raise ToolExecutionError("Linux journal channel is invalid.")
         if platform.system() == "Darwin" and channel not in {"", "system"}:
