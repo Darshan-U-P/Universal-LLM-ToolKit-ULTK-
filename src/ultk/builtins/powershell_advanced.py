@@ -32,7 +32,7 @@ class PersistentPowerShellSessions:
         "allowed", "forbidden", "maxOutput", "reserved", "request", "line", "ast", "tokens",
         "errors", "bad", "variables", "assignments", "calls", "name", "resolved", "result",
         "json", "value", "commandName", "arguments", "path", "variable", "assignment",
-        "call", "node", "vars", "item", "data", "ErrorActionPreference", "ProgressPreference",
+        "call", "node", "vars", "item", "data", "scripts", "scriptText", "allResults", "failed", "stepIndex", "stepOutput", "status", "ErrorActionPreference", "ProgressPreference",
         "WarningPreference", "InformationPreference", "ExecutionContext", "PSDefaultParameterValues",
         "host", "HOME", "PROFILE", "PSHOME", "PID", "PSVersionTable", "Error", "LASTEXITCODE",
         "MyInvocation", "PSScriptRoot", "PSCommandPath", "PSCmdlet", "PSBoundParameters",
@@ -71,7 +71,7 @@ class PersistentPowerShellSessions:
             "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
             "$WarningPreference='SilentlyContinue';$InformationPreference='SilentlyContinue';"
             f"$allowed=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{commands}'))|ConvertFrom-Json;"
-            f"$forbidden={forbidden};$reserved=@('allowed','forbidden','maxOutput','reserved','request','line','ast','tokens','errors','bad','variables','assignments','calls','name','resolved','result','json','value','commandName','arguments','path','variable','assignment','call','node','vars','item','data','ErrorActionPreference','ProgressPreference','WarningPreference','InformationPreference','ExecutionContext','PSDefaultParameterValues','host','HOME','PROFILE','PSHOME','PID','PSVersionTable','Error','LASTEXITCODE','MyInvocation','PSScriptRoot','PSCommandPath','PSCmdlet','PSBoundParameters','PSCulture','PSUICulture');"
+            f"$forbidden={forbidden};$reserved=@('allowed','forbidden','maxOutput','reserved','request','line','ast','tokens','errors','bad','variables','assignments','calls','name','resolved','result','json','value','commandName','arguments','path','variable','assignment','call','node','vars','item','data','scripts','scriptText','allResults','failed','stepIndex','stepOutput','status','ErrorActionPreference','ProgressPreference','WarningPreference','InformationPreference','ExecutionContext','PSDefaultParameterValues','host','HOME','PROFILE','PSHOME','PID','PSVersionTable','Error','LASTEXITCODE','MyInvocation','PSScriptRoot','PSCommandPath','PSCmdlet','PSBoundParameters','PSCulture','PSUICulture');"
             f"$maxOutput={self.max_output};"
             "function Send-Response($value) {"
             "$json=ConvertTo-Json -InputObject $value -Depth 8 -Compress;"
