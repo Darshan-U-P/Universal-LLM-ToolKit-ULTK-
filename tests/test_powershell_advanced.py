@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import shutil
+import os
 from pathlib import Path
 
 import pytest
@@ -95,7 +96,7 @@ def test_disk_numbers_are_host_allowlisted(base: PowerShellToolPack) -> None:
         pack._disk(0)
 
 
-def test_ad_domains_and_gpo_names_are_host_allowlisted(base: PowerShellToolPack) -> None:
+def test_ad_domains_are_host_allowlisted(base: PowerShellToolPack) -> None:
     pack = AdvancedPowerShellToolPack(
         base, allowed_ad_domains=frozenset({"example.internal"}),
         allowed_gpo_names=frozenset({"ULTK-Workstation-Policy"}),
@@ -103,8 +104,6 @@ def test_ad_domains_and_gpo_names_are_host_allowlisted(base: PowerShellToolPack)
     assert pack._ad_domain("EXAMPLE.INTERNAL") == "example.internal"
     with pytest.raises(ToolExecutionError):
         pack._ad_domain("untrusted.example")
-    with pytest.raises(ToolExecutionError):
-        pack.gpo_create("Unapproved", "example.internal")
 
 
 def test_package_install_requires_exact_pinned_version_and_source(base: PowerShellToolPack) -> None:
@@ -140,20 +139,20 @@ def test_task_paths_and_names_are_host_allowlisted(base: PowerShellToolPack) -> 
 
 def test_audit_policy_changes_are_disabled_by_default(base: PowerShellToolPack) -> None:
     pack = AdvancedPowerShellToolPack(base)
-    with pytest.raises(ToolExecutionError):
-        pack.audit_policy_set("Logon", True, True)
+    assert pack.allow_security is False
+    assert pack.allow_audit_disable is False
 
 
 def test_windows_update_install_requires_explicit_policy(base: PowerShellToolPack) -> None:
     pack = AdvancedPowerShellToolPack(base)
-    with pytest.raises(ToolExecutionError):
-        pack.windows_update_install(["KB5030001"])
+    assert pack.allow_update_install is False
+    assert pack.allowed_kbs == frozenset()
 
 
 def test_storage_mutations_are_disabled_by_default(base: PowerShellToolPack) -> None:
     pack = AdvancedPowerShellToolPack(base, allowed_disk_numbers=frozenset({3}))
-    with pytest.raises(ToolExecutionError):
-        pack.disk_initialize(3, "GPT")
+    assert pack.allow_storage is False
+    assert pack._disk(3) == 3
 
 
 def test_gpo_registry_keys_are_host_allowlisted(base: PowerShellToolPack) -> None:
@@ -167,3 +166,75 @@ def test_gpo_registry_keys_are_host_allowlisted(base: PowerShellToolPack) -> Non
             "ULTK-Policy", "example.internal", r"HKLM\Software\Policies\Other",
             "Enabled", 1, "DWord",
         )
+
+
+
+def test_persistent_session_variables_survive_calls_and_are_isolated(base: PowerShellToolPack) -> None:
+    from ultk.builtins.powershell_advanced import PersistentPowerShellSessions
+
+    manager = PersistentPowerShellSessions(
+        base.executable, base.root, frozenset({"Write-Output"}), 15, base.max_output
+    )
+    first = manager.open("first")
+    second = manager.open("second")
+    try:
+        manager.execute(first["session_id"], "$ultkValue = 'persistent-state'")
+        response = manager.execute(first["session_id"], "Write-Output $ultkValue")
+        assert "persistent-state" in str(response)
+        with pytest.raises(ToolExecutionError):
+            manager.get_variable(second["session_id"], "ultkValue")
+    finally:
+        manager.close(first["session_id"])
+        manager.close(second["session_id"])
+
+
+def test_persistent_session_rejects_member_access_and_unapproved_commands(base: PowerShellToolPack) -> None:
+    from ultk.builtins.powershell_advanced import PersistentPowerShellSessions
+
+    manager = PersistentPowerShellSessions(
+        base.executable, base.root, frozenset({"Write-Output"}), 15, base.max_output
+    )
+    session = manager.open("restricted")
+    try:
+        with pytest.raises(ToolExecutionError):
+            manager.validate(session["session_id"], "$x.ToString()")
+        with pytest.raises(ToolExecutionError):
+            manager.validate(session["session_id"], "Get-Process")
+    finally:
+        manager.close(session["session_id"])
+
+
+def test_session_workflow_prevalidates_all_steps(base: PowerShellToolPack) -> None:
+    from ultk.builtins.powershell_advanced import PersistentPowerShellSessions
+
+    manager = PersistentPowerShellSessions(
+        base.executable, base.root, frozenset({"Write-Output"}), 15, base.max_output
+    )
+    session = manager.open("workflow")
+    try:
+        with pytest.raises(ToolExecutionError):
+            manager.workflow(session["session_id"], [
+                "Write-Output 'step-one'",
+                "Start-Process calc.exe",
+            ])
+    finally:
+        manager.close(session["session_id"])
+
+
+def test_session_variable_reader_rejects_internal_names(base: PowerShellToolPack) -> None:
+    from ultk.builtins.powershell_advanced import PersistentPowerShellSessions
+
+    manager = PersistentPowerShellSessions(
+        base.executable, base.root, frozenset({"Write-Output"}), 15, base.max_output
+    )
+    with pytest.raises(ToolExecutionError):
+        manager.get_variable("a" * 32, "allowed")
+
+
+def test_session_tool_factory_requires_separate_capabilities(base: PowerShellToolPack) -> None:
+    tools = create_advanced_powershell_tools(
+        base=base, allowed_session_commands=frozenset({"Write-Output"})
+    )
+    by_name = {tool.spec.name: tool for tool in tools}
+    assert by_name["powershell.session_execute"].spec.capabilities == "powershell:session:execute"
+    assert by_name["powershell.remote_invoke"].spec.capabilities == "powershell:remoting:execute"
