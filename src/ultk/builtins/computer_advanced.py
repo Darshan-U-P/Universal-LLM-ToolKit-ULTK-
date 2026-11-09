@@ -107,7 +107,9 @@ def _workflow(steps: list[dict[str, Any]], image_root: str) -> dict[str, Any]:
                 raise ToolExecutionError("Workflow screenshot path must be a simple PNG filename.")
             root = Path(image_root).expanduser().resolve()
             root.mkdir(parents=True, exist_ok=True)
-            target = root / filename
+            target = (root / filename).resolve()
+            if not target.is_relative_to(root):
+                raise ToolExecutionError("Workflow screenshot path escapes image_root.")
             image = pyautogui.screenshot()
             image.save(target)
             results.append({"step": index, "action": "screenshot",
