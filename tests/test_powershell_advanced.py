@@ -59,6 +59,8 @@ def test_persistent_sessions_reject_high_risk_cmdlet_allowlists(base: PowerShell
         AdvancedPowerShellToolPack(base, allowed_session_commands=frozenset({"Get-Service", "Remove-Item"}))
     with pytest.raises(ToolExecutionError):
         AdvancedPowerShellToolPack(base, allowed_session_commands=frozenset({"Set-MpPreference"}))
+    with pytest.raises(ToolExecutionError):
+        AdvancedPowerShellToolPack(base, allowed_session_commands=frozenset({"Write-Host"}))
 
 
 def test_registry_write_requires_path_inside_exact_host_root(base: PowerShellToolPack) -> None:
