@@ -65,3 +65,15 @@ def test_non_windows_admin_operations_fail_closed(tmp_path: Path, pwsh: str) -> 
     pack = PowerShellToolPack(executable=pwsh, working_root=tmp_path)
     with pytest.raises(ToolExecutionError):
         pack._fixed("system.get_os")
+
+
+def test_registry_tools_reject_non_registry_provider_paths(tmp_path: Path, pwsh: str) -> None:
+    pack = PowerShellToolPack(executable=pwsh, working_root=tmp_path)
+    with pytest.raises(ToolExecutionError):
+        pack._registry_path("C:\\Users")
+
+
+def test_environment_tool_defaults_to_no_environment_values(tmp_path: Path, pwsh: str) -> None:
+    tools = create_powershell_tools(executable=pwsh, working_root=tmp_path)
+    environment_tool = next(tool for tool in tools if tool.spec.name == "powershell.get_environment")
+    assert "environment" in environment_tool.spec.name
