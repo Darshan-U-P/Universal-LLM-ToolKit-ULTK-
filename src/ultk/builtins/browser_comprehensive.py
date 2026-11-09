@@ -273,6 +273,35 @@ class BrowserControlPlane:
                     "note":"ULTK detects challenges but does not solve or bypass CAPTCHA."}
         return self._with_context(profile,run)
 
+    def auth_handoff(self, profile: str, login_url: str, login_selector: str,
+                     timeout_seconds: int = 120):
+        if self.headless:
+            raise ToolExecutionError("Human authentication handoff requires headless=False.")
+        if not login_selector or len(login_selector) > 300 or not 10 <= timeout_seconds <= 600:
+            raise ToolExecutionError("Login selector or handoff timeout is invalid.")
+        login_url = _url(login_url)
+        def run(ctx, pages, active):
+            page = pages[active]
+            page.goto(login_url, wait_until="domcontentloaded", timeout=25000)
+            locator = page.locator(login_selector).first
+            try:
+                visible = locator.is_visible(timeout=3000)
+            except Exception:
+                visible = False
+            if not visible:
+                return {"handoff_started": True, "completed": False,
+                        "reason": "login_selector_not_visible",
+                        "url": page.url,
+                        "note": "No authentication success was inferred; verify the account state explicitly."}
+            try:
+                locator.wait_for(state="hidden", timeout=timeout_seconds * 1000)
+            except Exception:
+                return {"handoff_started": True, "completed": False,
+                        "reason": "human_action_timeout", "url": page.url}
+            return {"handoff_started": True, "completed": True, "url": page.url,
+                    "note": "Login indicator disappeared; this is a heuristic, not identity proof."}
+        return self._with_context(profile, run)
+
     def auth_status(self, profile: str, selectors: list[str]):
         if len(selectors)>10 or any(not isinstance(s,str) or len(s)>300 for s in selectors): raise ToolExecutionError("Authentication selectors are invalid.")
         def run(ctx,pages,active):
@@ -465,6 +494,13 @@ def create_comprehensive_browser_tools(*,profile_root:str|Path="./browser_profil
           ["profile","steps"]),"browser:test:run",lambda profile,steps:b.run_test(profile,steps),timeout=90),
       FunctionTool("browser.challenge_detect","Detect CAPTCHA/anti-bot pages; does not solve or bypass challenges.",
         object_schema({"profile":p},["profile"]),"browser:challenge:inspect",b.challenge),
+      FunctionTool("browser.auth_handoff","Open a visible browser for a human to complete login/MFA; waits for a host-supplied login indicator to disappear.",
+        object_schema({"profile":p,"login_url":{"type":"string","format":"uri"},
+          "login_selector":{"type":"string","minLength":1,"maxLength":300},
+          "timeout_seconds":{"type":"integer","minimum":10,"maximum":600}},
+          ["profile","login_url","login_selector"]),"browser:auth:handoff",
+        lambda profile,login_url,login_selector,timeout_seconds=120:
+          b.auth_handoff(profile,login_url,login_selector,timeout_seconds),timeout=620),
       FunctionTool("browser.auth_status","Use host-supplied login selectors as an authentication heuristic.",
         object_schema({"profile":p,"login_selectors":{"type":"array","items":{"type":"string","maxLength":300},"maxItems":10}},["profile","login_selectors"]),
         "browser:auth:inspect",lambda profile,login_selectors:b.auth_status(profile,login_selectors)),
