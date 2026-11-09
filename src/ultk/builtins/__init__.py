@@ -4,6 +4,7 @@ from ultk.builtins.computer import create_computer_tools
 from ultk.builtins.computer_advanced import create_advanced_computer_tools
 from ultk.builtins.development import create_development_tools
 from ultk.builtins.development_advanced import create_advanced_development_tools
+from ultk.builtins.data import create_data_tools
 from ultk.builtins.filesystem import create_filesystem_tools
 from ultk.builtins.process_management import create_process_management_tools
 from ultk.builtins.scheduler import create_scheduler_tools
@@ -16,6 +17,7 @@ __all__ = [
     "create_advanced_computer_tools",
     "create_advanced_development_tools",
     "create_computer_tools",
+    "create_data_tools",
     "create_development_tools",
     "create_filesystem_tools",
     "create_process_management_tools",
