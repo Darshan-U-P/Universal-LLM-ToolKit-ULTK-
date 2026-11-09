@@ -16,10 +16,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
-from ultk.exceptions import ToolExecutionError
 from ultk.builtins._common import FunctionTool, object_schema
+from ultk.exceptions import ToolExecutionError
 
 
 def _rooted(root: str, relative: str, *, must_exist: bool = False) -> Path:
@@ -39,7 +39,7 @@ def _run(args: list[str], root: str, timeout: int = 60) -> dict[str, Any]:
     base = Path(root).resolve()
     try:
         result = subprocess.run(args, cwd=base, shell=False, stdin=subprocess.DEVNULL,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                capture_output=True,
                                 timeout=timeout, check=False)
     except subprocess.TimeoutExpired as exc:
         raise ToolExecutionError("Development operation timed out.") from exc
@@ -53,10 +53,10 @@ def _run(args: list[str], root: str, timeout: int = 60) -> dict[str, Any]:
 
 class RestrictedInterpreter:
     """Small expression interpreter; deliberately not general-purpose Python exec."""
-    _binary = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
+    _binary: ClassVar = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
                ast.Div: operator.truediv, ast.FloorDiv: operator.floordiv,
                ast.Mod: operator.mod, ast.Pow: operator.pow}
-    _compare = {ast.Eq: operator.eq, ast.NotEq: operator.ne, ast.Lt: operator.lt,
+    _compare: ClassVar = {ast.Eq: operator.eq, ast.NotEq: operator.ne, ast.Lt: operator.lt,
                 ast.LtE: operator.le, ast.Gt: operator.gt, ast.GtE: operator.ge}
     @staticmethod
     def _safe_range(*args):
@@ -65,7 +65,7 @@ class RestrictedInterpreter:
             raise ToolExecutionError("Interpreter range is limited to 10000 values.")
         return list(sequence)
 
-    _builtins = {"abs": abs, "round": round, "min": min, "max": max,
+    _builtins: ClassVar = {"abs": abs, "round": round, "min": min, "max": max,
                  "sum": sum, "len": len, "sorted": sorted,
                  "range": _safe_range.__func__}
 
@@ -99,7 +99,7 @@ class RestrictedInterpreter:
             return {"value": value, "variables": sorted(env)}
         except ToolExecutionError:
             raise
-        except Exception as exc:  # noqa: BLE001 - interpreter input is untrusted
+        except Exception as exc:
             raise ToolExecutionError(f"Restricted interpreter error ({type(exc).__name__}).") from exc
 
     def _eval(self, node, env):
