@@ -44,6 +44,8 @@ Free-form model-generated PowerShell is deliberately not exposed. A host may con
 - PowerShell execution policy is not a security boundary. Do not rely on it to sandbox scripts.
 - This pack does not elevate privileges. A tool can perform only actions allowed to the ULTK process identity.
 
-## Not included in this increment
+## Advanced administration pack
 
-Registry writes, firewall rule changes, user/group/account administration, package installation, Windows Update, disk/volume management, certificate store mutation, arbitrary cmdlet invocation, persistent interactive runspaces, general-purpose remoting command execution, DSC and Intune/Active Directory administration are not included.
+The following capabilities are implemented as a separate, permission-controlled pack rather than being folded into a general-purpose script executor: persistent restricted PowerShell sessions and workflows, persistent WinRM remoting, registry writes, firewall rule management, local users/groups, Windows Update, disk/partition/volume operations, certificate stores, pinned package/module installation, Active Directory, Group Policy, scheduled task templates, and Windows security policy.
+
+See [Advanced PowerShell Administration Tool Families](POWERSHELL_ADVANCED_TOOL_PACK.md) for installation, host allowlists, security boundaries and deferred verification.
