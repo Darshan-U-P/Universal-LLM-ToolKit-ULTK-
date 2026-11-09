@@ -244,6 +244,31 @@ class ToolEngine:
             max_output_bytes=max_output_bytes,
         ))
 
+    def install_powershell_tools(
+        self,
+        *,
+        executable: str | Path | None = None,
+        working_root: str | Path = ".",
+        timeout_seconds: int = 20,
+        max_output_bytes: int = 200_000,
+        allowed_script_hashes: Mapping[str, str] | None = None,
+        script_root: str | Path | None = None,
+        allowed_modules: frozenset[str] = frozenset(),
+        allowed_computers: frozenset[str] = frozenset(),
+    ) -> None:
+        """Install dedicated PowerShell-native tools with host-defined trust policies."""
+        from ultk.builtins.powershell import create_powershell_tools
+        self.register_tools(create_powershell_tools(
+            executable=executable,
+            working_root=working_root,
+            timeout_seconds=timeout_seconds,
+            max_output_bytes=max_output_bytes,
+            allowed_script_hashes=allowed_script_hashes,
+            script_root=script_root,
+            allowed_modules=allowed_modules,
+            allowed_computers=allowed_computers,
+        ))
+
     def install_development_tools(self, *, project_root: str | Path,
                                   allowed_executables: dict[str, str] | None = None) -> None:
         from ultk.builtins.development import create_development_tools
