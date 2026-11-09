@@ -168,12 +168,16 @@ def _run_ffmpeg(binary: str, arguments: list[str], *, root: Path,
             shell=False,
         )
     except subprocess.TimeoutExpired as exc:
+        if output_path is not None:
+            output_path.unlink(missing_ok=True)
         raise ToolExecutionError("Media operation exceeded its time limit.") from exc
     except OSError as exc:
         raise ToolExecutionError(
             f"Media executable could not start ({type(exc).__name__})."
         ) from exc
     if completed.returncode != 0:
+        if output_path is not None:
+            output_path.unlink(missing_ok=True)
         raise ToolExecutionError(
             f"Media operation failed with exit code {completed.returncode}."
         )
@@ -205,7 +209,7 @@ def _probe(root: Path, relative_path: str, ffprobe: str, max_input_bytes: int,
         )
         if completed.returncode != 0:
             raise ToolExecutionError("ffprobe could not inspect the media file.")
-        if len(completed.stdout.encode("utf-8")) > 2_000_000:
+        if len(completed.stdout.encode("utf-8")) > 90_000:
             raise ToolExecutionError("ffprobe metadata exceeds the output limit.")
         return json.loads(completed.stdout)
     except subprocess.TimeoutExpired as exc:
