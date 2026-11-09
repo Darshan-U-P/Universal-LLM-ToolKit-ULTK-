@@ -1007,6 +1007,9 @@ class AdvancedPowerShellToolPack:
         display = self._value(name, "AD user display name", 256)
         if path not in self.allowed_gpo_targets:
             raise ToolExecutionError("AD user creation path must be a host-allowlisted OU DN.")
+        domain_dn = ",".join(f"DC={part}" for part in domain.split("."))
+        if not path.casefold().endswith(domain_dn.casefold()):
+            raise ToolExecutionError("AD user creation OU must belong to the selected allowlisted domain.")
         expected_dn = f"CN={display},{path}"
         if expected_dn not in self.allowed_ad_members:
             raise ToolExecutionError("New AD user distinguished name must be host-allowlisted.")
