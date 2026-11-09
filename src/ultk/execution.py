@@ -5,7 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 
-from ultk.exceptions import ToolNotFoundError, ToolPermissionError, ToolSchemaError
+from ultk.exceptions import (
+    ToolExecutionError,
+    ToolNotFoundError,
+    ToolPermissionError,
+    ToolSchemaError,
+)
 from ultk.models import ToolCallRequest, ToolContext, ToolResult
 from ultk.permissions import DenyAllPolicy, PermissionPolicy
 from ultk.registry import ToolRegistry
@@ -53,11 +58,11 @@ class ToolDispatcher:
                 value, ensure_ascii=False, default=str
             )
             if len(content) > spec.max_output_chars:
-                content = content[: spec.max_output_chars] + "\\n[output truncated]"
+                content = content[: spec.max_output_chars] + "\n[output truncated]"
             return ToolResult(request.id, spec.name, content)
         except TimeoutError:
             return ToolResult(request.id, spec.name, "Tool execution timed out.", True)
-        except (ToolSchemaError, ToolPermissionError) as exc:
+        except (ToolSchemaError, ToolPermissionError, ToolExecutionError) as exc:
             return ToolResult(request.id, spec.name, str(exc), True)
         except Exception as exc:  # noqa: BLE001 - isolate arbitrary tool failures
             # Keep exception details out of model-visible output by default.
