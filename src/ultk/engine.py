@@ -63,9 +63,9 @@ class ToolEngine:
             image_root=image_root, allowed_apps=allowed_apps,
             allowed_environment_names=allowed_environment_names))
 
-    def install_advanced_computer_tools(self) -> None:
+    def install_advanced_computer_tools(self, *, image_root: str | Path = "./screenshots") -> None:
         from ultk.builtins.computer_advanced import create_advanced_computer_tools
-        self.register_tools(create_advanced_computer_tools())
+        self.register_tools(create_advanced_computer_tools(image_root=image_root))
 
     def install_scheduler_tools(self, database: str | Path,
                                 handlers: dict[str, Any]) -> None:
