@@ -48,6 +48,7 @@ Install the original pack and the advanced pack independently:
             "allowed_ad_domains": frozenset({"example.internal"}),
             "allowed_ad_group_dns": frozenset({"CN=ULTK-Operators,OU=Groups,DC=example,DC=internal"}),
             "allowed_ad_member_dns": frozenset({"CN=ultk-worker,OU=Users,DC=example,DC=internal"}),
+            "allowed_ad_ous": frozenset({"OU=Users,DC=example,DC=internal", "OU=Groups,DC=example,DC=internal"}),
             "allowed_gpo_names": frozenset({"ULTK-Workstation-Policy"}),
             "allowed_gpo_targets": frozenset({"OU=Workstations,DC=example,DC=internal"}),
             "allowed_gpo_registry_keys": frozenset({r"HKLM\Software\Policies\ULTK"}),
@@ -144,7 +145,7 @@ This is a deliberately restricted interactive command environment, not a general
 - List AD users/groups within a host-allowlisted domain and domain DN search base.
 - Create, enable, disable or remove host-allowlisted AD users; create/remove host-allowlisted groups; add/remove exact host-allowlisted group/member DNs. AD user creation uses the same host-injected password secret as local account provisioning.
 - List, create and delete host-allowlisted GPOs; link/unlink them only to exact host-allowlisted OU targets; set registry policy values only under host-allowlisted GPO names and registry policy keys.
-- Requires trusted RSAT ActiveDirectory and GroupPolicy modules and a domain identity with appropriately scoped rights. Domain, group, member, GPO, OU and policy-key allowlists must be configured by the host.
+- Requires trusted RSAT ActiveDirectory and GroupPolicy modules and a domain identity with appropriately scoped rights. Domain, group, member, AD provisioning OU, GPO target OU and policy-key allowlists must be configured independently by the host.
 - This increment does not provide arbitrary LDAP filters, arbitrary DN targeting, domain-controller discovery, forest-wide schema changes, replication management, or arbitrary GPO script deployment.
 
 ### 11. Scheduled tasks
