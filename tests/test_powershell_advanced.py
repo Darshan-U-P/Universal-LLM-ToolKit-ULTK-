@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import shutil
-import os
 from pathlib import Path
 
 import pytest
@@ -236,5 +235,5 @@ def test_session_tool_factory_requires_separate_capabilities(base: PowerShellToo
         base=base, allowed_session_commands=frozenset({"Write-Output"})
     )
     by_name = {tool.spec.name: tool for tool in tools}
-    assert by_name["powershell.session_execute"].spec.capabilities == "powershell:session:execute"
-    assert by_name["powershell.remote_invoke"].spec.capabilities == "powershell:remoting:execute"
+    assert by_name["powershell.session_execute"].spec.capabilities == frozenset({"powershell:session:execute"})
+    assert by_name["powershell.remote_invoke"].spec.capabilities == frozenset({"powershell:remoting:execute"})
