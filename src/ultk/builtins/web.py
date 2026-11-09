@@ -151,11 +151,23 @@ def _browser_open(url: str, timeout_ms: int = 10000) -> dict[str, Any]:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto(url, wait_until="domcontentloaded", timeout=min(timeout_ms, 20000))
-        result = {"url": page.url, "title": page.title(),
-                  "text": page.locator("body").inner_text(timeout=5000)[:20000]}
-        browser.close()
-        return result
+
+        def guard_route(route):
+            try:
+                _validate_public_url(route.request.url)
+                route.continue_()
+            except Exception:  # noqa: BLE001 - abort requests that fail URL validation
+                route.abort()
+
+        page.route("**/*", guard_route)
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=min(timeout_ms, 20000))
+            _validate_public_url(page.url)
+            result = {"url": page.url, "title": page.title(),
+                      "text": page.locator("body").inner_text(timeout=5000)[:20000]}
+            return result
+        finally:
+            browser.close()
 
 
 def create_web_tools(*, download_root: str = "./downloads") -> tuple[FunctionTool, ...]:
