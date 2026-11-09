@@ -849,7 +849,7 @@ def create_advanced_powershell_tools(
     allowed_gpo_names: frozenset[str] = frozenset(),
     allowed_gpo_targets: frozenset[str] = frozenset(),
     allowed_task_names: frozenset[str] = frozenset(),
-    allowed_task_paths: frozenset[str] = frozenset({"\"}),
+    allowed_task_paths: frozenset[str] = frozenset({chr(92)}),
     approved_task_templates: Mapping[str, Mapping[str, str]] | None = None,
     allowed_audit_subcategories: frozenset[str] = frozenset(),
     allow_security_policy_changes: bool = False,
