@@ -201,7 +201,10 @@ The provider and plugin branches extend the REST integration branch; media exten
 - [ ] Validate Linux/macOS safe eject with exact device allowlists, busy mount handling, multi-partition devices and data-loss prevention. Windows safe eject is not implemented.
 - [ ] Validate Windows wevtutil XPath query and XML namespace parsing, Linux journalctl since/channel behavior, macOS log show output format, privilege restrictions, truncation and secret-sensitive event data.
 - [ ] Event watches are persisted definitions only; host scheduler polling is required. Background daemon, incremental cursor/checkpoint, deduplication and notification delivery are not implemented.
-- [ ] Validate subprocess output draining/capping, timeout kill behavior, child-process cleanup, command availability, sanitized environment and Windows process handle behavior.
+- [ ] Validate subprocess output draining/capping, timeout kill behavior, child-process cleanup, command availability, restricted OS/display environment and Windows process handle behavior.
+- [ ] Verify secure attention sequence Ctrl+Alt+Delete is rejected by both standalone shortcut and sequence validation.
+- [ ] Verify Windows ACL grant uses only numeric host-allowlisted SIDs and R/RX/M rights, with no recursive or Full Control grants.
+- [ ] Verify device eject requires exact host-allowlisted identifiers and is rejected on Windows; test busy-device and in-flight I/O handling on Linux/macOS.
 - [ ] pyproject.toml had a malformed literal escaped newline between optional dependency declarations in the parent branch; this branch rewrites it as valid separate TOML entries and adds the computer-os extra. Verify TOML parsing, wheel build and installation of platform markers.
 - [ ] Validate optional dependency installation and imports: PyWinCtl, PyAutoGUI, screeninfo, pywinauto, pyvda, pyudev and system-level AT-SPI bindings.
 - [ ] No Windows 11, Linux X11/Wayland or macOS end-to-end integration tests have been run for this increment.
