@@ -36,7 +36,7 @@ class PersistentPowerShellSessions:
         "WarningPreference", "InformationPreference", "ExecutionContext", "PSDefaultParameterValues",
         "host", "HOME", "PROFILE", "PSHOME", "PID", "PSVersionTable", "Error", "LASTEXITCODE",
         "MyInvocation", "PSScriptRoot", "PSCommandPath", "PSCmdlet", "PSBoundParameters",
-        "PSCulture", "PSUICulture",
+        "PSCulture", "PSUICulture", "remoteSessions", "allowedRemoteCommands", "allowedComputers",
     })
 
     _FORBIDDEN_AST = [
@@ -54,10 +54,14 @@ class PersistentPowerShellSessions:
     def __init__(
         self, executable: str, working_root: Path, allowed_commands: frozenset[str],
         timeout_seconds: int, max_output_bytes: int,
+        allowed_computers: frozenset[str] = frozenset(),
+        allowed_remote_commands: frozenset[str] = frozenset(),
     ) -> None:
         self.executable = executable
         self.working_root = working_root
         self.allowed_commands = frozenset(allowed_commands)
+        self.allowed_computers = frozenset(item.casefold() for item in allowed_computers)
+        self.allowed_remote_commands = frozenset(allowed_remote_commands)
         self.timeout = timeout_seconds
         self.max_output = max_output_bytes
         self._sessions: dict[str, dict[str, Any]] = {}
@@ -66,12 +70,17 @@ class PersistentPowerShellSessions:
     def _wrapper(self) -> str:
         commands = base64.b64encode(json.dumps(sorted(self.allowed_commands)).encode()).decode()
         forbidden = "@(" + ",".join("'" + name.replace("'", "''") + "'" for name in self._FORBIDDEN_AST) + ")"
+        remote_commands = base64.b64encode(json.dumps(sorted(self.allowed_remote_commands)).encode()).decode()
+        computers = base64.b64encode(json.dumps(sorted(self.allowed_computers)).encode()).decode()
         return (
             "[Console]::InputEncoding=[System.Text.UTF8Encoding]::new($false);[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false);"
             "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
             "$WarningPreference='SilentlyContinue';$InformationPreference='SilentlyContinue';"
             f"$allowed=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{commands}'))|ConvertFrom-Json;"
-            f"$forbidden={forbidden};$reserved=@('allowed','forbidden','maxOutput','reserved','request','line','ast','tokens','errors','bad','variables','assignments','calls','name','resolved','result','json','value','commandName','arguments','path','variable','assignment','call','node','vars','item','data','scripts','scriptText','allResults','failed','stepIndex','stepOutput','status','ErrorActionPreference','ProgressPreference','WarningPreference','InformationPreference','ExecutionContext','PSDefaultParameterValues','host','HOME','PROFILE','PSHOME','PID','PSVersionTable','Error','LASTEXITCODE','MyInvocation','PSScriptRoot','PSCommandPath','PSCmdlet','PSBoundParameters','PSCulture','PSUICulture');"
+            f"$allowedRemoteCommands=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{remote_commands}'))|ConvertFrom-Json;"
+            f"$allowedComputers=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{computers}'))|ConvertFrom-Json;"
+            "$remoteSessions=@{};"
+            f"$forbidden={forbidden};$reserved=@('allowed','forbidden','maxOutput','reserved','request','line','ast','tokens','errors','bad','variables','assignments','calls','name','resolved','result','json','value','commandName','arguments','path','variable','assignment','call','node','vars','item','data','scripts','scriptText','allResults','failed','stepIndex','stepOutput','status','ErrorActionPreference','ProgressPreference','WarningPreference','InformationPreference','ExecutionContext','PSDefaultParameterValues','host','HOME','PROFILE','PSHOME','PID','PSVersionTable','Error','LASTEXITCODE','MyInvocation','PSScriptRoot','PSCommandPath','PSCmdlet','PSBoundParameters','PSCulture','PSUICulture','remoteSessions','allowedRemoteCommands','allowedComputers');"
             f"$maxOutput={self.max_output};"
             "function Send-Response($value) {"
             "$json=ConvertTo-Json -InputObject $value -Depth 8 -Compress;"
