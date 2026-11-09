@@ -73,6 +73,9 @@ class ComputerOSPack:
     def __init__(
         self, *, filesystem_root: str | Path, state_database: str | Path,
         allowed_services: frozenset[str] = frozenset(),
+        allowed_acl_sids: frozenset[str] = frozenset(),
+        allowed_eject_devices: frozenset[str] = frozenset(),
+        allow_windows_acl_changes: bool = False,
         allow_posix_chmod: bool = True, allow_posix_chown: bool = False,
         max_output_bytes: int = 200_000,
     ) -> None:
@@ -81,6 +84,9 @@ class ComputerOSPack:
         self.database = Path(state_database).expanduser().resolve()
         self.database.parent.mkdir(parents=True, exist_ok=True)
         self.allowed_services = frozenset(allowed_services)
+        self.allowed_acl_sids = frozenset(allowed_acl_sids)
+        self.allowed_eject_devices = frozenset(allowed_eject_devices)
+        self.allow_windows_acl_changes = allow_windows_acl_changes
         self.allow_chmod = allow_posix_chmod
         self.allow_chown = allow_posix_chown
         self.max_output = max_output_bytes
@@ -546,6 +552,63 @@ class ComputerOSPack:
         os.chown(path, uid, gid, follow_symlinks=False)
         return self.file_metadata(relative_path)
 
+
+    def windows_acl(self, relative_path: str) -> dict[str, Any]:
+        if os.name != "nt":
+            raise ToolExecutionError("Windows ACL inspection is available only on Windows.")
+        path = self.resolve(relative_path)
+        if self._contains_symlink(relative_path) or not path.exists():
+            raise ToolExecutionError("ACL inspection requires an existing non-symlink path.")
+        executable = shutil.which("icacls.exe") or shutil.which("icacls")
+        if not executable:
+            raise ToolExecutionError("icacls is unavailable.")
+        result = _run([executable, str(path)], output_limit=self.max_output)
+        return {"path": relative_path, **result}
+
+    def grant_windows_acl(self, relative_path: str, sid: str, rights: str) -> dict[str, Any]:
+        if os.name != "nt" or not self.allow_windows_acl_changes:
+            raise ToolExecutionError("Windows ACL changes are disabled or unavailable.")
+        path = self.resolve(relative_path)
+        if self._contains_symlink(relative_path) or not path.exists():
+            raise ToolExecutionError("ACL changes require an existing non-symlink path.")
+        principal = self._text(sid, "Windows security identifier", 184)
+        if not re.fullmatch(r"S-1-(?:[0-9]+-){1,14}[0-9]+", principal, flags=re.IGNORECASE):
+            raise ToolExecutionError("ACL principal must be a canonical numeric Windows SID.")
+        if principal not in self.allowed_acl_sids:
+            raise ToolExecutionError("Windows SID is not in the host-configured ACL allowlist.")
+        if rights not in {"R", "RX", "M"}:
+            raise ToolExecutionError("ACL rights must be R, RX or M; Full Control is intentionally excluded.")
+        executable = shutil.which("icacls.exe") or shutil.which("icacls")
+        if not executable:
+            raise ToolExecutionError("icacls is unavailable.")
+        result = _run([executable, str(path), "/grant:r", f"{principal}:({rights})"],
+                      timeout=20, output_limit=self.max_output)
+        return {"path": relative_path, "sid": principal, "rights": rights, **result}
+
+    def eject_device(self, device_id: str) -> dict[str, Any]:
+        device = self._text(device_id, "device identifier", 256)
+        if device not in self.allowed_eject_devices:
+            raise ToolExecutionError("Device is not in the host-configured eject allowlist.")
+        if platform.system() == "Linux":
+            if not device.startswith("/dev/") or ".." in Path(device).parts:
+                raise ToolExecutionError("Linux eject identifier must be an exact /dev device path.")
+            executable = shutil.which("udisksctl")
+            if not executable:
+                raise ToolExecutionError("udisksctl is unavailable.")
+            result = _run([executable, "power-off", "-b", device], timeout=30,
+                          output_limit=self.max_output)
+        elif platform.system() == "Darwin":
+            if not re.fullmatch(r"/dev/disk[0-9]+(?:s[0-9]+)?", device):
+                raise ToolExecutionError("macOS eject identifier must be an exact /dev/disk device.")
+            executable = shutil.which("diskutil")
+            if not executable:
+                raise ToolExecutionError("diskutil is unavailable.")
+            result = _run([executable, "eject", device], timeout=30,
+                          output_limit=self.max_output)
+        else:
+            raise ToolExecutionError("Safe eject is not implemented for Windows in this increment.")
+        return {"device": device, **result}
+
     # Hardware and device inventory.
     def hardware(self) -> dict[str, Any]:
         vm = psutil.virtual_memory()
@@ -733,14 +796,20 @@ class ComputerOSPack:
 def create_computer_os_tools(
     *, filesystem_root: str | Path = ".", state_database: str | Path = "./ultk_computer_os.sqlite3",
     allowed_services: frozenset[str] = frozenset(),
+    allowed_acl_sids: frozenset[str] = frozenset(),
+    allowed_eject_devices: frozenset[str] = frozenset(),
+    allow_windows_acl_changes: bool = False,
     allow_posix_chmod: bool = True, allow_posix_chown: bool = False,
     max_output_bytes: int = 200_000,
 ) -> tuple[FunctionTool, ...]:
     """Create the cross-platform computer/OS pack; optional native backends load on demand."""
     pack = ComputerOSPack(
         filesystem_root=filesystem_root, state_database=state_database,
-        allowed_services=allowed_services, allow_posix_chmod=allow_posix_chmod,
-        allow_posix_chown=allow_posix_chown, max_output_bytes=max_output_bytes)
+        allowed_services=allowed_services, allowed_acl_sids=allowed_acl_sids,
+        allowed_eject_devices=allowed_eject_devices,
+        allow_windows_acl_changes=allow_windows_acl_changes,
+        allow_posix_chmod=allow_posix_chmod, allow_posix_chown=allow_posix_chown,
+        max_output_bytes=max_output_bytes)
 
     def add(name: str, description: str, props: dict[str, Any], required: list[str],
             capability: str, function: Any, timeout: int = 20) -> None:
@@ -768,9 +837,12 @@ def create_computer_os_tools(
     add("computer_os.list_services", "List services using Windows SCM, systemd or launchd.", {}, [], "system:services:read", pack.services, 35)
     add("computer_os.service_action", "Start, stop or restart an exact host-allowlisted Windows/Linux service.", {"service": {"type": "string", "minLength": 1, "maxLength": 128}, "action": {"type": "string", "enum": ["start", "stop", "restart"]}}, ["service", "action"], "system:services:write", pack.service_action, 40)
     add("computer_os.file_metadata", "Inspect file type, size, timestamps, ownership and permission mode within filesystem_root.", {"path": text}, ["path"], "filesystem:metadata:read", pack.file_metadata)
+    add("computer_os.windows_acl", "Inspect Windows discretionary access control entries with icacls.", {"path": text}, ["path"], "filesystem:acl:read", pack.windows_acl)
+    add("computer_os.grant_windows_acl", "Grant R, RX or M rights to one host-allowlisted SID on one Windows filesystem object.", {"path": text, "sid": {"type": "string", "minLength": 5, "maxLength": 184}, "rights": {"type": "string", "enum": ["R", "RX", "M"]}}, ["path", "sid", "rights"], "filesystem:acl:write", pack.grant_windows_acl)
     add("computer_os.chmod", "Change POSIX permission bits for a non-symlink path within filesystem_root.", {"path": text, "mode": {"type": "integer", "minimum": 0, "maximum": 511}}, ["path", "mode"], "filesystem:permissions:write", pack.chmod)
     add("computer_os.chown", "Change POSIX ownership only when explicitly enabled by the host.", {"path": text, "uid": {"type": "integer", "minimum": -1}, "gid": {"type": "integer", "minimum": -1}}, ["path", "uid", "gid"], "filesystem:ownership:write", pack.chown)
     add("computer_os.hardware_info", "Inspect CPU, memory, disk, battery and available thermal sensors.", {}, [], "system:hardware:read", pack.hardware)
+    add("computer_os.eject_usb_device", "Safely power off/eject one exact host-allowlisted USB storage device on Linux or macOS.", {"device_id": {"type": "string", "minLength": 1, "maxLength": 256}}, ["device_id"], "system:devices:eject", pack.eject_device, 40)
     add("computer_os.network_interfaces", "Inspect network interface state, addresses, MTU and link speed.", {}, [], "system:network:read", pack.network_interfaces)
     add("computer_os.usb_devices", "Enumerate connected USB devices using pyudev, pnputil or system_profiler.", {}, [], "system:devices:read", pack.usb_devices, 40)
     add("computer_os.read_recent_events", "Read a bounded snapshot of recent Windows Event Log, Linux journal or macOS unified log entries.", {"channel": {"type": "string", "maxLength": 32}, "limit": {"type": "integer", "minimum": 1, "maximum": 200}, "since_minutes": {"type": "integer", "minimum": 1, "maximum": 10080}}, [], "system:events:read", pack.recent_events, 40)
