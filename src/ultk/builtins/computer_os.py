@@ -439,9 +439,10 @@ class ComputerOSPack:
                 import pyvda
             except ImportError as exc:
                 raise ToolExecutionError("Install the optional pyvda package for Windows virtual desktops.") from exc
-            if action == "current":
+            if action in {"current", "list"}:
                 desktop = pyvda.Desktop.current()
-                return {"backend": "pyvda", "current_number": desktop.number}
+                return {"backend": "pyvda", "current_number": desktop.number,
+                        "note": "pyvda current-desktop view; complete enumeration depends on the installed pyvda version."}
             if action == "create":
                 desktop = pyvda.Desktop.create()
                 return {"backend": "pyvda", "created_number": desktop.number}
@@ -643,11 +644,12 @@ class ComputerOSPack:
             try:
                 root = ET.fromstring("<Events>" + result["stdout"] + "</Events>")
                 for event in list(root)[:limit]:
-                    system = event.find("System")
-                    provider = system.find("Provider") if system is not None else None
-                    event_id = system.find("EventID") if system is not None else None
-                    record = system.find("EventRecordID") if system is not None else None
-                    time_node = system.find("TimeCreated") if system is not None else None
+                    system = next((node for node in event if node.tag.rsplit("}", 1)[-1] == "System"), None)
+                    children = list(system) if system is not None else []
+                    provider = next((node for node in children if node.tag.rsplit("}", 1)[-1] == "Provider"), None)
+                    event_id = next((node for node in children if node.tag.rsplit("}", 1)[-1] == "EventID"), None)
+                    record = next((node for node in children if node.tag.rsplit("}", 1)[-1] == "EventRecordID"), None)
+                    time_node = next((node for node in children if node.tag.rsplit("}", 1)[-1] == "TimeCreated"), None)
                     events.append({"provider": provider.get("Name") if provider is not None else None,
                                    "event_id": event_id.text if event_id is not None else None,
                                    "record_id": record.text if record is not None else None,
@@ -680,7 +682,7 @@ class ComputerOSPack:
                     "output_truncated": result["output_truncated"]}
         if platform.system() == "Darwin":
             result = _run(["log", "show", "--last", f"{since_minutes}m", "--style", "json",
-                           "--info", "--debug", "--limit", str(limit)],
+                           "--info", "--debug", "--max-events", str(limit)],
                           timeout=30, output_limit=self.max_output)
             events = []
             if result["return_code"] == 0:
