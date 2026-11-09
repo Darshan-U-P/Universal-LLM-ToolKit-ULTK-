@@ -228,7 +228,7 @@ def create_document_tools(*, root_dir: str | Path,
             object_schema({
                 **path_schema,
                 "max_pages": {"type": "integer", "minimum": 1, "maximum": 100},
-                "max_chars": {"type": "integer", "minimum": 1, "maximum": 200000},
+                "max_chars": {"type": "integer", "minimum": 1, "maximum": max_output_chars},
             }, ["path"]),
             "document:read",
             lambda path, max_pages=50, max_chars=max_output_chars: _extract_text(
