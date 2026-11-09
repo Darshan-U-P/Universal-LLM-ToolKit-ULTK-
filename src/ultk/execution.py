@@ -72,6 +72,7 @@ class ToolDispatcher:
             session_id=session_id,
             granted_capabilities=granted_capabilities,
             arguments=dict(request.arguments),
+            metadata={},
         )
         approval_id = None
         try:
@@ -84,6 +85,7 @@ class ToolDispatcher:
                 granted_capabilities=granted_capabilities,
                 result=ToolResult(request.id, spec.name, "Authorized for execution.",
                                   metadata={"audit_outcome": "authorized"}),
+                approval_id=context.metadata.get("approval_id"),
             )
             if preflight.metadata.get("audit_failure"):
                 return preflight
