@@ -39,6 +39,8 @@ def test_scheduler_jobs_persist_and_run_only_configured_handlers(tmp_path: Path)
     assert result["executed"] == 1
     assert calls == [{"task": "heartbeat"}]
     assert scheduler.list()[0]["last_status"] == "success"
+    restarted = PersistentScheduler(database, {"record": lambda payload: None})
+    assert restarted.list()[0]["id"] == job["job_id"]
 
 
 def test_scheduler_rejects_unconfigured_handler(tmp_path: Path) -> None:
