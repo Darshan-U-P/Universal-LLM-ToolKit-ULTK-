@@ -42,3 +42,21 @@ async def test_agent_calls_tool_then_returns_final_answer():
     assert len(provider.calls) == 2
     assert provider.calls[0]["tools"][0]["function"]["name"] == "demo.greet"
     assert provider.calls[1]["messages"][-1]["content"] == "Hello, Darshan!"
+
+
+@pytest.mark.asyncio
+async def test_model_cannot_call_registered_but_disabled_tool():
+    provider = MockProvider([
+        AssistantTurn(tool_calls=(
+            ToolCallRequest("call-disabled", "demo.greet", {"name": "Darshan"}),
+        )),
+        AssistantTurn(content="The requested tool was unavailable."),
+    ])
+    toolkit = ToolKit(provider, policy=AllowListPolicy({"demo.greet"}))
+    toolkit.register_tool(GreetingTool())
+
+    answer = await toolkit.run("Try greeting.", enabled_tools=[])
+
+    assert answer == "The requested tool was unavailable."
+    assert provider.calls[0]["tools"] == []
+    assert "not enabled" in provider.calls[1]["messages"][-1]["content"]
