@@ -28,7 +28,7 @@ class FunctionTool:
             raise ToolExecutionError("Operation exceeded its time limit.") from exc
         except ToolExecutionError:
             raise
-        except Exception as exc:  # noqa: BLE001 - normalize optional integration failures
+        except Exception as exc:
             raise ToolExecutionError(f"Operation failed ({type(exc).__name__}).") from exc
 
 
