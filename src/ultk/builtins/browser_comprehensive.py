@@ -84,12 +84,24 @@ class BrowserControlPlane:
         return {"profile": name, "deleted": cur.rowcount == 1}
 
     @staticmethod
-    def _guard(page):
+    def _guard_context(context):
         def guard(route):
             try:
                 _url(route.request.url)
                 route.continue_()
-            except Exception: route.abort()
+            except Exception:
+                route.abort()
+        context.route("**/*", guard)
+
+    @staticmethod
+    def _guard(page):
+        # Standalone monitor pages do not share a BrowserContext created by _with_context.
+        def guard(route):
+            try:
+                _url(route.request.url)
+                route.continue_()
+            except Exception:
+                route.abort()
         page.route("**/*", guard)
 
     def _with_context(self, profile: str, action):
@@ -115,6 +127,7 @@ class BrowserControlPlane:
             browser = p.chromium.launch(headless=self.headless, args=launch_args)
             context = browser.new_context(storage_state=str(state) if state.exists() else None,
                                           service_workers="block", accept_downloads=False)
+            self._guard_context(context)
             try:
                 pages = []
                 for saved_url in tabs:
@@ -151,6 +164,13 @@ class BrowserControlPlane:
             page=pages[active]; page.goto(url,wait_until=wait_until,timeout=25000); _url(page.url)
             return {"url":page.url,"title":page.title(),"tab_index":active}
         return self._with_context(profile,run)
+
+    def snapshot(self, profile: str):
+        def run(ctx, pages, active):
+            page = pages[active]
+            return {"url": page.url, "title": page.title(),
+                    "text": page.locator("body").inner_text(timeout=5000)[:20000]}
+        return self._with_context(profile, run)
 
     def tabs(self, profile: str, operation: str, url: str | None = None, index: int | None = None):
         def run(ctx,pages,active):
@@ -398,6 +418,13 @@ def create_comprehensive_browser_tools(*,profile_root:str|Path="./browser_profil
       FunctionTool("browser.extensions_list","List host-trusted browser extensions configured for this browser pack.",
         object_schema({}),"browser:extensions:read",b.list_extensions),
       FunctionTool("browser.profile_delete","Delete a profile and its saved authentication state.",object_schema({"name":p},["name"]),"browser:profile:manage",b.delete_profile),
+      FunctionTool("browser.navigate","Navigate the active tab of a named profile to a public HTTP(S) URL.",
+        object_schema({"profile":p,"url":{"type":"string","format":"uri"},
+          "wait_until":{"type":"string","enum":["domcontentloaded","load","networkidle","commit"]}},
+          ["profile","url"]),"browser:navigate",
+        lambda profile,url,wait_until="domcontentloaded":b.navigate(profile,url,wait_until)),
+      FunctionTool("browser.snapshot","Return the active tab URL, title and bounded visible text.",
+        object_schema({"profile":p},["profile"]),"browser:read",b.snapshot),
       FunctionTool("browser.tabs","List, create, select or close tabs in a named profile.",
         object_schema({"profile":p,"operation":{"type":"string","enum":["list","new","select","close"]},
           "url":{"type":"string","format":"uri"},"index":{"type":"integer","minimum":0}},["profile","operation"]),
