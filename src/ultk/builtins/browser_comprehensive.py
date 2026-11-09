@@ -80,6 +80,16 @@ class BrowserControlPlane:
 
     def create_profile(self, name: str, clone_from: str | None = None):
         name = _name(name)
+        source = None
+        if clone_from is not None:
+            source_name = _name(clone_from)
+            if source_name == name:
+                raise ToolExecutionError("A profile cannot clone itself.")
+            with sqlite3.connect(self.db_path) as db:
+                source_exists = db.execute("SELECT 1 FROM profiles WHERE name=?", (source_name,)).fetchone()
+            if not source_exists:
+                raise ToolExecutionError("Source browser profile does not exist.")
+            source = self._profile_path(source_name)
         with sqlite3.connect(self.db_path) as db:
             if db.execute("SELECT COUNT(*) FROM profiles").fetchone()[0] >= self.max_profiles:
                 raise ToolExecutionError("Browser profile limit reached.")
@@ -88,15 +98,10 @@ class BrowserControlPlane:
             now = time.time()
             db.execute("INSERT INTO profiles(name,created,last_used,tabs,active_tab) VALUES (?,?,?,?,0)",
                        (name, now, now, "[]"))
-        if clone_from:
-            source_name = _name(clone_from)
-            with sqlite3.connect(self.db_path) as db:
-                source_exists = db.execute("SELECT 1 FROM profiles WHERE name=?", (source_name,)).fetchone()
-            source = self._profile_path(source_name)
-            if not source_exists or not source.is_dir():
-                raise ToolExecutionError("Source browser profile does not exist or has no local profile directory.")
-            shutil.copytree(source, self._profile_path(name), dirs_exist_ok=True)
-        return {"profile": name, "created": True}
+        target = self._profile_path(name)
+        if source is not None and source.is_dir():
+            shutil.copytree(source, target, dirs_exist_ok=True)
+        return {"profile": name, "created": True, "cloned": clone_from is not None}
 
     def list_profiles(self):
         with sqlite3.connect(self.db_path) as db:
@@ -450,7 +455,7 @@ class BrowserControlPlane:
         return self._with_context(profile,run)
 
     def list_extensions(self):
-        return {"extensions":[{"path":str(path),"manifest_present":(path/"manifest.json").is_file()}
+        return {"extensions":[{"name":path.name,"manifest_present":(path/"manifest.json").is_file()}
                               for path in self.extension_dirs],
                 "note":"Only host-configured extension directories are loaded; model input cannot add extensions."}
 
