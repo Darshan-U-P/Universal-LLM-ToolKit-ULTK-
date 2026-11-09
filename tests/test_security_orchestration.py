@@ -193,3 +193,27 @@ def test_workflow_rejects_cycles_and_undeclared_references() -> None:
                 WorkflowStep("b", "test.b", {"value": {"$ref": "a#/value"}}, ()),
             ]
         )
+
+@pytest.mark.asyncio
+async def test_approval_request_callback_receives_exact_action_context(tmp_path) -> None:
+    tool = CounterTool()
+    registry = ToolRegistry()
+    registry.register(tool)
+    notices = []
+    store = SQLiteApprovalStore(tmp_path / "approvals.sqlite3")
+    policy = ApprovalPolicy(
+        AllowListPolicy({"test.write"}),
+        store,
+        approval_capabilities={"test:write"},
+        on_request=lambda notice: notices.append(notice),
+    )
+    dispatcher = ToolDispatcher(registry, policy)
+    result = await dispatcher.execute(
+        ToolCallRequest("call-notify", "test.write", {"value": 12}),
+        session_id="session-notify",
+        granted_capabilities=frozenset({"test:write"}),
+    )
+    assert result.is_error
+    assert notices[0].approval_id == result.metadata["approval_id"]
+    assert notices[0].tool_name == "test.write"
+    assert notices[0].arguments == {"value": 12}
