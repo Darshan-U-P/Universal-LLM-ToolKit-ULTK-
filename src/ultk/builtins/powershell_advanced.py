@@ -1243,7 +1243,247 @@ class AdvancedPowerShellToolPack:
             "$audit=auditpol.exe /get /category:*;"
             "$defender=Get-MpComputerStatus -ErrorAction SilentlyContinue | "
             "Select-Object AntivirusEnabled,RealTimeProtectionEnabled,BehaviorMonitorEnabled,IoavProtectionEnabled,NISEnabled;"
-            "@{audit_policy=$audit;defender=$defender}",
+            "$preferences=Get-MpPreference -ErrorAction SilentlyContinue | "
+            "Select-Object PUAProtection,EnableControlledFolderAccess,EnableNetworkProtection,MAPSReporting,SubmitSamplesConsent;"
+            "$firewall=Get-NetFirewallProfile -ErrorAction SilentlyContinue | "
+            "Select-Object Name,Enabled,DefaultInboundAction,DefaultOutboundAction,LogAllowed,LogBlocked;"
+            "$cfg=Join-Path $env:TEMP ('ultk-secpol-'+[guid]::NewGuid().ToString('N')+'.inf');$policy=@();"
+            "try{secedit.exe /export /cfg $cfg /quiet;if($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $cfg)){"
+            "$policy=Get-Content -LiteralPath $cfg | Where-Object {$_ -match '^\\s*[^;#][^=]+=.*
+
+    def audit_policy_set(self, subcategory: str, success: bool, failure: bool) -> dict[str, Any]:
+        self._windows("audit policy management")
+        if not self.allow_security or subcategory not in self.allowed_audit:
+            raise ToolExecutionError("Security policy changes are disabled or subcategory is not host-allowlisted.")
+        if (not success or not failure) and not self.allow_audit_disable:
+            raise ToolExecutionError("Disabling audit categories requires the separate allow_audit_disable host opt-in.")
+        success_arg = "enable" if success else "disable"
+        failure_arg = "enable" if failure else "disable"
+        return self.base._run(
+            "auditpol.exe /set /subcategory:$data.subcategory /success:$data.success /failure:$data.failure;"
+            "if($LASTEXITCODE -ne 0){throw 'auditpol failed'};"
+            "auditpol.exe /get /subcategory:$data.subcategory",
+            {"subcategory": subcategory, "success": success_arg, "failure": failure_arg},
+            timeout=self.timeout)
+
+    def defender_harden(self, setting: str) -> dict[str, Any]:
+        self._windows("Defender policy management")
+        if not self.allow_security or setting not in {
+            "PUAProtection", "EnableControlledFolderAccess", "EnableNetworkProtection"
+        }:
+            raise ToolExecutionError("Defender hardening is disabled or setting is not in the safe allowlist.")
+        return self.base._run(
+            f"Set-MpPreference -{setting} Enabled -ErrorAction Stop;"
+            f"Get-MpPreference | Select-Object {setting}",
+            timeout=self.timeout)
+
+
+def create_advanced_powershell_tools(
+    *, base: PowerShellToolPack,
+    allowed_session_commands: frozenset[str] = frozenset(),
+    allowed_computers: frozenset[str] = frozenset(),
+    allowed_remote_commands: frozenset[str] = frozenset(),
+    allowed_registry_roots: frozenset[str] = frozenset(),
+    allowed_firewall_rule_names: frozenset[str] = frozenset(),
+    allowed_local_users: frozenset[str] = frozenset(),
+    allowed_local_groups: frozenset[str] = frozenset(),
+    local_user_password_env: str | None = None,
+    allowed_update_kbs: frozenset[str] = frozenset(),
+    allow_windows_update_install: bool = False,
+    allowed_disk_numbers: frozenset[int] = frozenset(),
+    allowed_drive_letters: frozenset[str] = frozenset(),
+    allow_storage_mutations: bool = False,
+    allowed_certificate_stores: frozenset[str] = frozenset({"Cert:\\CurrentUser\\My"}),
+    allowed_certificate_thumbprints: frozenset[str] = frozenset(),
+    allowed_install_modules: Mapping[str, frozenset[str]] | None = None,
+    allowed_package_names: frozenset[str] = frozenset(),
+    allowed_package_versions: Mapping[str, frozenset[str]] | None = None,
+    allowed_package_sources: frozenset[str] = frozenset(),
+    allowed_ad_domains: frozenset[str] = frozenset(),
+    allowed_ad_group_dns: frozenset[str] = frozenset(),
+    allowed_ad_member_dns: frozenset[str] = frozenset(),
+    allowed_gpo_names: frozenset[str] = frozenset(),
+    allowed_gpo_targets: frozenset[str] = frozenset(),
+    allowed_gpo_registry_keys: frozenset[str] = frozenset(),
+    allowed_task_names: frozenset[str] = frozenset(),
+    allowed_task_paths: frozenset[str] = frozenset({chr(92)}),
+    approved_task_templates: Mapping[str, Mapping[str, str]] | None = None,
+    allowed_audit_subcategories: frozenset[str] = frozenset(),
+    allow_security_policy_changes: bool = False,
+    allow_audit_disable: bool = False,
+    approved_security_templates: Mapping[str, Mapping[str, Any]] | None = None,
+    timeout_seconds: int = 30,
+) -> tuple[FunctionTool, ...]:
+    """Build the advanced PowerShell tool families under explicit host configuration."""
+    pack = AdvancedPowerShellToolPack(
+        base, allowed_session_commands=allowed_session_commands,
+        allowed_computers=allowed_computers, allowed_remote_commands=allowed_remote_commands,
+        allowed_registry_roots=allowed_registry_roots,
+        allowed_firewall_rule_names=allowed_firewall_rule_names,
+        allowed_local_users=allowed_local_users, allowed_local_groups=allowed_local_groups,
+        local_user_password_env=local_user_password_env, allowed_update_kbs=allowed_update_kbs,
+        allow_windows_update_install=allow_windows_update_install,
+        allowed_disk_numbers=allowed_disk_numbers, allowed_drive_letters=allowed_drive_letters,
+        allow_storage_mutations=allow_storage_mutations,
+        allowed_certificate_stores=allowed_certificate_stores,
+        allowed_certificate_thumbprints=allowed_certificate_thumbprints,
+        allowed_install_modules=allowed_install_modules, allowed_package_names=allowed_package_names,
+        allowed_package_versions=allowed_package_versions,
+        allowed_package_sources=allowed_package_sources, allowed_ad_domains=allowed_ad_domains,
+        allowed_ad_group_dns=allowed_ad_group_dns, allowed_ad_member_dns=allowed_ad_member_dns,
+        allowed_gpo_names=allowed_gpo_names, allowed_gpo_targets=allowed_gpo_targets,
+        allowed_gpo_registry_keys=allowed_gpo_registry_keys,
+        allowed_task_names=allowed_task_names, allowed_task_paths=allowed_task_paths,
+        approved_task_templates=approved_task_templates,
+        allowed_audit_subcategories=allowed_audit_subcategories,
+        allow_security_policy_changes=allow_security_policy_changes,
+        allow_audit_disable=allow_audit_disable,
+        approved_security_templates=approved_security_templates,
+        timeout_seconds=timeout_seconds,
+    )
+    tools: list[FunctionTool] = []
+
+    def add(name: str, description: str, props: dict[str, Any], required: list[str],
+            capability: str, fn: Any, timeout: int = 35) -> None:
+        tools.append(FunctionTool(name, description, object_schema(props, required),
+                                  capability, fn, timeout=timeout, output_limit=base.max_output))
+
+    s = {"type": "string", "minLength": 1, "maxLength": 2048}
+    name = {"type": "string", "minLength": 1, "maxLength": 128}
+    session_id = {"type": "string", "minLength": 32, "maxLength": 32}
+    empty: dict[str, Any] = {}
+
+    # Persistent local PowerShell runspaces.
+    add("powershell.session_open", "Open an isolated persistent PowerShell process with host-allowlisted cmdlets.", {"label": {"type": "string", "minLength": 1, "maxLength": 100}}, ["label"], "powershell:session:create", pack.sessions.open)
+    add("powershell.session_list", "List persistent PowerShell sessions owned by this tool pack.", empty, [], "powershell:session:read", pack.sessions.list)
+    add("powershell.session_execute", "Execute a bounded sequence of allowlisted cmdlets and session-variable assignments in an isolated persistent runspace.", {"session_id": session_id, "script": {"type": "string", "minLength": 1, "maxLength": 32000}}, ["session_id", "script"], "powershell:session:execute", pack.sessions.execute)
+    add("powershell.session_workflow", "Prevalidate then execute up to 20 sequential PowerShell steps in one persistent session.", {"session_id": session_id, "steps": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"type": "string", "minLength": 1, "maxLength": 32000}}}, ["session_id", "steps"], "powershell:workflow:execute", pack.sessions.workflow, 40)
+    add("powershell.session_variables", "List variable names and metadata in one isolated PowerShell session.", {"session_id": session_id}, ["session_id"], "powershell:session:read", pack.sessions.variables)
+    add("powershell.session_get_variable", "Read one explicitly named variable from an isolated PowerShell session.", {"session_id": session_id, "name": name}, ["session_id", "name"], "powershell:session:variables:read", pack.sessions.get_variable)
+    add("powershell.session_close", "Terminate and remove one persistent PowerShell session.", {"session_id": session_id}, ["session_id"], "powershell:session:close", pack.sessions.close)
+
+    # Authorized remoting; only host-allowlisted computers and cmdlets are callable.
+    def remote(computer: str, command: str, parameters: dict[str, Any] | None = None,
+               use_ssl: bool = True) -> dict[str, Any]:
+        pack._windows("PowerShell remoting")
+        host = pack._value(computer, "remote computer", 255)
+        if host.casefold() not in pack.allowed_computers:
+            raise ToolExecutionError("Remote computer is not host-allowlisted.")
+        if type(use_ssl) is not bool:
+            raise ToolExecutionError("use_ssl must be boolean.")
+        if command not in pack.allowed_remote_commands:
+            raise ToolExecutionError("Remote cmdlet is not host-allowlisted.")
+        if command.casefold() in {"invoke-expression", "add-type", "start-process", "set-executionpolicy", "invoke-command", "new-pssession"}:
+            raise ToolExecutionError("Remote command is blocked by the ULTK remoting safety policy.")
+        values = parameters or {}
+        if not isinstance(values, dict) or len(values) > 30:
+            raise ToolExecutionError("Remote parameters must be an object with at most 30 entries.")
+        if any(not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", key) or
+               isinstance(value, dict) or (isinstance(value, list) and (len(value) > 100 or any(not isinstance(item, (str, int, float, bool, type(None))) for item in value))) or
+               not isinstance(value, (str, int, float, bool, type(None), list))
+               for key, value in values.items()):
+            raise ToolExecutionError("Remote parameter names or values are invalid.")
+        if len(json.dumps(values, ensure_ascii=False)) > 16_000:
+            raise ToolExecutionError("Remote parameter payload exceeds 16 KB.")
+        return pack.base._run(
+            "$parameters=@{};foreach($p in $data.parameters.PSObject.Properties){$parameters[$p.Name]=$p.Value};"
+            "$script={param($commandName,$arguments);"
+            "$cmd=Get-Command -Name $commandName -CommandType Cmdlet -ErrorAction Stop;"
+            "& $cmd @arguments};"
+            "Invoke-Command -ComputerName $data.computer -UseSSL:$data.use_ssl -ScriptBlock $script "
+            "-ArgumentList $data.command,$parameters -ErrorAction Stop",
+            {"computer": host, "command": command, "parameters": values, "use_ssl": bool(use_ssl)},
+            timeout=120)
+    add("powershell.remote_session_open", "Open a persistent WinRM PSSession to one host-allowlisted computer using integrated authentication and SSL by default.", {"label": {"type": "string", "minLength": 1, "maxLength": 100}, "computer": s, "use_ssl": {"type": "boolean"}}, ["label", "computer"], "powershell:remoting:session:create", pack.sessions.open_remote_session, 130)
+    add("powershell.remote_session_invoke", "Invoke one host-allowlisted cmdlet with bounded data arguments in an existing persistent WinRM session.", {"session_id": session_id, "remote_session_id": session_id, "command": name, "parameters": {"type": "object"}}, ["session_id", "remote_session_id", "command"], "powershell:remoting:session:execute", pack.sessions.remote_invoke, 130)
+    add("powershell.remote_session_close", "Close a persistent WinRM session and its local PowerShell process.", {"session_id": session_id, "remote_session_id": session_id}, ["session_id", "remote_session_id"], "powershell:remoting:session:close", pack.sessions.close_remote_session, 40)
+    add("powershell.remote_invoke", "Invoke one host-allowlisted cmdlet with bounded data arguments on an allowlisted remote computer using WS-Man; integrated authentication.", {"computer": s, "command": name, "parameters": {"type": "object"}, "use_ssl": {"type": "boolean"}}, ["computer", "command"], "powershell:remoting:execute", remote, 130)
+
+    # Registry mutation.
+    add("powershell.registry_set_value", "Create or set one registry value inside a host-allowlisted writable registry subtree.", {"path": s, "name": s, "value": {}, "value_type": {"type": "string", "enum": ["String", "ExpandString", "MultiString", "DWord", "QWord", "Binary"]}}, ["path", "name", "value", "value_type"], "powershell:registry:write", pack.registry_set)
+    add("powershell.registry_remove_value", "Remove one named value inside a host-allowlisted registry subtree.", {"path": s, "name": s}, ["path", "name"], "powershell:registry:value:delete", pack.registry_remove_value)
+    add("powershell.registry_remove_key", "Remove one empty registry key inside a host-allowlisted subtree; recursive deletion is not exposed.", {"path": s}, ["path"], "powershell:registry:key:delete", pack.registry_remove_key)
+
+    # Firewall rules.
+    add("powershell.firewall_list_rules", "List Windows Defender Firewall rules.", empty, [], "powershell:read:firewall", pack.firewall_list)
+    add("powershell.firewall_create_rule", "Create a firewall rule whose internal name is host-allowlisted.", {"name": name, "display_name": s, "direction": {"type": "string", "enum": ["Inbound", "Outbound"]}, "action": {"type": "string", "enum": ["Allow", "Block"]}, "protocol": {"type": "string", "enum": ["TCP", "UDP", "Any"]}, "local_port": {"type": ["integer", "null"], "minimum": 1, "maximum": 65535}, "remote_port": {"type": ["integer", "null"], "minimum": 1, "maximum": 65535}, "profile": {"type": "string", "enum": ["Domain", "Private", "Public", "Any"]}, "enabled": {"type": "boolean"}}, ["name", "display_name", "direction", "action", "protocol", "profile", "enabled"], "powershell:firewall:create", pack.firewall_create)
+    add("powershell.firewall_enable_rule", "Enable one host-allowlisted firewall rule.", {"name": name}, ["name"], "powershell:firewall:write", lambda name: pack.firewall_state(name, True))
+    add("powershell.firewall_disable_rule", "Disable one host-allowlisted firewall rule.", {"name": name}, ["name"], "powershell:firewall:disable", lambda name: pack.firewall_state(name, False))
+    add("powershell.firewall_remove_rule", "Remove one host-allowlisted firewall rule.", {"name": name}, ["name"], "powershell:firewall:delete", pack.firewall_remove)
+
+    # Local Windows users/groups.
+    add("powershell.list_local_users", "List local Windows user accounts.", empty, [], "powershell:read:identity", pack.local_users)
+    add("powershell.list_local_groups", "List local Windows groups.", empty, [], "powershell:read:identity", pack.local_groups)
+    add("powershell.create_local_user", "Create one host-allowlisted local user using a host-injected password environment secret.", {"name": name, "description": {"type": "string", "maxLength": 256}}, ["name"], "powershell:identity:user:create", pack.local_user_create)
+    add("powershell.enable_local_user", "Enable one host-allowlisted local user.", {"name": name}, ["name"], "powershell:identity:user:write", lambda name: pack.local_user_enabled(name, True))
+    add("powershell.disable_local_user", "Disable one host-allowlisted local user.", {"name": name}, ["name"], "powershell:identity:user:disable", lambda name: pack.local_user_enabled(name, False))
+    add("powershell.remove_local_user", "Remove one host-allowlisted local user.", {"name": name}, ["name"], "powershell:identity:user:delete", pack.local_user_remove)
+    add("powershell.create_local_group", "Create one host-allowlisted local group.", {"name": name, "description": {"type": "string", "maxLength": 256}}, ["name"], "powershell:identity:group:create", pack.local_group_create)
+    add("powershell.remove_local_group", "Remove one host-allowlisted local group.", {"name": name}, ["name"], "powershell:identity:group:delete", pack.local_group_remove)
+    add("powershell.add_local_group_member", "Add one host-allowlisted user to one host-allowlisted local group.", {"user_name": name, "group_name": name}, ["user_name", "group_name"], "powershell:identity:group:write", lambda user_name, group_name: pack.local_group_member(user_name, group_name, True))
+    add("powershell.remove_local_group_member", "Remove one host-allowlisted user from one host-allowlisted local group.", {"user_name": name, "group_name": name}, ["user_name", "group_name"], "powershell:identity:group:remove_member", lambda user_name, group_name: pack.local_group_member(user_name, group_name, False))
+
+    # Windows Update.
+    add("powershell.windows_update_available", "List available Windows updates using host-installed PSWindowsUpdate.", empty, [], "powershell:read:updates", pack.windows_update_list, 90)
+    add("powershell.windows_update_history", "Read installed Windows update history.", empty, [], "powershell:read:updates", pack.windows_update_history)
+    add("powershell.windows_update_install", "Install only host-allowlisted KB updates; automatic reboot is suppressed.", {"kb_ids": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"type": "string", "pattern": "^KB[0-9]{5,10}$"}}}, ["kb_ids"], "powershell:updates:install", pack.windows_update_install, 150)
+
+    # Disks and volumes.
+    add("powershell.list_disks", "List physical Windows disks.", empty, [], "powershell:read:storage", pack.disks)
+    add("powershell.list_partitions", "List partitions on one host-allowlisted disk.", {"disk_number": {"type": "integer", "minimum": 0}}, ["disk_number"], "powershell:read:storage", pack.partitions)
+    add("powershell.list_volumes", "List Windows volumes and free space.", empty, [], "powershell:read:storage", pack.volumes)
+    add("powershell.set_disk_online", "Bring one host-allowlisted disk online or offline.", {"disk_number": {"type": "integer", "minimum": 0}, "online": {"type": "boolean"}}, ["disk_number", "online"], "powershell:storage:state", pack.disk_online)
+    add("powershell.initialize_disk", "Initialize only a host-allowlisted RAW disk as GPT or MBR.", {"disk_number": {"type": "integer", "minimum": 0}, "partition_style": {"type": "string", "enum": ["GPT", "MBR"]}}, ["disk_number", "partition_style"], "powershell:storage:initialize", pack.disk_initialize)
+    add("powershell.set_partition_drive_letter", "Assign a host-allowlisted drive letter to a partition on a host-allowlisted disk.", {"disk_number": {"type": "integer", "minimum": 0}, "partition_number": {"type": "integer", "minimum": 1}, "drive_letter": {"type": "string", "pattern": "^[D-Zd-z]$"}}, ["disk_number", "partition_number", "drive_letter"], "powershell:storage:partition:driveletter", pack.partition_set_drive_letter)
+    add("powershell.set_volume_label", "Change the label of a host-allowlisted volume drive letter.", {"drive_letter": {"type": "string", "pattern": "^[D-Zd-z]$"}, "label": {"type": "string", "minLength": 1, "maxLength": 32}}, ["drive_letter", "label"], "powershell:storage:volume:label", pack.volume_set_label)
+    add("powershell.resize_partition", "Resize a partition only within the size bounds reported by Windows Storage cmdlets.", {"disk_number": {"type": "integer", "minimum": 0}, "partition_number": {"type": "integer", "minimum": 1}, "size_bytes": {"type": "integer", "minimum": 1048576, "maximum": 2000000000000}}, ["disk_number", "partition_number", "size_bytes"], "powershell:storage:partition:resize", pack.partition_resize)
+    add("powershell.create_partition", "Create a bounded partition on one host-allowlisted disk; formatting is not exposed.", {"disk_number": {"type": "integer", "minimum": 0}, "size_bytes": {"type": "integer", "minimum": 1048576, "maximum": 2000000000000}, "drive_letter": {"type": ["string", "null"], "pattern": "^[D-Zd-z]$"}}, ["disk_number", "size_bytes"], "powershell:storage:partition:create", pack.partition_create)
+
+    # Certificate stores.
+    add("powershell.list_certificates", "List certificates in a host-allowlisted certificate store.", {"store": s}, ["store"], "powershell:read:certificates", pack.certificate_list)
+    add("powershell.import_public_certificate", "Import a project-local public CER/CRT/DER certificate into a host-allowlisted store; PFX/private-key import is not exposed.", {"path": s, "store": s}, ["path", "store"], "powershell:certificates:import", pack.certificate_import)
+    add("powershell.remove_certificate", "Remove a certificate only when its thumbprint is host-allowlisted.", {"store": s, "thumbprint": s}, ["store", "thumbprint"], "powershell:certificates:delete", pack.certificate_remove)
+
+    # Package/module installation.
+    add("powershell.install_module", "Install one host-allowlisted PowerShell module/version from a host-allowlisted repository.", {"name": name, "version": s, "repository": name}, ["name", "version", "repository"], "powershell:modules:install", pack.module_install, 150)
+    add("powershell.remove_module", "Remove one host-allowlisted PowerShell module/version.", {"name": name, "version": s}, ["name", "version"], "powershell:modules:remove", pack.module_remove, 150)
+    add("powershell.install_package", "Install one host-allowlisted package/version from a host-allowlisted package source.", {"name": name, "version": s, "source": name}, ["name", "version", "source"], "powershell:packages:install", pack.package_install, 150)
+    add("powershell.remove_package", "Uninstall one host-allowlisted package/version.", {"name": name, "version": s}, ["name", "version"], "powershell:packages:remove", pack.package_remove, 150)
+
+    # Active Directory and Group Policy.
+    add("powershell.ad_list_users", "List bounded AD users within a host-allowlisted domain/search base.", {"domain": s, "search_base": s}, ["domain", "search_base"], "powershell:read:active_directory", pack.ad_users, 60)
+    add("powershell.ad_list_groups", "List bounded AD groups within a host-allowlisted domain/search base.", {"domain": s, "search_base": s}, ["domain", "search_base"], "powershell:read:active_directory", pack.ad_groups, 60)
+    add("powershell.ad_create_user", "Create one AD user whose expected DN and OU are host-allowlisted, using a host-injected password secret.", {"sam_account_name": name, "name": s, "domain": s, "path": s, "description": {"type": "string", "maxLength": 256}}, ["sam_account_name", "name", "domain", "path"], "powershell:active_directory:user:create", pack.ad_user_create, 60)
+    add("powershell.ad_enable_user", "Enable one host-allowlisted Active Directory user DN.", {"distinguished_name": s}, ["distinguished_name"], "powershell:active_directory:user:write", lambda distinguished_name: pack.ad_user_state(distinguished_name, True), 60)
+    add("powershell.ad_disable_user", "Disable one host-allowlisted Active Directory user DN.", {"distinguished_name": s}, ["distinguished_name"], "powershell:active_directory:user:disable", lambda distinguished_name: pack.ad_user_state(distinguished_name, False), 60)
+    add("powershell.ad_remove_user", "Remove one host-allowlisted Active Directory user DN.", {"distinguished_name": s}, ["distinguished_name"], "powershell:active_directory:user:delete", pack.ad_user_remove, 60)
+    add("powershell.ad_create_group", "Create an AD group under a host-allowlisted OU.", {"name": s, "path": s, "scope": {"type": "string", "enum": ["Global", "DomainLocal", "Universal"]}, "category": {"type": "string", "enum": ["Security", "Distribution"]}}, ["name", "path", "scope", "category"], "powershell:active_directory:group:create", pack.ad_group_create, 60)
+    add("powershell.ad_remove_group", "Remove one host-allowlisted AD group DN.", {"group_dn": s}, ["group_dn"], "powershell:active_directory:group:delete", pack.ad_group_remove, 60)
+    add("powershell.ad_add_group_member", "Add one host-allowlisted AD member DN to one host-allowlisted group DN.", {"group_dn": s, "member_dn": s}, ["group_dn", "member_dn"], "powershell:active_directory:group:write", lambda group_dn, member_dn: pack.ad_group_member(group_dn, member_dn, True))
+    add("powershell.ad_remove_group_member", "Remove one host-allowlisted AD member DN from one host-allowlisted group DN.", {"group_dn": s, "member_dn": s}, ["group_dn", "member_dn"], "powershell:active_directory:group:remove_member", lambda group_dn, member_dn: pack.ad_group_member(group_dn, member_dn, False))
+    add("powershell.gpo_list", "List Group Policy Objects in a host-allowlisted AD domain.", {"domain": s}, ["domain"], "powershell:read:gpo", pack.gpo_list, 60)
+    add("powershell.gpo_create", "Create a host-allowlisted GPO in a host-allowlisted domain.", {"name": name, "domain": s}, ["name", "domain"], "powershell:gpo:create", pack.gpo_create, 60)
+    add("powershell.gpo_delete", "Delete one host-allowlisted GPO in a host-allowlisted domain.", {"name": name, "domain": s}, ["name", "domain"], "powershell:gpo:delete", pack.gpo_remove, 60)
+    add("powershell.gpo_set_registry_value", "Set one Group Policy registry setting only under a host-allowlisted GPO and registry key.", {"name": name, "domain": s, "key": s, "value_name": s, "value": {}, "value_type": {"type": "string", "enum": ["String", "DWord", "QWord", "ExpandString", "MultiString"]}}, ["name", "domain", "key", "value_name", "value", "value_type"], "powershell:gpo:settings:write", pack.gpo_registry_set, 60)
+    add("powershell.gpo_link", "Link a host-allowlisted GPO to a host-allowlisted OU target.", {"name": name, "target": s, "domain": s}, ["name", "target", "domain"], "powershell:gpo:link", lambda name, target, domain: pack.gpo_link(name, target, domain, True), 60)
+    add("powershell.gpo_unlink", "Remove a host-allowlisted GPO link from a host-allowlisted OU target.", {"name": name, "target": s, "domain": s}, ["name", "target", "domain"], "powershell:gpo:unlink", lambda name, target, domain: pack.gpo_link(name, target, domain, False), 60)
+
+    # Scheduled task templates.
+    add("powershell.create_scheduled_task", "Create/update a scheduled task from a host-approved executable template and bounded schedule.", {"name": name, "template_id": name, "schedule": {"type": "string", "enum": ["Once", "Daily", "Weekly"]}, "at": {"type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"}, "days": {"type": "array", "items": {"type": "string"}, "maxItems": 7}, "task_path": s}, ["name", "template_id", "schedule", "at"], "powershell:tasks:create", pack.tasks_create, 60)
+    add("powershell.delete_scheduled_task", "Delete one host-allowlisted scheduled task.", {"name": name, "task_path": s}, ["name", "task_path"], "powershell:tasks:delete", pack.tasks_delete)
+
+    # Security policy.
+    add("powershell.apply_security_template", "Apply one host-approved SHA-256-pinned local security INF template for explicitly approved secedit areas.", {"template_id": name}, ["template_id"], "powershell:security:template:apply", pack.apply_security_template, 130)
+    add("powershell.inspect_security_policy", "Inspect Windows audit policy and Defender protection status.", empty, [], "powershell:read:security", pack.security_inspect)
+    add("powershell.set_audit_policy", "Enable/disable success/failure auditing for a host-allowlisted audit subcategory.", {"subcategory": s, "success": {"type": "boolean"}, "failure": {"type": "boolean"}}, ["subcategory", "success", "failure"], "powershell:security:audit:write", pack.audit_policy_set)
+    add("powershell.harden_defender_setting", "Enable one supported Defender hardening feature; weakening settings are not exposed.", {"setting": {"type": "string", "enum": ["PUAProtection", "EnableControlledFolderAccess", "EnableNetworkProtection"]}}, ["setting"], "powershell:security:defender:write", pack.defender_harden)
+    return tuple(tools)
+} | Select-Object -First 300}}"
+            "catch{$policy=@('secedit export unavailable: '+$_.Exception.Message)}"
+            "finally{if(Test-Path -LiteralPath $cfg){Remove-Item -LiteralPath $cfg -Force -ErrorAction SilentlyContinue}};"
+            "$accounts=net.exe accounts;"
+            "@{audit_policy=$audit;defender_status=$defender;defender_preferences=$preferences;"
+            "firewall_profiles=$firewall;local_security_policy=$policy;account_policy=$accounts}",
             timeout=self.timeout)
 
     def audit_policy_set(self, subcategory: str, success: bool, failure: bool) -> dict[str, Any]:
