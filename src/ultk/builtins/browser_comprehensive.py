@@ -24,10 +24,16 @@ def _url(value: str) -> str:
 
 class BrowserControlPlane:
     def __init__(self, root: str | Path, *, headless: bool = True,
-                 max_profiles: int = 20, max_tabs: int = _MAX_TABS) -> None:
+                 max_profiles: int = 20, max_tabs: int = _MAX_TABS,
+                 extension_dirs: tuple[str | Path, ...] = (), notifier=None) -> None:
         self.root = Path(root).expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.headless, self.max_profiles, self.max_tabs = bool(headless), max_profiles, max_tabs
+        self.extension_dirs = tuple(Path(x).expanduser().resolve() for x in extension_dirs)
+        self.notifier = notifier
+        for extension in self.extension_dirs:
+            if not extension.is_dir() or not (extension / "manifest.json").is_file():
+                raise ValueError(f"Trusted browser extension directory is invalid: {extension}")
         self.db_path = self.root / "browser_profiles.sqlite3"
         with sqlite3.connect(self.db_path) as db:
             db.execute("""CREATE TABLE IF NOT EXISTS profiles(
@@ -99,7 +105,14 @@ class BrowserControlPlane:
         state = self._profile_path(profile)
         tabs, active = self._manifest(profile)
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=self.headless)
+            launch_args = []
+            if self.extension_dirs:
+                if self.headless:
+                    raise ToolExecutionError("Chromium extensions require headed mode.")
+                paths = [str(x) for x in self.extension_dirs]
+                launch_args = ["--disable-extensions-except=" + ",".join(paths),
+                               "--load-extension=" + ",".join(paths)]
+            browser = p.chromium.launch(headless=self.headless, args=launch_args)
             context = browser.new_context(storage_state=str(state) if state.exists() else None,
                                           service_workers="block", accept_downloads=False)
             try:
@@ -286,7 +299,80 @@ class BrowserControlPlane:
         result=self._fetch_monitor(row[0],row[1]); digest=hashlib.sha256(result["text"].encode()).hexdigest()
         changed=row[2] is not None and row[2]!=digest
         with sqlite3.connect(self.db_path) as db: db.execute("UPDATE site_changes SET last_hash=? WHERE monitor_id=?",(digest,monitor_id))
-        return {"monitor_id":monitor_id,"url":row[0],"changed":changed,"title":result["title"],"text_excerpt":result["text"][:3000]}
+        event = {"monitor_id":monitor_id,"url":row[0],"changed":changed,"title":result["title"],"text_excerpt":result["text"][:3000]}
+        if changed and self.notifier is not None:
+            self.notifier(event)
+        return event
+
+    def websocket_probe(self, profile: str, ws_url: str, message: str, timeout_ms: int = 5000):
+        parsed = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(ws_url)
+        if parsed.scheme not in {"ws", "wss"} or not parsed.hostname or len(ws_url) > 2048:
+            raise ToolExecutionError("Only public ws:// or wss:// URLs are accepted.")
+        _url(("https://" if parsed.scheme == "wss" else "http://") + parsed.netloc + "/")
+        if not isinstance(message, str) or len(message) > 4000 or not 500 <= timeout_ms <= 10000:
+            raise ToolExecutionError("WebSocket message or timeout is outside configured bounds.")
+        def run(ctx, pages, active):
+            return pages[active].evaluate("""async ({url,message,timeout}) => {
+              return await new Promise(resolve => {
+                const ws = new WebSocket(url); let settled=false;
+                const finish = value => { if (!settled) { settled=true; try{ws.close();}catch{} resolve(value); } };
+                const timer = setTimeout(() => finish({error:'timeout'}), timeout);
+                ws.onopen = () => ws.send(message);
+                ws.onmessage = event => { clearTimeout(timer); finish({received:String(event.data).slice(0,4000)}); };
+                ws.onerror = () => { clearTimeout(timer); finish({error:'websocket_error'}); };
+              });
+            }""", {"url":ws_url,"message":message,"timeout":timeout_ms})
+        return self._with_context(profile, run)
+
+    def run_test(self, profile: str, steps: list[dict[str, Any]]):
+        if not 1 <= len(steps) <= 30:
+            raise ToolExecutionError("Browser test must contain 1–30 steps.")
+        def run(ctx, pages, active):
+            page = pages[active]
+            results = []
+            for index, step in enumerate(steps):
+                action = step.get("action")
+                try:
+                    if action == "navigate":
+                        page.goto(_url(step.get("url","")), wait_until="domcontentloaded", timeout=20000)
+                    elif action in {"click","fill"}:
+                        selector = step.get("selector","")
+                        if not selector or len(selector)>500: raise ToolExecutionError("Invalid test selector.")
+                        loc = page.locator(selector).first
+                        if action == "click": loc.click(timeout=10000)
+                        else:
+                            value = step.get("value","")
+                            if not isinstance(value,str) or len(value)>5000: raise ToolExecutionError("Invalid test value.")
+                            loc.fill(value,timeout=10000)
+                    elif action == "expect_text":
+                        text = step.get("text","")
+                        if not isinstance(text,str) or not text or len(text)>1000: raise ToolExecutionError("Invalid expected text.")
+                        if text not in page.locator("body").inner_text(timeout=5000):
+                            raise ToolExecutionError("Expected text was not present.")
+                    elif action == "expect_visible":
+                        selector = step.get("selector","")
+                        if not selector or len(selector)>500: raise ToolExecutionError("Invalid visibility selector.")
+                        if not page.locator(selector).first.is_visible(timeout=5000):
+                            raise ToolExecutionError("Expected element was not visible.")
+                    elif action == "expect_url":
+                        expected = step.get("contains","")
+                        if not isinstance(expected,str) or len(expected)>500 or expected not in page.url:
+                            raise ToolExecutionError("Current URL did not contain the expected value.")
+                    else:
+                        raise ToolExecutionError("Unsupported browser test action.")
+                    results.append({"step":index,"action":action,"passed":True,"url":page.url})
+                except Exception as exc:
+                    results.append({"step":index,"action":action,"passed":False,
+                                    "error":str(exc)[:500],"url":page.url})
+                    break
+            return {"passed":all(x["passed"] for x in results),
+                    "steps_completed":len(results),"results":results}
+        return self._with_context(profile,run)
+
+    def list_extensions(self):
+        return {"extensions":[{"path":str(path),"manifest_present":(path/"manifest.json").is_file()}
+                              for path in self.extension_dirs],
+                "note":"Only host-configured extension directories are loaded; model input cannot add extensions."}
 
     def _fetch_monitor(self,url,selector):
         try:
@@ -301,13 +387,16 @@ class BrowserControlPlane:
             finally: browser.close()
 
 
-def create_comprehensive_browser_tools(*,profile_root:str|Path="./browser_profiles",headless:bool=True):
-    b=BrowserControlPlane(profile_root,headless=headless)
+def create_comprehensive_browser_tools(*,profile_root:str|Path="./browser_profiles",headless:bool=True,
+                                        extension_dirs:tuple[str|Path,...]=(),notifier=None):
+    b=BrowserControlPlane(profile_root,headless=headless,extension_dirs=extension_dirs,notifier=notifier)
     p={"type":"string","minLength":1,"maxLength":64}
     return (
       FunctionTool("browser.profile_create","Create a named persistent browser profile; optional clone copies saved cookies/storage state.",
         object_schema({"name":p,"clone_from":p},["name"]),"browser:profile:manage",b.create_profile),
       FunctionTool("browser.profile_list","List browser profiles and last-used timestamps.",object_schema({}),"browser:profile:read",b.list_profiles),
+      FunctionTool("browser.extensions_list","List host-trusted browser extensions configured for this browser pack.",
+        object_schema({}),"browser:extensions:read",b.list_extensions),
       FunctionTool("browser.profile_delete","Delete a profile and its saved authentication state.",object_schema({"name":p},["name"]),"browser:profile:manage",b.delete_profile),
       FunctionTool("browser.tabs","List, create, select or close tabs in a named profile.",
         object_schema({"profile":p,"operation":{"type":"string","enum":["list","new","select","close"]},
@@ -333,6 +422,14 @@ def create_comprehensive_browser_tools(*,profile_root:str|Path="./browser_profil
       FunctionTool("browser.network_inspect","Capture request, response, failure and WebSocket metadata during navigation.",
         object_schema({"profile":p,"url":{"type":"string","format":"uri"}},["profile"]),
         "browser:network:inspect",lambda profile,url=None:b.network(profile,url),timeout=40),
+      FunctionTool("browser.websocket_probe","Send one bounded text message to a public WebSocket and capture one bounded reply.",
+        object_schema({"profile":p,"url":{"type":"string","minLength":1,"maxLength":2048},
+          "message":{"type":"string","maxLength":4000},"timeout_ms":{"type":"integer","minimum":500,"maximum":10000}},
+          ["profile","url","message"]),"browser:websocket:interact",
+        lambda profile,url,message,timeout_ms=5000:b.websocket_probe(profile,url,message,timeout_ms),timeout=20),
+      FunctionTool("browser.test_run","Run a bounded browser application test with navigation, interaction and assertions.",
+        object_schema({"profile":p,"steps":{"type":"array","minItems":1,"maxItems":30,"items":{"type":"object"}}},
+          ["profile","steps"]),"browser:test:run",lambda profile,steps:b.run_test(profile,steps),timeout=90),
       FunctionTool("browser.challenge_detect","Detect CAPTCHA/anti-bot pages; does not solve or bypass challenges.",
         object_schema({"profile":p},["profile"]),"browser:challenge:inspect",b.challenge),
       FunctionTool("browser.auth_status","Use host-supplied login selectors as an authentication heuristic.",
