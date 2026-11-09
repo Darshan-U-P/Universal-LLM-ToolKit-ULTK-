@@ -79,6 +79,24 @@ class ToolEngine:
 
         return tuple(await asyncio.gather(*(run(request) for request in requests)))
 
+    def install_data_tools(
+        self,
+        *,
+        root_dir: str | Path,
+        sqlite_database: str | Path | None = None,
+        allow_database_writes: bool = False,
+        max_file_bytes: int = 5_000_000,
+        max_rows: int = 1000,
+    ) -> None:
+        from ultk.builtins.data import create_data_tools
+        self.register_tools(create_data_tools(
+            root_dir=root_dir,
+            sqlite_database=sqlite_database,
+            allow_database_writes=allow_database_writes,
+            max_file_bytes=max_file_bytes,
+            max_rows=max_rows,
+        ))
+
     def install_filesystem_tools(self, root_dir: str | Path, *,
                                  max_file_bytes: int = 2_000_000) -> None:
         from ultk.builtins.filesystem import create_filesystem_tools
