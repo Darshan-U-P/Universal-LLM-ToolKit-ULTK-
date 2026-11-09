@@ -1,6 +1,6 @@
 """Expanded browser control plane: profiles, tabs, frames, network, scraping and guarded submissions."""
 from __future__ import annotations
-import hashlib, json, re, sqlite3, time, uuid
+import hashlib, json, re, shutil, sqlite3, time, uuid
 from pathlib import Path
 from typing import Any
 from ultk.builtins._common import FunctionTool, object_schema
@@ -44,7 +44,7 @@ class BrowserControlPlane:
                 last_hash TEXT, enabled INTEGER NOT NULL DEFAULT 1)""")
 
     def _profile_path(self, profile: str) -> Path:
-        return self.root / (hashlib.sha256(_name(profile).encode()).hexdigest() + ".state.json")
+        return self.root / (hashlib.sha256(_name(profile).encode()).hexdigest() + ".chromium")
 
     def _manifest(self, profile: str):
         with sqlite3.connect(self.db_path) as db:
@@ -66,9 +66,13 @@ class BrowserControlPlane:
             db.execute("INSERT INTO profiles(name,created,last_used,tabs,active_tab) VALUES (?,?,?,?,0)",
                        (name, now, now, "[]"))
         if clone_from:
-            source = self._profile_path(_name(clone_from))
-            if not source.is_file(): raise ToolExecutionError("Source profile has no saved browser state.")
-            self._profile_path(name).write_bytes(source.read_bytes())
+            source_name = _name(clone_from)
+            with sqlite3.connect(self.db_path) as db:
+                source_exists = db.execute("SELECT 1 FROM profiles WHERE name=?", (source_name,)).fetchone()
+            source = self._profile_path(source_name)
+            if not source_exists or not source.is_dir():
+                raise ToolExecutionError("Source browser profile does not exist or has no local profile directory.")
+            shutil.copytree(source, self._profile_path(name), dirs_exist_ok=True)
         return {"profile": name, "created": True}
 
     def list_profiles(self):
@@ -80,7 +84,7 @@ class BrowserControlPlane:
         name = _name(name)
         with sqlite3.connect(self.db_path) as db: cur = db.execute("DELETE FROM profiles WHERE name=?", (name,))
         path = self._profile_path(name)
-        if path.exists(): path.unlink()
+        if path.exists(): shutil.rmtree(path)
         return {"profile": name, "deleted": cur.rowcount == 1}
 
     @staticmethod
@@ -114,7 +118,8 @@ class BrowserControlPlane:
             from playwright.sync_api import sync_playwright
         except ImportError as exc:
             raise ToolExecutionError("Install the browser extra and Chromium browser binaries.") from exc
-        state = self._profile_path(profile)
+        user_data_dir = self._profile_path(profile)
+        user_data_dir.mkdir(parents=True, exist_ok=True)
         tabs, active = self._manifest(profile)
         with sync_playwright() as p:
             launch_args = []
@@ -124,24 +129,27 @@ class BrowserControlPlane:
                 paths = [str(x) for x in self.extension_dirs]
                 launch_args = ["--disable-extensions-except=" + ",".join(paths),
                                "--load-extension=" + ",".join(paths)]
-            browser = p.chromium.launch(headless=self.headless, args=launch_args)
-            context = browser.new_context(storage_state=str(state) if state.exists() else None,
-                                          service_workers="block", accept_downloads=False)
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=str(user_data_dir), headless=self.headless, args=launch_args,
+                service_workers="block", accept_downloads=False)
             self._guard_context(context)
             try:
+                initial_pages = list(context.pages)
                 pages = []
                 for saved_url in tabs:
                     try:
                         page = context.new_page()
-                        self._guard(page)
                         page.goto(_url(saved_url), wait_until="domcontentloaded", timeout=20000)
                         pages.append(page)
                     except Exception:
                         try: page.close()
                         except Exception: pass
-                if not pages:
-                    pages = [context.new_page()]
-                    self._guard(pages[0])
+                if pages:
+                    for initial in initial_pages:
+                        try: initial.close()
+                        except Exception: pass
+                else:
+                    pages = initial_pages or [context.new_page()]
                 active = min(max(active, 0), len(pages)-1)
                 result = action(context, pages, active)
                 new_tabs = [p.url for p in context.pages if p.url.startswith(("http://","https://"))][:self.max_tabs]
@@ -150,11 +158,9 @@ class BrowserControlPlane:
                 with sqlite3.connect(self.db_path) as db:
                     db.execute("UPDATE profiles SET tabs=?,active_tab=? WHERE name=?",
                                (json.dumps(new_tabs), active_index, profile))
-                context.storage_state(path=str(state))
                 return result
             finally:
                 context.close()
-                browser.close()
 
     def navigate(self, profile: str, url: str, wait_until: str = "domcontentloaded"):
         url = _url(url)
