@@ -857,7 +857,12 @@ class AdvancedPowerShellToolPack:
         candidate = Path(self._value(relative_path, "certificate path", 1000))
         if candidate.is_absolute() or ".." in candidate.parts:
             raise ToolExecutionError("Certificate path must be relative to working_root.")
-        path = (self.base.root / candidate).resolve()
+        lexical = self.base.root
+        for part in candidate.parts:
+            lexical = lexical / part
+            if lexical.is_symlink():
+                raise ToolExecutionError("Certificate path cannot contain symlink components.")
+        path = lexical.resolve()
         if not path.is_relative_to(self.base.root) or not path.is_file() or path.suffix.casefold() not in {".cer", ".crt", ".der"}:
             raise ToolExecutionError("Only a project-local public .cer/.crt/.der certificate can be imported.")
         return self.base._run(
@@ -908,7 +913,8 @@ class AdvancedPowerShellToolPack:
         self._ad_domain(domain)
         base = self._value(search_base, "AD search base", 512)
         domain_dn = ",".join(f"DC={part}" for part in domain.split("."))
-        if not base.casefold().endswith(domain_dn.casefold()):
+        base_folded, domain_dn_folded = base.casefold(), domain_dn.casefold()
+        if base_folded != domain_dn_folded and not base_folded.endswith("," + domain_dn_folded):
             raise ToolExecutionError("AD search base must be within the selected domain; verify the DN with your directory administrator.")
         return self.base._run(
             "Import-Module ActiveDirectory -ErrorAction Stop;"
@@ -1218,6 +1224,7 @@ class AdvancedPowerShellToolPack:
             raise ToolExecutionError("Partition size must be between 1 MiB and 2 TB.")
         return self.base._run(
             "$part=Get-Partition -DiskNumber $data.disk -PartitionNumber $data.partition -ErrorAction Stop;"
+            "if($part.IsBoot -or $part.IsSystem){throw 'Boot/system partitions cannot be resized through this tool.'};"
             "$supported=Get-PartitionSupportedSize -DiskNumber $data.disk -PartitionNumber $data.partition;"
             "if($data.size -lt $supported.SizeMin -or $data.size -gt $supported.SizeMax){throw 'Requested size is outside supported resize bounds.'};"
             "Resize-Partition -DiskNumber $data.disk -PartitionNumber $data.partition -Size $data.size -ErrorAction Stop | "
