@@ -469,7 +469,8 @@ class AdvancedPowerShellToolPack:
         remote_blocked = {"invoke-expression", "add-type", "start-process", "set-executionpolicy",
                           "invoke-command", "new-pssession", "remove-pssession", "stop-computer",
                           "restart-computer", "new-object", "add-member", "import-module", "import-pssession",
-                          "export-pssession", "new-module", "add-pssnapin"}
+                          "export-pssession", "new-module", "add-pssnapin", "invoke-item", "start-job",
+                          "start-threadjob", "register-objectevent", "register-wmievent"}
         if any(command.casefold() in remote_blocked for command in allowed_remote_commands):
             raise ToolExecutionError("Remote cmdlet allowlist includes a blocked code-execution or session-control command.")
         self.allowed_remote_commands = frozenset(allowed_remote_commands)
