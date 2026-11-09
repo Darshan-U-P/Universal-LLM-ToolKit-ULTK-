@@ -1,7 +1,7 @@
 """Universal LLM ToolKit public API."""
 
 from ultk.agents.runtime import AgentRuntime
-from ultk.approvals import ApprovalPolicy, SQLiteApprovalStore
+from ultk.approvals import ApprovalNotice, ApprovalPolicy, SQLiteApprovalStore
 from ultk.audit import SQLiteAuditLogger
 from ultk.engine import ToolEngine
 from ultk.models import AssistantTurn, ToolCallRequest, ToolContext, ToolResult, ToolSpec
@@ -14,7 +14,7 @@ from ultk.tool import Tool
 from ultk.toolkit import ToolKit
 
 __all__ = [
-    "AgentRuntime", "AllowListPolicy", "ApprovalPolicy", "AssistantTurn",
+    "AgentRuntime", "AllowListPolicy", "ApprovalNotice", "ApprovalPolicy", "AssistantTurn",
     "DenyAllPolicy", "OpenAICompatibleProvider", "PermissionPolicy", "ProviderAdapter", "SQLiteApprovalStore",
     "SQLiteAuditLogger", "Tool", "ToolCallRequest", "ToolContext", "ToolEngine",
     "ToolKit", "ToolRegistry", "ToolResult", "ToolSpec", "WorkflowEngine", "WorkflowStep",
