@@ -276,6 +276,48 @@ class PersistentPowerShellSessions:
                 raise ToolExecutionError(str(response.get("error", "PowerShell session operation failed."))[:1000])
             return response
 
+    def open_remote_session(self, label: str, computer: str, use_ssl: bool = True) -> dict[str, Any]:
+        host = PowerShellToolPack._string(computer, "remote computer", 255)
+        if host.casefold() not in self.allowed_computers or not self.allowed_remote_commands:
+            raise ToolExecutionError("Remote host and remote cmdlet allowlists must be configured by the host.")
+        if type(use_ssl) is not bool:
+            raise ToolExecutionError("use_ssl must be boolean.")
+        local = self.open(label)
+        try:
+            remote = self._request(local["session_id"], "remote_open", computer=host, use_ssl=use_ssl)
+        except Exception:
+            self.close(local["session_id"])
+            raise
+        return {"session_id": local["session_id"], **remote}
+
+    def remote_invoke(self, session_id: str, remote_session_id: str, command: str,
+                      parameters: dict[str, Any] | None = None) -> dict[str, Any]:
+        if not isinstance(remote_session_id, str) or not re.fullmatch(r"[0-9a-f]{32}", remote_session_id):
+            raise ToolExecutionError("Invalid remote session ID.")
+        if command not in self.allowed_remote_commands:
+            raise ToolExecutionError("Remote cmdlet is not host-allowlisted.")
+        values = parameters or {}
+        if not isinstance(values, dict) or len(values) > 30:
+            raise ToolExecutionError("Remote parameters must be an object with at most 30 entries.")
+        if any(not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", key) or isinstance(value, dict) or
+               (isinstance(value, list) and (len(value) > 100 or any(not isinstance(item, (str, int, float, bool, type(None))) for item in value))) or
+               not isinstance(value, (str, int, float, bool, type(None), list))
+               for key, value in values.items()):
+            raise ToolExecutionError("Remote parameter names or values are invalid.")
+        if len(json.dumps(values, ensure_ascii=False)) > 16_000:
+            raise ToolExecutionError("Remote parameter payload exceeds 16 KB.")
+        return {"session_id": session_id, **self._request(
+            session_id, "remote_invoke", remote_session_id=remote_session_id,
+            command=command, parameters=values,
+        )}
+
+    def close_remote_session(self, session_id: str, remote_session_id: str) -> dict[str, Any]:
+        if not isinstance(remote_session_id, str) or not re.fullmatch(r"[0-9a-f]{32}", remote_session_id):
+            raise ToolExecutionError("Invalid remote session ID.")
+        response = self._request(session_id, "remote_close", remote_session_id=remote_session_id)
+        self.close(session_id)
+        return {"session_id": session_id, **response}
+
     def validate(self, session_id: str, script: str) -> dict[str, Any]:
         self._validate_script_text(script)
         return self._request(session_id, "validate", script=script)
@@ -319,10 +361,17 @@ class PersistentPowerShellSessions:
 
     def close(self, session_id: str) -> dict[str, Any]:
         with self._lock:
-            record = self._sessions.pop(session_id, None)
+            record = self._sessions.get(session_id)
         if record is None:
             raise ToolExecutionError("PowerShell session does not exist or is already closed.")
         process: subprocess.Popen[str] = record["process"]
+        if process.poll() is None:
+            try:
+                self._request(session_id, "remote_close_all")
+            except ToolExecutionError:
+                pass
+        with self._lock:
+            self._sessions.pop(session_id, None)
         if process.poll() is None:
             process.terminate()
             try:
@@ -435,7 +484,7 @@ class AdvancedPowerShellToolPack:
         self.allow_audit_disable = allow_audit_disable
         self.sessions = PersistentPowerShellSessions(
             base.executable, base.root, allowed_session_commands, min(base.timeout, timeout_seconds),
-            base.max_output,
+            base.max_output, self.allowed_computers, self.allowed_remote_commands,
         )
 
     def _windows(self, name: str) -> None:
