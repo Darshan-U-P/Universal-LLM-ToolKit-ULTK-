@@ -339,3 +339,25 @@ def test_security_template_rejects_parent_traversal(base: PowerShellToolPack) ->
     )
     with pytest.raises(ToolExecutionError):
         pack._resolve_security_template("escape")
+
+
+
+def test_remote_computer_allowlist_rejects_host_lists_and_wildcards(base: PowerShellToolPack) -> None:
+    with pytest.raises(ToolExecutionError):
+        AdvancedPowerShellToolPack(
+            base, allowed_computers=frozenset({"srv01,srv02"}),
+            allowed_remote_commands=frozenset({"Get-Service"}),
+        )
+    with pytest.raises(ToolExecutionError):
+        AdvancedPowerShellToolPack(
+            base, allowed_computers=frozenset({"*.example.internal"}),
+            allowed_remote_commands=frozenset({"Get-Service"}),
+        )
+
+
+def test_non_ssl_remoting_is_disabled_by_default(base: PowerShellToolPack) -> None:
+    pack = AdvancedPowerShellToolPack(
+        base, allowed_computers=frozenset({"srv01.example.internal"}),
+        allowed_remote_commands=frozenset({"Get-Service"}),
+    )
+    assert pack.allow_insecure_remoting is False
