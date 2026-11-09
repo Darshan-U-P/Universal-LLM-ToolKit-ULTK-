@@ -1,5 +1,5 @@
+import asyncio
 import json
-import subprocess
 import sys
 import time
 
@@ -83,7 +83,9 @@ async def test_terminal_requires_capability(terminal_engine: ToolEngine) -> None
 async def test_process_terminate_requires_identity_and_capability() -> None:
     engine = ToolEngine(policy=AllowListPolicy({"process.terminate"}))
     engine.install_process_management_tools()
-    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    child = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", "import time; time.sleep(30)"
+    )
     try:
         created = psutil.Process(child.pid).create_time()
         denied = await engine.execute(
@@ -99,16 +101,18 @@ async def test_process_terminate_requires_identity_and_capability() -> None:
         assert not allowed.is_error
         assert json.loads(allowed.content)["status"] == "exited"
     finally:
-        if child.poll() is None:
+        if child.returncode is None:
             child.kill()
-            child.wait()
+            await child.wait()
 
 
 @pytest.mark.asyncio
 async def test_process_identity_mismatch_is_rejected() -> None:
     engine = ToolEngine(policy=AllowListPolicy({"process.terminate"}))
     engine.install_process_management_tools()
-    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    child = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", "import time; time.sleep(30)"
+    )
     try:
         result = await engine.execute(
             "process.terminate",
@@ -118,6 +122,6 @@ async def test_process_identity_mismatch_is_rejected() -> None:
         assert result.is_error
         assert "identity check failed" in result.content.lower()
     finally:
-        if child.poll() is None:
+        if child.returncode is None:
             child.kill()
-            child.wait()
+            await child.wait()
