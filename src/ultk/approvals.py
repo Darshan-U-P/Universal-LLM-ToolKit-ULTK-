@@ -81,7 +81,7 @@ class SQLiteApprovalStore:
                        (status, now, actor, approval_id))
         return {"approval_id": approval_id, "updated": True, "status": status}
 
-    def consume(self, tool_name: str, session_id: str, arguments: dict[str, Any]) -> bool:
+    def consume(self, tool_name: str, session_id: str, arguments: dict[str, Any]) -> str | None:
         now, digest = time.time(), _digest_arguments(arguments)
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -90,11 +90,11 @@ class SQLiteApprovalStore:
                 AND status='approved' AND expires_at>? ORDER BY decided_at DESC LIMIT 1""",
                 (tool_name, session_id, digest, now)).fetchone()
             if row is None:
-                return False
+                return None
             cursor = db.execute("""UPDATE approvals SET status='consumed'
                                    WHERE approval_id=? AND status='approved'""",
                                 (row["approval_id"],))
-            return cursor.rowcount == 1
+            return str(row["approval_id"]) if cursor.rowcount == 1 else None
 
     def list_pending(self, *, limit: int = 100) -> list[dict[str, Any]]:
         if not 1 <= limit <= 500:
@@ -121,7 +121,10 @@ class ApprovalPolicy:
         if not spec.capabilities.intersection(self.approval_capabilities):
             return True
         arguments = dict(context.arguments)
-        if self.store.consume(spec.name, context.session_id, arguments):
+        consumed_approval_id = self.store.consume(spec.name, context.session_id, arguments)
+        if consumed_approval_id:
+            if isinstance(context.metadata, dict):
+                context.metadata["approval_id"] = consumed_approval_id
             return True
         approval_id = self.store.create(spec.name, context.session_id, arguments)
         raise ApprovalRequiredError(approval_id)
