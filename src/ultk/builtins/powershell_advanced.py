@@ -285,7 +285,7 @@ class PersistentPowerShellSessions:
         local = self.open(label)
         try:
             remote = self._request(local["session_id"], "remote_open", computer=host, use_ssl=use_ssl)
-        except Exception:
+        except ToolExecutionError:
             self.close(local["session_id"])
             raise
         return {"session_id": local["session_id"], **remote}
@@ -1273,6 +1273,9 @@ def create_advanced_powershell_tools(
             "-ArgumentList $data.command,$parameters -ErrorAction Stop",
             {"computer": host, "command": command, "parameters": values, "use_ssl": bool(use_ssl)},
             timeout=120)
+    add("powershell.remote_session_open", "Open a persistent WinRM PSSession to one host-allowlisted computer using integrated authentication and SSL by default.", {"label": {"type": "string", "minLength": 1, "maxLength": 100}, "computer": s, "use_ssl": {"type": "boolean"}}, ["label", "computer"], "powershell:remoting:session:create", pack.sessions.open_remote_session, 130)
+    add("powershell.remote_session_invoke", "Invoke one host-allowlisted cmdlet with bounded data arguments in an existing persistent WinRM session.", {"session_id": session_id, "remote_session_id": session_id, "command": name, "parameters": {"type": "object"}}, ["session_id", "remote_session_id", "command"], "powershell:remoting:session:execute", pack.sessions.remote_invoke, 130)
+    add("powershell.remote_session_close", "Close a persistent WinRM session and its local PowerShell process.", {"session_id": session_id, "remote_session_id": session_id}, ["session_id", "remote_session_id"], "powershell:remoting:session:close", pack.sessions.close_remote_session, 40)
     add("powershell.remote_invoke", "Invoke one host-allowlisted cmdlet with bounded data arguments on an allowlisted remote computer using WS-Man; integrated authentication.", {"computer": s, "command": name, "parameters": {"type": "object"}, "use_ssl": {"type": "boolean"}}, ["computer", "command"], "powershell:remoting:execute", remote, 130)
 
     # Registry mutation.
