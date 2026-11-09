@@ -113,6 +113,22 @@ class ToolEngine:
             timeout_seconds=timeout_seconds,
         ))
 
+    def install_rest_tools(
+        self,
+        endpoints: Mapping[str, Mapping[str, Any]],
+        *,
+        allow_writes: bool = False,
+        max_response_bytes: int = 1_000_000,
+        timeout_seconds: int = 20,
+    ) -> None:
+        from ultk.builtins.integrations import create_rest_tools
+        self.register_tools(create_rest_tools(
+            endpoints,
+            allow_writes=allow_writes,
+            max_response_bytes=max_response_bytes,
+            timeout_seconds=timeout_seconds,
+        ))
+
     def install_document_tools(
         self,
         *,
