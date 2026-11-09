@@ -443,6 +443,8 @@ class AdvancedPowerShellToolPack:
             "Install-Module", "Uninstall-Module", "Install-Package", "Uninstall-Package", "Install-WindowsUpdate",
             "Set-Disk", "Initialize-Disk", "New-Partition", "Resize-Partition", "Import-Certificate",
             "Remove-GPO", "New-GPO", "New-GPLink", "Remove-GPLink", "Set-GPRegistryValue", "auditpol.exe",
+            "Enable-LocalUser", "Disable-LocalUser", "Enable-NetFirewallRule", "Disable-NetFirewallRule",
+            "Enable-ADAccount", "Disable-ADAccount", "Set-Partition", "Set-Volume", "Set-MpPreference",
         }
         forbidden_folded = {command.casefold() for command in forbidden_commands}
         if any(command.casefold() in forbidden_folded for command in allowed_session_commands):
