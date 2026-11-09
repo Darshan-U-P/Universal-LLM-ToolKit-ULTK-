@@ -12,7 +12,7 @@ This ledger separates implementation status from verification status. The projec
 | PR #6 — terminal/process management | Passed | Run 42666469124; 24 tests and Ruff passed. |
 | PR #7 — initial computer/web/development | Passed | Run 42672846897 passed after import/lint fixes. |
 | PR #8 — advanced computer/browser/development | Passed | Latest known run 42673036987 (run #168) completed successfully on head 0a48c0e2c986c4d69ccf07dc2e52d5059820c0ef. Earlier run 42672519333 had 16 Ruff findings; fixes were committed before the successful run. |
-| PR #9+ feature branches | Not run / deferred | New security, data, document and REST integration code is committed to sequential feature branches; no CI or test suite has been run on these increments by design. Pull requests have not yet been opened. |
+| New feature branches after PR #8 | Not run / deferred | Security, data, documents, REST, provider, plugin, media and email additions have not had tests or CI run by design. |
 
 Historical CI does not establish Windows GUI behavior, browser integration, production security or end-to-end provider compatibility. PRs remain unmerged unless explicitly merged by the project owner.
 
@@ -22,12 +22,16 @@ The new increments are deliberately sequential and remain unmerged:
 
 | Increment | Branch | Current scope |
 |---|---|---|
-| Security/orchestration | `feat/security-approval-audit-orchestration` | Persistent exact-argument approvals, SQLite audit hash chain, bounded parallel calls, workflow DAG execution, verification ledger |
+| Security/orchestration | `feat/security-approval-audit-orchestration` | Persistent exact-argument approvals, SQLite audit hash chain, bounded parallel calls, workflow DAG execution |
 | Data/database | `feat/data-database-tool-pack` | Root-confined CSV/JSON operations, read-only SQLite query/schema, opt-in DML |
 | Documents | `feat/document-extraction-tool-pack` | Bounded TXT/Markdown/PDF/DOCX/PPTX/XLSX extraction and metadata |
-| REST integrations | `feat/allowlisted-rest-integrations` | Host-configured HTTPS endpoints, host-held credentials, read tools and opt-in mutation tools |\n| Provider adapter | `feat/openai-compatible-provider` | Non-streaming OpenAI-compatible chat-completions adapter for hosted HTTPS and loopback HTTP endpoints |\n| Plugin SDK/manager | `feat/plugin-sdk-and-manager` | Metadata-only entry-point discovery, host trust allowlist, API compatibility checks, enable/disable lifecycle |\n| Media processing | `feat/media-processing-tool-pack` | Bounded Pillow image tools and host-configured FFmpeg/ffprobe operations |
+| REST integrations | `feat/allowlisted-rest-integrations` | Host-configured HTTPS endpoints, host-held credentials, read tools and opt-in mutation tools |
+| Provider adapter | `feat/openai-compatible-provider` | Non-streaming OpenAI-compatible chat-completions adapter for hosted HTTPS and loopback HTTP endpoints |
+| Plugin SDK/manager | `feat/plugin-sdk-and-manager` | Metadata-only entry-point discovery, host trust allowlist, API compatibility checks, enable/disable lifecycle |
+| Media processing | `feat/media-processing-tool-pack` | Bounded Pillow image tools and host-configured FFmpeg/ffprobe operations |
+| Email | `feat/secure-email-tool-pack` | Host-configured TLS SMTP sender, exact/domain recipient allowlists, plain-text only |
 
-Latest feature branch in the current chain: `feat/plugin-sdk-and-manager` (plugin SDK and manager). The provider and plugin branches extend the REST integration branch; the media branch extends the plugin branch. The feature branches are not pull requests yet; final integration and validation will happen after implementation work is complete.
+The provider and plugin branches extend the REST integration branch; media extends the plugin branch; email extends media. These are feature branches, not pull requests. Final integration and validation will happen after implementation work is complete.
 
 ## Known failures and fixes to retain
 
@@ -105,6 +109,29 @@ Latest feature branch in the current chain: `feat/plugin-sdk-and-manager` (plugi
 - [ ] DNS rebinding/pinning and network egress enforcement; current host checks do not pin DNS.
 - [ ] Verify API-specific pagination, rate limits, webhook signatures, idempotency and retry policies; not implemented.
 
+### Provider adapters
+- [ ] Validate hosted provider authentication, local Ollama-compatible endpoints, endpoint path construction, same-origin redirects and response parsing.
+- [ ] Test tool-call parsing against real OpenAI-compatible providers and confirm schema compatibility across vendors.
+- [ ] Add streaming, usage accounting, rate-limit/backoff and provider capability negotiation; these are not implemented.
+
+### Plugin SDK and manager
+- [ ] Validate metadata-only discovery, explicit trust gating, API compatibility, atomic registration, disable behavior and duplicate entry points.
+- [ ] Verify untrusted plugin modules are never imported before explicit enablement.
+- [ ] Package and install a real third-party test plugin from a wheel.
+- [ ] Add signed manifests, dependency resolution, isolated plugin workers and hot-reload; these are not implemented.
+
+### Media processing
+- [ ] Validate Pillow optional dependency, image metadata, alpha flattening, resize, conversion, decompression-bomb limits and output atomicity.
+- [ ] Validate FFmpeg/ffprobe executable configuration, codec availability, output detection, partial-output cleanup, timeouts and process cancellation.
+- [ ] Test large media files, corrupted inputs, path traversal and Windows/Linux path behavior.
+- [ ] Speech-to-text, diarization, TTS, subtitle generation and AI media generation remain unimplemented.
+
+### Email and communications
+- [ ] Validate SMTP-over-TLS and STARTTLS, credential loading/rotation, recipient allowlists, partial refusal and timeout behavior.
+- [ ] Require exact-argument human approval for externally visible email sends.
+- [ ] Test SMTP provider compatibility and message encoding.
+- [ ] Inbox reading, attachments, OAuth mail APIs, calendar, contacts, SMS and messaging APIs remain unimplemented.
+
 ## Current limitations / not yet implemented
 
 - No OS/container sandbox, credential vault, authenticated approval UI/API, distributed worker, durable workflow checkpoint/replay, global rate limiter or resource quota manager.
@@ -113,5 +140,9 @@ Latest feature branch in the current chain: `feat/plugin-sdk-and-manager` (plugi
 - No full Python execution environment; the restricted interpreter is intentionally not a REPL.
 - Data pack currently supports CSV/JSON and SQLite only; PostgreSQL, MySQL, NoSQL, vector databases, ETL and visualization are outstanding.
 - Document pack is read-only text extraction; OCR, editing, signing, redaction and conversion are outstanding.
-- REST transport is not a complete OAuth implementation or vendor-specific connector.\n- Media tools currently cover image operations and FFmpeg transcodes/probing only; speech and generative media are not implemented.\n- Provider support currently covers non-streaming OpenAI-compatible chat completions only.\n- Plugin manager supports explicitly trusted Python entry points in-process; it is not a plugin sandbox or marketplace.
-- Communications, media, AI/ML, cloud/infra, marketplace, TypeScript SDK and REST API server remain roadmap work.
+- REST transport is not a complete OAuth implementation or vendor-specific connector.
+- Provider support currently covers non-streaming OpenAI-compatible chat completions only.
+- Plugin manager supports explicitly trusted Python entry points in-process; it is not a plugin sandbox or marketplace.
+- Media tools cover image operations and FFmpeg transcodes/probing only; speech and generative media are not implemented.
+- Communications currently includes plain-text SMTP sending only.
+- Cloud/infra, AI/ML, marketplace, TypeScript SDK and REST API server remain roadmap work.
