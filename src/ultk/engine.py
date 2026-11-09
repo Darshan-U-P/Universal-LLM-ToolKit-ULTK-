@@ -336,6 +336,7 @@ class ToolEngine:
             allowed_session_commands=allowed_session_commands,
             allowed_computers=allowed_computers,
             allowed_remote_commands=allowed_remote_commands,
+            timeout_seconds=timeout_seconds,
             **options,
         ))
 
