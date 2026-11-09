@@ -17,6 +17,23 @@ from ultk.exceptions import ConfigurationError
 from ultk.models import AssistantTurn, ToolCallRequest
 
 
+class _SameOriginRedirect(urllib.request.HTTPRedirectHandler):
+    def __init__(self, origin: tuple[str, str, int]) -> None:
+        super().__init__()
+        self.origin = origin
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        parsed = urllib.parse.urlsplit(newurl)
+        origin = (
+            parsed.scheme,
+            parsed.hostname or "",
+            parsed.port or (443 if parsed.scheme == "https" else 80),
+        )
+        if origin != self.origin:
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 class OpenAICompatibleProvider:
     """Provider adapter for OpenAI-compatible /chat/completions APIs.
 
@@ -72,6 +89,11 @@ class OpenAICompatibleProvider:
             raise ConfigurationError("extra_headers contains an unsafe or invalid header.")
         self.base_url = base_url.rstrip("/") + "/"
         self.endpoint = urllib.parse.urljoin(self.base_url, "chat/completions")
+        self.origin = (
+            parsed.scheme,
+            parsed.hostname.casefold(),
+            parsed.port or (443 if parsed.scheme == "https" else 80),
+        )
         self.model = model
         self.api_key_env = api_key_env
         self.timeout_seconds = timeout_seconds
@@ -116,8 +138,10 @@ class OpenAICompatibleProvider:
                 raise ConfigurationError("Provider returned an unsupported content type.")
         tool_calls: list[ToolCallRequest] = []
         raw_calls = message.get("tool_calls") or []
-        if not isinstance(raw_calls, list):
-            raise ConfigurationError("Provider returned an invalid tool_calls collection.")
+        if not isinstance(raw_calls, list) or len(raw_calls) > 32:
+            raise ConfigurationError(
+                "Provider returned an invalid or oversized tool_calls collection."
+            )
         for raw_call in raw_calls:
             if not isinstance(raw_call, Mapping):
                 raise ConfigurationError("Provider returned an invalid tool call.")
@@ -177,7 +201,9 @@ class OpenAICompatibleProvider:
         request = urllib.request.Request(
             self.endpoint, data=request_data, headers=headers, method="POST"
         )
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}), _SameOriginRedirect(self.origin)
+        )
         try:
             with opener.open(request, timeout=self.timeout_seconds) as response:
                 response_data = response.read(self.max_response_bytes + 1)
