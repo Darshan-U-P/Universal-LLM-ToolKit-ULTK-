@@ -5,7 +5,7 @@ This is a planned taxonomy, not an implementation inventory. Each tool must be i
 | Domain | Planned tools |
 |---|---|
 | Core | provider/model discovery, registry, schemas, dispatch, retries, telemetry |
-| Computer/OS | filesystem, process management, generic terminal, dedicated PowerShell administration, clipboard, desktop interaction |
+| Computer/OS | filesystem and permissions, process management, generic terminal, dedicated PowerShell administration, persistent desktop contexts, multi-monitor/window/virtual-desktop management, keyboard automation, accessibility/UI Automation, cross-platform services, hardware/USB inventory, OS event monitoring |
 | Web | search, URL fetch, browser, scraper, downloads, monitoring |
 | Development | editor, isolated code runner, compiler, debugger, tests, Git repository inspection, branch/index/commit/diff/merge/conflict/history/remote workflows, API testing |
 | Data | SQL/NoSQL, CSV/XLSX, JSON/XML, ETL, vector DB, visualization |
