@@ -1,7 +1,10 @@
 """Bounded web retrieval, page analysis and browser automation tools."""
 from __future__ import annotations
 
+import hashlib
 import ipaddress
+import os
+import tempfile
 import socket
 import urllib.error
 import urllib.parse
@@ -127,19 +130,33 @@ def _search(query: str, limit: int = 5) -> dict[str, Any]:
     return {"query": query, "results": results}
 
 
-def _download(url: str, filename: str, download_root: str, max_bytes: int = 5_000_000) -> dict[str, Any]:
+def _download(url: str, filename: str, download_root: str, max_bytes: int = 5_000_000,
+              expected_sha256: str | None = None) -> dict[str, Any]:
     root = Path(download_root).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
-    name = Path(filename).name
-    if not name or name in {".", ".."}:
+    if not filename or filename in {".", ".."} or "/" in filename or "\\" in filename:
         raise ToolExecutionError("filename must be a simple file name.")
-    target = (root / name).resolve()
+    target = (root / filename).resolve()
     if not target.is_relative_to(root):
         raise ToolExecutionError("Download path escapes configured root.")
     final_url, data, content_type = _request(url, max_bytes)
-    target.write_bytes(data)
+    digest = hashlib.sha256(data).hexdigest()
+    if expected_sha256 is not None and (
+        len(expected_sha256) != 64 or digest.casefold() != expected_sha256.casefold()
+    ):
+        raise ToolExecutionError("Downloaded file SHA-256 does not match expected checksum.")
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="wb", dir=root, prefix=".ultk-download-", delete=False) as handle:
+            handle.write(data)
+            temporary_path = handle.name
+        os.replace(temporary_path, target)
+    finally:
+        if temporary_path and os.path.exists(temporary_path):
+            os.unlink(temporary_path)
     return {"url": final_url, "path": str(target), "bytes_written": len(data),
-            "content_type": content_type}
+            "content_type": content_type, "sha256": digest,
+            "checksum_verified": expected_sha256 is not None}
 
 
 def _browser_open(url: str, timeout_ms: int = 10000) -> dict[str, Any]:
@@ -189,9 +206,11 @@ def create_web_tools(*, download_root: str = "./downloads") -> tuple[FunctionToo
         FunctionTool("web.download_file", "Download a public URL into the configured download directory.",
                      object_schema({"url": {"type": "string", "format": "uri"},
                                     "filename": {"type": "string", "minLength": 1, "maxLength": 180},
-                                    "max_bytes": {"type": "integer", "minimum": 1, "maximum": 5000000}},
+                                    "max_bytes": {"type": "integer", "minimum": 1, "maximum": 5000000},
+                                    "expected_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"}},
                                    ["url", "filename"]),
-                     "web:download", lambda url, filename, max_bytes=5000000: _download(url, filename, root, max_bytes),
+                     "web:download", lambda url, filename, max_bytes=5000000, expected_sha256=None:
+                     _download(url, filename, root, max_bytes, expected_sha256),
                      timeout=30),
         FunctionTool("web.browser_open", "Open a public page in headless Chromium and return visible text.",
                      object_schema({"url": {"type": "string", "format": "uri"},
