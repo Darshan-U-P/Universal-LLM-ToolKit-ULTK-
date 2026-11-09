@@ -44,11 +44,13 @@ class ToolEngine:
 
     def require_approval(self, database: str | Path, *,
                          approval_capabilities: set[str] | frozenset[str],
-                         ttl_seconds: int = 600) -> Any:
+                         ttl_seconds: int = 600,
+                         on_request: Any = None) -> Any:
         from ultk.approvals import ApprovalPolicy, SQLiteApprovalStore
         store = SQLiteApprovalStore(database, ttl_seconds=ttl_seconds)
         self.policy = ApprovalPolicy(
-            self.policy, store, approval_capabilities=approval_capabilities)
+            self.policy, store, approval_capabilities=approval_capabilities,
+            on_request=on_request)
         self.dispatcher.policy = self.policy
         return store
 
