@@ -32,7 +32,6 @@ class ToolEngine:
     async def execute(self, name: str, arguments: dict[str, Any], *,
                       session_id: str = "default",
                       granted_capabilities: frozenset[str] = frozenset()) -> ToolResult:
-        """Execute one registered tool through the normal validation and policy path."""
         request = ToolCallRequest(id=uuid.uuid4().hex, name=name, arguments=arguments)
         return await self.dispatcher.execute(request, session_id=session_id,
                                              granted_capabilities=granted_capabilities)
@@ -59,20 +58,39 @@ class ToolEngine:
     def install_computer_tools(self, *, image_root: str | Path = "./screenshots",
                                allowed_apps: dict[str, str] | None = None,
                                allowed_environment_names: tuple[str, ...] = ()) -> None:
-        """Install clipboard, screenshot, mouse, keyboard, window and app tools."""
         from ultk.builtins.computer import create_computer_tools
         self.register_tools(create_computer_tools(
             image_root=image_root, allowed_apps=allowed_apps,
             allowed_environment_names=allowed_environment_names))
 
+    def install_advanced_computer_tools(self) -> None:
+        from ultk.builtins.computer_advanced import create_advanced_computer_tools
+        self.register_tools(create_advanced_computer_tools())
+
+    def install_scheduler_tools(self, database: str | Path,
+                                handlers: dict[str, Any]) -> None:
+        from ultk.builtins.scheduler import create_scheduler_tools
+        self.register_tools(create_scheduler_tools(database, handlers))
+
     def install_web_tools(self, *, download_root: str | Path = "./downloads") -> None:
-        """Install public web retrieval, extraction, download and browser tools."""
         from ultk.builtins.web import create_web_tools
         self.register_tools(create_web_tools(download_root=str(download_root)))
 
+    def install_advanced_browser_tools(self, *, session_root: str | Path = "./browser_sessions",
+                                       monitor_database: str | Path = "./site_monitors.sqlite3",
+                                       notifier: Any = None) -> None:
+        from ultk.builtins.browser_automation import create_advanced_browser_tools
+        self.register_tools(create_advanced_browser_tools(
+            session_root=session_root, monitor_database=monitor_database, notifier=notifier))
+
     def install_development_tools(self, *, project_root: str | Path,
                                   allowed_executables: dict[str, str] | None = None) -> None:
-        """Install project-scoped source, analysis, Git, compile and test tools."""
         from ultk.builtins.development import create_development_tools
         self.register_tools(create_development_tools(
             project_root=project_root, allowed_executables=allowed_executables))
+
+    def install_advanced_development_tools(self, *, project_root: str | Path,
+                                           **configuration: Any) -> None:
+        from ultk.builtins.development_advanced import create_advanced_development_tools
+        self.register_tools(create_advanced_development_tools(
+            project_root=project_root, **configuration))
