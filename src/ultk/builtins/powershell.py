@@ -100,6 +100,7 @@ class PowerShellToolPack:
             json.dumps(payload or {}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         ).decode("ascii")
         wrapper = (
+            "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false);"
             "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
             "$WarningPreference='SilentlyContinue';$InformationPreference='SilentlyContinue';"
             f"$data=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{payload_b64}')) | ConvertFrom-Json;"
@@ -147,7 +148,7 @@ class PowerShellToolPack:
         path = self.approved_scripts.get(script_id)
         if path is None:
             raise ToolExecutionError("Script ID is not host-approved.")
-        args = arguments or []
+        args = [] if arguments is None else arguments
         if not isinstance(args, list) or len(args) > 64 or any(
             not isinstance(item, str) or len(item) > 2000 or "\x00" in item for item in args):
             raise ToolExecutionError("Script arguments are invalid.")
