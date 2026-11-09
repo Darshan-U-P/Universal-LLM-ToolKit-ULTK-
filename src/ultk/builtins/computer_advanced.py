@@ -7,8 +7,8 @@ from typing import Any
 
 import psutil
 
-from ultk.exceptions import ToolExecutionError
 from ultk.builtins._common import FunctionTool, object_schema
+from ultk.exceptions import ToolExecutionError
 
 
 def _optional(module: str) -> Any:
