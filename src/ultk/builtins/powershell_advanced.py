@@ -928,7 +928,8 @@ class AdvancedPowerShellToolPack:
         self._ad_domain(domain)
         base = self._value(search_base, "AD search base", 512)
         domain_dn = ",".join(f"DC={part}" for part in domain.split("."))
-        if not base.casefold().endswith(domain_dn.casefold()):
+        base_folded, domain_dn_folded = base.casefold(), domain_dn.casefold()
+        if base_folded != domain_dn_folded and not base_folded.endswith("," + domain_dn_folded):
             raise ToolExecutionError("AD search base must be within the selected domain.")
         return self.base._run(
             "Import-Module ActiveDirectory -ErrorAction Stop;"
