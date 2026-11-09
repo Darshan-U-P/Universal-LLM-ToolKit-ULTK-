@@ -56,6 +56,8 @@ def test_persistent_sessions_reject_high_risk_cmdlet_allowlists(base: PowerShell
         AdvancedPowerShellToolPack(base, allowed_session_commands=frozenset({"Get-Service", "Invoke-Expression"}))
     with pytest.raises(ToolExecutionError):
         AdvancedPowerShellToolPack(base, allowed_session_commands=frozenset({"Get-Service", "Remove-Item"}))
+    with pytest.raises(ToolExecutionError):
+        AdvancedPowerShellToolPack(base, allowed_session_commands=frozenset({"Set-MpPreference"}))
 
 
 def test_registry_write_requires_path_inside_exact_host_root(base: PowerShellToolPack) -> None:
@@ -258,3 +260,20 @@ def test_remote_session_manager_requires_explicit_host_and_cmdlet_allowlists(bas
     )
     assert manager.allowed_computers == frozenset({"srv01.example.internal"})
     assert manager.allowed_remote_commands == frozenset({"Get-Service"})
+
+
+
+def test_persistent_session_blocks_output_variable_parameter_aliases(base: PowerShellToolPack) -> None:
+    from ultk.builtins.powershell_advanced import PersistentPowerShellSessions
+
+    manager = PersistentPowerShellSessions(
+        base.executable, base.root, frozenset({"Get-Process"}), 15, base.max_output
+    )
+    session = manager.open("variable-guard")
+    try:
+        with pytest.raises(ToolExecutionError):
+            manager.validate(session["session_id"], "Get-Process -OutVariable allowed")
+        with pytest.raises(ToolExecutionError):
+            manager.validate(session["session_id"], "Get-Process -ov allowed")
+    finally:
+        manager.close(session["session_id"])
