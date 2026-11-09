@@ -60,10 +60,10 @@ class RestrictedInterpreter:
                 ast.LtE: operator.le, ast.Gt: operator.gt, ast.GtE: operator.ge}
     @staticmethod
     def _safe_range(*args):
-        values = list(range(*args))
-        if len(values) > 10000:
+        sequence = range(*args)
+        if len(sequence) > 10000:
             raise ToolExecutionError("Interpreter range is limited to 10000 values.")
-        return values
+        return list(sequence)
 
     _builtins = {"abs": abs, "round": round, "min": min, "max": max,
                  "sum": sum, "len": len, "sorted": sorted,
@@ -118,6 +118,11 @@ class RestrictedInterpreter:
             return {self._eval(k, env): self._eval(v, env) for k, v in zip(node.keys, node.values)}
         if isinstance(node, ast.BinOp) and type(node.op) in self._binary:
             left, right = self._eval(node.left, env), self._eval(node.right, env)
+            if isinstance(node.op, ast.Mult):
+                if isinstance(left, (str, list, tuple)) and isinstance(right, int) and len(left) * max(0, right) > 10000:
+                    raise ToolExecutionError("Interpreter multiplication result is too large.")
+                if isinstance(right, (str, list, tuple)) and isinstance(left, int) and len(right) * max(0, left) > 10000:
+                    raise ToolExecutionError("Interpreter multiplication result is too large.")
             if isinstance(node.op, ast.Pow) and (not isinstance(right, (int, float)) or abs(right) > 12):
                 raise ToolExecutionError("Exponent is too large.")
             result = self._binary[type(node.op)](left, right)
