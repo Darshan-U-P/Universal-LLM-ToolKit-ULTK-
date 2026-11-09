@@ -180,7 +180,7 @@ def _git_write(action: str, root: str, branch: str | None = None,
             raise ToolExecutionError("Push requires a configured remote and explicit branch.")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,100}", branch) or ".." in branch:
             raise ToolExecutionError("Invalid branch name.")
-        args = ["git", "push", remote, branch]
+        args = ["git", "push", "--", remote, branch]
     else:
         raise ToolExecutionError("Unsupported Git mutation.")
     return _run(args, root, 90)
@@ -245,8 +245,9 @@ def _deploy(target: str, targets: dict[str, list[str]], root: str) -> dict[str, 
 def _api_request(url: str, method: str, body: dict[str, Any] | None,
                  allowed_hosts: tuple[str, ...]) -> dict[str, Any]:
     parsed = urllib.parse.urlparse(url)
-    if parsed.scheme != "https" or parsed.hostname not in allowed_hosts or parsed.username or parsed.password:
-        raise ToolExecutionError("API URL must use HTTPS and a host explicitly allowlisted by the host.")
+    local_http = parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+    if (parsed.scheme != "https" and not local_http) or parsed.hostname not in allowed_hosts or parsed.username or parsed.password:
+        raise ToolExecutionError("API URL must use HTTPS (or HTTP on explicitly allowlisted loopback) and an allowlisted host.")
     if method not in {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}:
         raise ToolExecutionError("Unsupported HTTP method.")
     payload = None if body is None else json.dumps(body).encode()
@@ -255,7 +256,8 @@ def _api_request(url: str, method: str, body: dict[str, Any] | None,
     class AllowlistedRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             redirected = urllib.parse.urlparse(newurl)
-            if redirected.scheme != "https" or redirected.hostname not in allowed_hosts:
+            redirect_local_http = redirected.scheme == "http" and redirected.hostname in {"localhost", "127.0.0.1", "::1"}
+            if (redirected.scheme != "https" and not redirect_local_http) or redirected.hostname not in allowed_hosts:
                 raise ToolExecutionError("API redirect target is not allowlisted.")
             return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -266,7 +268,8 @@ def _api_request(url: str, method: str, body: dict[str, Any] | None,
         opener = urllib.request.build_opener(AllowlistedRedirect())
         with opener.open(request, timeout=15) as response:
             final = urllib.parse.urlparse(response.geturl())
-            if final.scheme != "https" or final.hostname not in allowed_hosts:
+            final_local_http = final.scheme == "http" and final.hostname in {"localhost", "127.0.0.1", "::1"}
+            if (final.scheme != "https" and not final_local_http) or final.hostname not in allowed_hosts:
                 raise ToolExecutionError("Final API response host is not allowlisted.")
             data = response.read(100_001)
             return {"status": response.status, "headers": {
