@@ -117,6 +117,14 @@ class PersistentPowerShellSessions:
             "$result=@(); . ([scriptblock]::Create([string]$request.script)) | ForEach-Object {$result += ,$_};"
             "Send-Response @{ok=$true;result=$result}"
             "}"
+            "'workflow' {"
+            "$scripts=@($request.steps);if($scripts.Count -lt 1 -or $scripts.Count -gt 20){throw 'Workflow must contain 1–20 steps.'};"
+            "foreach($scriptText in $scripts){Test-SessionScript ([string]$scriptText)|Out-Null};"
+            "$allResults=@();foreach($scriptText in $scripts){$stepOutput=@();"
+            ". ([scriptblock]::Create([string]$scriptText)) | ForEach-Object {$stepOutput += ,$_};"
+            "$allResults += ,$stepOutput};"
+            "Send-Response @{ok=$true;steps_completed=$allResults.Count;results=$allResults}"
+            "}"
             "'variables' {"
             "$vars=Get-Variable | Where-Object {$reserved -notcontains $_.Name -and $_.Name -notmatch '^(PS|_|args$|input$)'} | "
             "Select-Object -First 200 Name,Visibility,Options;"
@@ -246,13 +254,12 @@ class PersistentPowerShellSessions:
             raise ToolExecutionError("A PowerShell workflow must contain 1–20 steps.")
         for step in steps:
             self._validate_script_text(step)
-        # Validate every step before executing any step, so a bad later step cannot partially run.
-        for step in steps:
-            self.validate(session_id, step)
-        results = []
-        for index, step in enumerate(steps):
-            results.append({"step": index + 1, **self.execute(session_id, step)})
-        return {"session_id": session_id, "steps_completed": len(results), "results": results}
+        request_size = len(json.dumps({"steps": steps}, ensure_ascii=False).encode("utf-8"))
+        if request_size > self.max_output - 1024:
+            raise ToolExecutionError("Combined PowerShell workflow exceeds the configured request limit.")
+        # The persistent PowerShell wrapper validates every step before executing any step.
+        result = self._request(session_id, "workflow", steps=steps)
+        return {"session_id": session_id, **result}
 
     def variables(self, session_id: str) -> dict[str, Any]:
         return self._request(session_id, "variables")
@@ -1116,7 +1123,7 @@ def create_advanced_powershell_tools(
     add("powershell.session_open", "Open an isolated persistent PowerShell process with host-allowlisted cmdlets.", {"label": {"type": "string", "minLength": 1, "maxLength": 100}}, ["label"], "powershell:session:create", pack.sessions.open)
     add("powershell.session_list", "List persistent PowerShell sessions owned by this tool pack.", empty, [], "powershell:session:read", pack.sessions.list)
     add("powershell.session_execute", "Execute a bounded sequence of allowlisted cmdlets and session-variable assignments in an isolated persistent runspace.", {"session_id": session_id, "script": {"type": "string", "minLength": 1, "maxLength": 32000}}, ["session_id", "script"], "powershell:session:execute", pack.sessions.execute)
-    add("powershell.session_workflow", "Prevalidate then execute up to 20 sequential PowerShell steps in one persistent session.", {"session_id": session_id, "steps": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"type": "string", "minLength": 1, "maxLength": 32000}}}, ["session_id", "steps"], "powershell:workflow:execute", pack.sessions.workflow, 120)
+    add("powershell.session_workflow", "Prevalidate then execute up to 20 sequential PowerShell steps in one persistent session.", {"session_id": session_id, "steps": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"type": "string", "minLength": 1, "maxLength": 32000}}}, ["session_id", "steps"], "powershell:workflow:execute", pack.sessions.workflow, 40)
     add("powershell.session_variables", "List variable names and metadata in one isolated PowerShell session.", {"session_id": session_id}, ["session_id"], "powershell:session:read", pack.sessions.variables)
     add("powershell.session_get_variable", "Read one explicitly named variable from an isolated PowerShell session.", {"session_id": session_id, "name": name}, ["session_id", "name"], "powershell:session:variables:read", pack.sessions.get_variable)
     add("powershell.session_close", "Terminate and remove one persistent PowerShell session.", {"session_id": session_id}, ["session_id"], "powershell:session:close", pack.sessions.close)
