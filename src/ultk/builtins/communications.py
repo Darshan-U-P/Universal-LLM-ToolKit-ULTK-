@@ -8,7 +8,7 @@ import smtplib
 import ssl
 from collections.abc import Iterable
 from email.message import EmailMessage
-from email.utils import parseaddr
+from email.utils import make_msgid, parseaddr
 from typing import Any
 
 from ultk.builtins._common import FunctionTool, object_schema
@@ -69,7 +69,7 @@ class SMTPEmailSender:
         self.timeout_seconds = timeout_seconds
 
     def _check_recipients(self, recipients: list[str]) -> None:
-        if not 1 <= len(recipients) <= 10:
+        if not isinstance(recipients, list) or not 1 <= len(recipients) <= 10:
             raise ToolExecutionError("Email must have between 1 and 10 recipients.")
         if len({address.casefold() for address in recipients}) != len(recipients):
             raise ToolExecutionError("Duplicate email recipients are not allowed.")
@@ -98,6 +98,7 @@ class SMTPEmailSender:
         message["From"] = self.from_address
         message["To"] = ", ".join(recipients)
         message["Subject"] = subject
+        message["Message-ID"] = make_msgid()
         message.set_content(body)
         context = ssl.create_default_context()
         try:
