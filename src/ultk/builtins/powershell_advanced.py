@@ -294,12 +294,14 @@ class AdvancedPowerShellToolPack:
         allowed_certificate_thumbprints: frozenset[str] = frozenset(),
         allowed_install_modules: Mapping[str, frozenset[str]] | None = None,
         allowed_package_names: frozenset[str] = frozenset(),
+        allowed_package_versions: Mapping[str, frozenset[str]] | None = None,
         allowed_package_sources: frozenset[str] = frozenset(),
         allowed_ad_domains: frozenset[str] = frozenset(),
         allowed_ad_group_dns: frozenset[str] = frozenset(),
         allowed_ad_member_dns: frozenset[str] = frozenset(),
         allowed_gpo_names: frozenset[str] = frozenset(),
         allowed_gpo_targets: frozenset[str] = frozenset(),
+        allowed_gpo_registry_keys: frozenset[str] = frozenset(),
         allowed_task_names: frozenset[str] = frozenset(),
         allowed_task_paths: frozenset[str] = frozenset({chr(92)}),
         approved_task_templates: Mapping[str, Mapping[str, str]] | None = None,
@@ -327,12 +329,14 @@ class AdvancedPowerShellToolPack:
         self.allowed_cert_thumbprints = frozenset(item.replace(" ", "").upper() for item in allowed_certificate_thumbprints)
         self.allowed_modules = dict(allowed_install_modules or {})
         self.allowed_packages = frozenset(allowed_package_names)
+        self.allowed_package_versions = dict(allowed_package_versions or {})
         self.allowed_sources = frozenset(allowed_package_sources)
         self.allowed_ad_domains = frozenset(item.casefold() for item in allowed_ad_domains)
         self.allowed_ad_groups = frozenset(allowed_ad_group_dns)
         self.allowed_ad_members = frozenset(allowed_ad_member_dns)
         self.allowed_gpos = frozenset(allowed_gpo_names)
         self.allowed_gpo_targets = frozenset(allowed_gpo_targets)
+        self.allowed_gpo_registry_keys = frozenset(allowed_gpo_registry_keys)
         self.allowed_tasks = frozenset(allowed_task_names)
         self.allowed_task_paths = frozenset(allowed_task_paths)
         self.task_templates = {key: dict(value) for key, value in (approved_task_templates or {}).items()}
@@ -373,6 +377,14 @@ class AdvancedPowerShellToolPack:
         value_name = self._value(name, "registry value name", 256)
         if value_type not in {"String", "ExpandString", "MultiString", "DWord", "QWord", "Binary"}:
             raise ToolExecutionError("Unsupported registry value type.")
+        if value_type in {"String", "ExpandString"} and not isinstance(value, str):
+            raise ToolExecutionError("String registry values require text.")
+        if value_type == "MultiString" and (not isinstance(value, list) or any(not isinstance(item, str) for item in value)):
+            raise ToolExecutionError("MultiString registry values require a list of strings.")
+        if value_type in {"DWord", "QWord"} and (type(value) is not int or not 0 <= value <= (2**32-1 if value_type == "DWord" else 2**64-1)):
+            raise ToolExecutionError("DWord/QWord registry values require a non-negative in-range integer.")
+        if value_type == "Binary" and (not isinstance(value, list) or any(type(item) is not int or not 0 <= item <= 255 for item in value)):
+            raise ToolExecutionError("Binary registry values require a list of byte values.")
         if isinstance(value, (dict,)) or not isinstance(value, (str, int, float, bool, list)):
             raise ToolExecutionError("Registry value must be a scalar or array.")
         if len(json.dumps(value, ensure_ascii=False)) > 16_000:
@@ -475,7 +487,7 @@ class AdvancedPowerShellToolPack:
             raise ToolExecutionError("Local group is not in the host-configured allowlist.")
         return value
 
-    def local_user_create(self, name: str, description: str) -> dict[str, Any]:
+    def local_user_create(self, name: str, description: str = "") -> dict[str, Any]:
         self._windows("local user management")
         user = self._user(name)
         if not self.password_env or not os.environ.get(self.password_env):
@@ -842,12 +854,14 @@ def create_advanced_powershell_tools(
     allowed_certificate_thumbprints: frozenset[str] = frozenset(),
     allowed_install_modules: Mapping[str, frozenset[str]] | None = None,
     allowed_package_names: frozenset[str] = frozenset(),
+    allowed_package_versions: Mapping[str, frozenset[str]] | None = None,
     allowed_package_sources: frozenset[str] = frozenset(),
     allowed_ad_domains: frozenset[str] = frozenset(),
     allowed_ad_group_dns: frozenset[str] = frozenset(),
     allowed_ad_member_dns: frozenset[str] = frozenset(),
     allowed_gpo_names: frozenset[str] = frozenset(),
     allowed_gpo_targets: frozenset[str] = frozenset(),
+    allowed_gpo_registry_keys: frozenset[str] = frozenset(),
     allowed_task_names: frozenset[str] = frozenset(),
     allowed_task_paths: frozenset[str] = frozenset({chr(92)}),
     approved_task_templates: Mapping[str, Mapping[str, str]] | None = None,
@@ -867,9 +881,11 @@ def create_advanced_powershell_tools(
         allowed_certificate_stores=allowed_certificate_stores,
         allowed_certificate_thumbprints=allowed_certificate_thumbprints,
         allowed_install_modules=allowed_install_modules, allowed_package_names=allowed_package_names,
+        allowed_package_versions=allowed_package_versions,
         allowed_package_sources=allowed_package_sources, allowed_ad_domains=allowed_ad_domains,
         allowed_ad_group_dns=allowed_ad_group_dns, allowed_ad_member_dns=allowed_ad_member_dns,
         allowed_gpo_names=allowed_gpo_names, allowed_gpo_targets=allowed_gpo_targets,
+        allowed_gpo_registry_keys=allowed_gpo_registry_keys,
         allowed_task_names=allowed_task_names, allowed_task_paths=allowed_task_paths,
         approved_task_templates=approved_task_templates,
         allowed_audit_subcategories=allowed_audit_subcategories,
