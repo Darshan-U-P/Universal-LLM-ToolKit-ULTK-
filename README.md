@@ -35,7 +35,7 @@ Feature branches currently contain:
 - A host-configured TLS SMTP email sender with recipient allowlists and plain-text messages.
 - A dedicated Git repository tool pack for inspection, branch lifecycle, staging/commits, diffs, merge/conflict workflows, history, tags and allowlisted HTTPS remotes.
 - A dedicated PowerShell-native tool pack for Windows system, process, service, networking, registry reads, event logs, scheduled tasks, modules and host-pinned scripts.
-- An advanced PowerShell administration pack with persistent restricted sessions, persistent WinRM sessions, allowlisted registry writes, firewall rules, local identity, Windows Update, disk/partition/volume, certificate, pinned package/module, AD/GPO, scheduled task-template and security policy tools.
+- An advanced PowerShell administration pack with restricted persistent sessions, persistent WinRM sessions, allowlisted registry writes, firewall rules, local and AD identity, Windows Update, disk/partition/volume, certificate, pinned package/module, Group Policy, scheduled task templates and SHA-256-pinned local security policy templates.
 - A cross-platform computer/OS pack for logical desktop sessions, monitor/window/virtual desktop management, keyboard automation, Windows UI Automation/Linux AT-SPI, service control, filesystem permissions and ACLs, hardware/USB inventory, safe device ejection and OS event logs.
 
 This list is an implementation snapshot, not a claim that the features have passed final integration tests. See [docs/VERIFICATION_LEDGER.md](docs/VERIFICATION_LEDGER.md).
