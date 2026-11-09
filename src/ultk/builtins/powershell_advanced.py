@@ -301,7 +301,7 @@ class AdvancedPowerShellToolPack:
         allowed_gpo_names: frozenset[str] = frozenset(),
         allowed_gpo_targets: frozenset[str] = frozenset(),
         allowed_task_names: frozenset[str] = frozenset(),
-        allowed_task_paths: frozenset[str] = frozenset({"\"}),
+        allowed_task_paths: frozenset[str] = frozenset({chr(92)}),
         approved_task_templates: Mapping[str, Mapping[str, str]] | None = None,
         allowed_audit_subcategories: frozenset[str] = frozenset(),
         allow_security_policy_changes: bool = False,
@@ -783,7 +783,7 @@ class AdvancedPowerShellToolPack:
         if name not in self.allowed_tasks:
             raise ToolExecutionError("Scheduled task name is not host-allowlisted.")
         path = self._value(task_path, "task path", 512)
-        if not path.startswith("\\") or ".." in path.split("\\") or path not in self.allowed_task_paths:
+    allowed_task_paths: frozenset[str] = frozenset({chr(92)}),
             raise ToolExecutionError("Task path must be an absolute Task Scheduler path.")
         return self.base._run(
             "Unregister-ScheduledTask -TaskName $data.name -TaskPath $data.path -Confirm:$false -ErrorAction Stop;"
