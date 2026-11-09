@@ -60,11 +60,11 @@ class ToolDispatcher:
             if len(content) > spec.max_output_chars:
                 content = content[: spec.max_output_chars] + "\n[output truncated]"
             return ToolResult(request.id, spec.name, content)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ToolResult(request.id, spec.name, "Tool execution timed out.", True)
         except (ToolSchemaError, ToolPermissionError, ToolExecutionError) as exc:
             return ToolResult(request.id, spec.name, str(exc), True)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - isolate arbitrary tool failures
             # Keep exception details out of model-visible output by default.
             return ToolResult(
                 request.id,
