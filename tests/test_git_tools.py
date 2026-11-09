@@ -85,3 +85,17 @@ def test_tool_pack_exports_expected_names(repo: Path) -> None:
     names = {tool.spec.name for tool in tools}
     assert {"git.inspect_repository", "git.resolve_conflict", "git.push",
             "git.history", "git.diff"} <= names
+
+
+def test_fetch_checks_push_url_allowlist(repo: Path) -> None:
+    tools = GitRepository(repo, allowed_remote_hosts={"github.com"})
+    tools.add_remote("origin", "https://github.com/acme/repo.git")
+    git(repo, "config", "remote.origin.pushurl", "https://evil.example/acme/repo.git")
+    with pytest.raises(ToolExecutionError):
+        tools.fetch("origin")
+
+
+def test_malformed_remote_port_is_rejected(repo: Path) -> None:
+    tools = GitRepository(repo, allowed_remote_hosts={"github.com"})
+    with pytest.raises(ToolExecutionError):
+        tools.add_remote("origin", "https://github.com:bad/acme/repo.git")
