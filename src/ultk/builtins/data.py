@@ -130,10 +130,13 @@ class SQLiteDataStore:
     }
 
     def __init__(self, database: str | Path, *, allow_writes: bool = False,
-                 max_rows: int = 1000) -> None:
+                 max_rows: int = 1000, max_vm_steps: int = 1_000_000) -> None:
         self.database = Path(database).expanduser().resolve()
         self.allow_writes = allow_writes
         self.max_rows = max_rows
+        self.max_vm_steps = max_vm_steps
+        if max_vm_steps < 1000 or max_vm_steps > 100_000_000:
+            raise ValueError("max_vm_steps must be between 1000 and 100 million.")
         if max_rows < 1 or max_rows > 10000:
             raise ValueError("max_rows must be between 1 and 10000.")
 
@@ -159,6 +162,13 @@ class SQLiteDataStore:
             return sqlite3.SQLITE_OK
 
         connection.set_authorizer(authorize)
+        instruction_count = [0]
+
+        def progress() -> int:
+            instruction_count[0] += 1000
+            return int(instruction_count[0] > self.max_vm_steps)
+
+        connection.set_progress_handler(progress, 1000)
         return connection
 
     @staticmethod
