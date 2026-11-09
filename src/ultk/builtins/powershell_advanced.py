@@ -278,6 +278,8 @@ class PersistentPowerShellSessions:
             return response
 
     def open_remote_session(self, label: str, computer: str, use_ssl: bool = True) -> dict[str, Any]:
+        if os.name != "nt":
+            raise ToolExecutionError("Persistent WinRM remoting is currently supported only from a Windows host.")
         host = PowerShellToolPack._string(computer, "remote computer", 255)
         if host.casefold() not in self.allowed_computers or not self.allowed_remote_commands:
             raise ToolExecutionError("Remote host and remote cmdlet allowlists must be configured by the host.")
