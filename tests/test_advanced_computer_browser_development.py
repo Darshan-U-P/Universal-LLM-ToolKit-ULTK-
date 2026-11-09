@@ -54,6 +54,7 @@ def test_browser_pack_exposes_interaction_workflow_and_monitor_tools(tmp_path: P
     assert {
         "browser.navigate",
         "browser.interact",
+        "browser.clear_session",
         "browser.snapshot",
         "browser.workflow",
         "web.monitor_add",
