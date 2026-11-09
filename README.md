@@ -29,6 +29,10 @@ Feature branches currently contain:
 - Bounded CSV/JSON and SQLite database tools.
 - Read-only text extraction for TXT/Markdown, PDF, DOCX, PPTX and XLSX.
 - Host-configured HTTPS REST endpoints with host-held credentials and opt-in mutation methods.
+- A non-streaming OpenAI-compatible provider adapter for hosted and loopback-local chat-completions servers.
+- An explicitly trusted Python entry-point plugin SDK/manager with metadata-only discovery and enable/disable lifecycle.
+- Bounded Pillow image operations and host-configured FFmpeg/ffprobe media processing.
+- A host-configured TLS SMTP email sender with recipient allowlists and plain-text messages.
 
 This list is an implementation snapshot, not a claim that the features have passed final integration tests. See [docs/VERIFICATION_LEDGER.md](docs/VERIFICATION_LEDGER.md).
 
