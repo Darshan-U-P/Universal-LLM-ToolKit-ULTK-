@@ -324,7 +324,7 @@ class PersistentPowerShellSessions:
             raise ToolExecutionError("Invalid remote session ID.")
         if not isinstance(command, str) or not _NAME.fullmatch(command) or command not in self.allowed_remote_commands:
             raise ToolExecutionError("Remote cmdlet is not host-allowlisted.")
-        values = parameters or {}
+        values = {} if parameters is None else parameters
         if not isinstance(values, dict) or len(values) > 30:
             raise ToolExecutionError("Remote parameters must be an object with at most 30 entries.")
         if any(not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", key) or isinstance(value, dict) or
@@ -1470,7 +1470,11 @@ def create_advanced_powershell_tools(
                not isinstance(value, (str, int, float, bool, type(None), list))
                for key, value in values.items()):
             raise ToolExecutionError("Remote parameter names or values are invalid.")
-        if len(json.dumps(values, ensure_ascii=False)) > 16_000:
+        try:
+            remote_payload_size = len(json.dumps(values, ensure_ascii=False, allow_nan=False).encode("utf-8"))
+        except (TypeError, ValueError) as exc:
+            raise ToolExecutionError("Remote parameters must contain finite JSON-compatible values.") from exc
+        if remote_payload_size > 16_000:
             raise ToolExecutionError("Remote parameter payload exceeds 16 KB.")
         return pack.base._run(
             "$parameters=@{};foreach($p in $data.parameters.PSObject.Properties){$parameters[$p.Name]=$p.Value};"
