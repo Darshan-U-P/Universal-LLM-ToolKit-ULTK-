@@ -61,7 +61,7 @@ Event watches are durable watch definitions. They do not start background daemon
 
 ## Security boundaries
 
-- Model input is never passed to a shell. Native commands use fixed executable arguments with shell=False; process environment is reduced to basic OS variables.
+- Model input is never passed to a shell. Native commands use fixed executable arguments with shell=False; subprocess environment is restricted to required OS, user-session and display-session variables; no model-supplied environment is accepted.
 - Window selectors must uniquely identify one window. UIA clicks require an exact automation ID and enabled/visible control.
 - Keyboard shortcuts and sequences have key, step, text and delay bounds. Desktop automation can still trigger consequential actions in the foreground application; use narrow capabilities and host approval.
 - Service mutations require an exact host-configured allowlist. The host must require approval for stop/restart/start operations.
