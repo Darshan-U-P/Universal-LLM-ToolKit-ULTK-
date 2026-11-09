@@ -39,7 +39,7 @@ class ToolDispatcher:
                 call_id=request.id,
                 tool_name=request.name,
                 session_id=session_id,
-                outcome="error" if result.is_error else "success",
+                outcome=result.metadata.get("audit_outcome", "error" if result.is_error else "success"),
                 is_error=result.is_error,
                 argument_sha256=hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
                 argument_keys=list(request.arguments),
@@ -79,6 +79,14 @@ class ToolDispatcher:
             validate_arguments(spec.input_schema, request.arguments)
             if not await self.policy.authorize(spec, context):
                 raise ToolPermissionError(f"Execution denied by policy: {spec.name}")
+            preflight = await self._audit(
+                request, session_id=session_id,
+                granted_capabilities=granted_capabilities,
+                result=ToolResult(request.id, spec.name, "Authorized for execution.",
+                                  metadata={"audit_outcome": "authorized"}),
+            )
+            if preflight.metadata.get("audit_failure"):
+                return preflight
             value = await asyncio.wait_for(
                 tool.invoke(dict(request.arguments), context),
                 timeout=spec.timeout_seconds,
