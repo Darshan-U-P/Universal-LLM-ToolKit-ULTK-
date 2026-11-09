@@ -12,8 +12,22 @@ This ledger separates implementation status from verification status. The projec
 | PR #6 — terminal/process management | Passed | Run 42666469124; 24 tests and Ruff passed. |
 | PR #7 — initial computer/web/development | Passed | Run 42672846897 passed after import/lint fixes. |
 | PR #8 — advanced computer/browser/development | Passed | Latest known run 42673036987 (run #168) completed successfully on head 0a48c0e2c986c4d69ccf07dc2e52d5059820c0ef. Earlier run 42672519333 had 16 Ruff findings; fixes were committed before the successful run. |
+| PR #9+ feature branches | Not run / deferred | New security, data, document and REST integration code is committed to sequential feature branches; no CI or test suite has been run on these increments by design. Pull requests have not yet been opened. |
 
 Historical CI does not establish Windows GUI behavior, browser integration, production security or end-to-end provider compatibility. PRs remain unmerged unless explicitly merged by the project owner.
+
+## Current implementation branch chain
+
+The new increments are deliberately sequential and remain unmerged:
+
+| Increment | Branch | Current scope |
+|---|---|---|
+| Security/orchestration | `feat/security-approval-audit-orchestration` | Persistent exact-argument approvals, SQLite audit hash chain, bounded parallel calls, workflow DAG execution, verification ledger |
+| Data/database | `feat/data-database-tool-pack` | Root-confined CSV/JSON operations, read-only SQLite query/schema, opt-in DML |
+| Documents | `feat/document-extraction-tool-pack` | Bounded TXT/Markdown/PDF/DOCX/PPTX/XLSX extraction and metadata |
+| REST integrations | `feat/allowlisted-rest-integrations` | Host-configured HTTPS endpoints, host-held credentials, read tools and opt-in mutation tools |
+
+Latest known REST integration branch commit: `2f49ff5bb6e097c553acff563dbc55aaf127f438`. The feature branches are not pull requests yet; final integration and validation will happen after implementation work is complete.
 
 ## Known failures and fixes to retain
 
@@ -21,6 +35,7 @@ Historical CI does not establish Windows GUI behavior, browser integration, prod
 - PR #5: process-list test was changed not to assume the test-runner PID appears in the sampled process list; later CI passed.
 - PR #7: Ruff import ordering and subprocess capture style were corrected; later CI passed.
 - PR #8: initial CI had pytest pass but Ruff fail (16 findings: import sorting, subprocess capture, ClassVar annotations, unused noqa/import). Fixes were committed to PR #7/PR #8 branches; latest PR #8 CI subsequently passed.
+- New branches: no test/lint failures have been observed because testing is intentionally deferred. Treat all new code as unverified, not as passing.
 - PR #4 was closed as superseded; do not revive it. PR #8 is based on PR #7, which is based on earlier sequential feature branches. Reconcile/retarget bases deliberately during final integration.
 
 ## Deferred verification checklist
@@ -59,14 +74,36 @@ Historical CI does not establish Windows GUI behavior, browser integration, prod
 - [ ] Scheduler concurrent workers, crash between claim and handler, missed intervals, idempotency and host polling.
 - [ ] Cross-platform compiler/package-manager command templates.
 
-### New approval, audit and orchestration layer
+### Approval, audit and orchestration
 - [ ] Approval exact-argument binding, one-time consumption, expiry, denial, replay and concurrent retries.
-- [ ] Authenticate approval actor at host UI/API; current library trusts the actor label supplied by host.
-- [ ] Audit hash-chain verification, concurrent writes, tamper detection and disk-full behavior.
-- [ ] Verify audit events for every success, denial, timeout, cancellation and unknown-tool path.
-- [ ] Workflow DAG cycle detection, reference resolution, concurrency, dependent-step skip, fail-fast and cancellation.
-- [ ] Verify workflow results preserve approval metadata and do not leak secrets.
+- [ ] Authenticate approval actor at host UI/API; the library trusts the actor label supplied by host.
+- [ ] Audit hash-chain verification, concurrent writes, tamper detection, tail-truncation detection through external checkpoints, and disk-full behavior.
+- [ ] Verify audit events for success, denial, timeout, cancellation, unknown-tool paths and approved execution.
+- [ ] Verify audit backend failure blocks execution before side effects; reconcile cases where final audit persistence fails after a tool has already run.
+- [ ] Workflow DAG cycle detection, malformed/unknown references, concurrency, dependent-step skip, fail-fast and cancellation.
+- [ ] Verify workflow results preserve approval metadata and block use of truncated output.
 - [ ] Multi-process/distributed execution and durable workflow checkpoints remain unimplemented.
+
+### Data and database
+- [ ] CSV/JSON path traversal, symlink/junction races, atomic replacement and size/row caps on Windows and Linux.
+- [ ] SQLite read-only authorizer denies DML, DDL, ATTACH/DETACH, PRAGMA and extension loading.
+- [ ] SQLite write mode is unavailable unless host opts in; DML only, rollback on failure, parameter binding and transaction behavior.
+- [ ] SQLite URI handling on Windows, concurrent writers, VM-step interruption, large fields/results and malformed SQL.
+- [ ] Validate behavior against real application schemas and large databases; only SQLite is implemented in this increment.
+
+### Documents
+- [ ] Install and validate optional pypdf/python-docx/python-pptx/openpyxl dependencies.
+- [ ] Malformed/encrypted PDFs, scanned PDF limitations, DOCX tables, PPTX shapes, XLSX formulas/cell types and large files.
+- [ ] Parser execution in restricted worker for hostile documents; current extraction is not sandboxed.
+- [ ] Confirm extraction limits, truncation metadata, worksheet/slide/page counts and Windows paths.
+- [ ] OCR, layout reconstruction and document editing/conversion remain unimplemented.
+
+### REST integrations
+- [ ] Validate URL construction, encoded traversal, base path restrictions, redirects, port handling and allowed methods.
+- [ ] Verify no model-controlled auth headers or credentials; missing host environment credentials fail closed.
+- [ ] Test request/response size limits, timeout behavior, HTTP errors and response redaction.
+- [ ] DNS rebinding/pinning and network egress enforcement; current host checks do not pin DNS.
+- [ ] Verify API-specific pagination, rate limits, webhook signatures, idempotency and retry policies; not implemented.
 
 ## Current limitations / not yet implemented
 
@@ -74,4 +111,7 @@ Historical CI does not establish Windows GUI behavior, browser integration, prod
 - Scheduler supports interval jobs only and relies on host polling; no cron/one-shot daemon.
 - Browser tabs/popups/frames/CAPTCHA and robust monitor retry/backoff are incomplete.
 - No full Python execution environment; the restricted interpreter is intentionally not a REPL.
-- Database, documents, communications, media, cloud/infra, AI/ML, OAuth/MCP and marketplace remain roadmap work.
+- Data pack currently supports CSV/JSON and SQLite only; PostgreSQL, MySQL, NoSQL, vector databases, ETL and visualization are outstanding.
+- Document pack is read-only text extraction; OCR, editing, signing, redaction and conversion are outstanding.
+- REST transport is not a complete OAuth implementation or vendor-specific connector.
+- Communications, media, AI/ML, cloud/infra, marketplace, TypeScript SDK and REST API server remain roadmap work.
