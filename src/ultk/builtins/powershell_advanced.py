@@ -190,7 +190,7 @@ class PersistentPowerShellSessions:
         encoded = base64.b64encode(self._wrapper().encode("utf-16le")).decode("ascii")
         env = {key: value for key, value in os.environ.items() if key.upper() in {
             "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATH", "PATHEXT", "PSMODULEPATH",
-            "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA",
+            "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "XDG_RUNTIME_DIR", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA", "PROGRAMDATA", "USERNAME", "USERDOMAIN", "COMPUTERNAME",
         }}
         try:
             process = subprocess.Popen(
