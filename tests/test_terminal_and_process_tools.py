@@ -1,4 +1,3 @@
-import asyncio
 import json
 import subprocess
 import sys
@@ -60,7 +59,11 @@ async def test_terminal_rejects_working_directory_escape(terminal_engine: ToolEn
 async def test_terminal_enforces_timeout(terminal_engine: ToolEngine) -> None:
     result = await terminal_engine.execute(
         "terminal.execute",
-        {"executable": "python", "args": ["-c", "import time; time.sleep(10)"], "timeout_seconds": 0.2},
+        {
+            "executable": "python",
+            "args": ["-c", "import time; time.sleep(10)"],
+            "timeout_seconds": 0.2,
+        },
         granted_capabilities=frozenset({"terminal:execute"}),
     )
     assert not result.is_error
