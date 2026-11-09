@@ -20,7 +20,7 @@ def _optional(module: str) -> Any:
 def _window_action(title_contains: str, action: str, x: int | None = None,
                    y: int | None = None, width: int | None = None,
                    height: int | None = None) -> dict[str, Any]:
-    gw = _optional("pygetwindow")
+    gw = _optional("pywinctl")
     matches = [w for w in gw.getAllWindows()
                if title_contains.casefold() in w.title.casefold()]
     if len(matches) != 1:
