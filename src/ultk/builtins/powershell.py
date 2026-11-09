@@ -19,7 +19,7 @@ from ultk.exceptions import ToolExecutionError
 
 _FIXED_SCRIPTS: dict[str, str] = {
     "shell.get_location": "$ExecutionContext.SessionState.Path.CurrentLocation.Path",
-    "shell.get_environment": "Get-ChildItem Env: | Sort-Object Name | Select-Object Name,Value",
+    "shell.get_environment": "Get-ChildItem Env: | Where-Object { $data.names -contains $_.Name } | Sort-Object Name | Select-Object Name,Value",
     "system.get_os": "Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,BuildNumber,OSArchitecture,LastBootUpTime",
     "system.get_computer": "Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer,Model,TotalPhysicalMemory,NumberOfLogicalProcessors,Domain",
     "system.get_hotfixes": "Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 100 HotFixID,Description,InstalledBy,InstalledOn",
@@ -56,6 +56,7 @@ class PowerShellToolPack:
         script_root: str | Path | None = None,
         allowed_modules: frozenset[str] = frozenset(),
         allowed_computers: frozenset[str] = frozenset(),
+        allowed_environment_names: frozenset[str] = frozenset(),
     ) -> None:
         candidates = ("pwsh.exe", "powershell.exe") if os.name == "nt" else ("pwsh",)
         selected = str(executable) if executable else next(
@@ -75,6 +76,7 @@ class PowerShellToolPack:
         self.max_output = max_output_bytes
         self.allowed_modules = frozenset(allowed_modules)
         self.allowed_computers = frozenset(host.casefold() for host in allowed_computers)
+        self.allowed_environment_names = frozenset(allowed_environment_names)
         self.script_root = Path(script_root).expanduser().resolve() if script_root else None
         self.script_hashes = dict(allowed_script_hashes or {})
         if self.script_hashes and (self.script_root is None or not self.script_root.is_dir()):
@@ -182,6 +184,8 @@ class PowerShellToolPack:
     def _service(self, name: str, action: str) -> dict[str, Any]:
         self._windows_required("service management")
         service = self._string(name, "service name", 256)
+        if any(char in service for char in "*?[]"):
+            raise ToolExecutionError("Service name must be exact; wildcard matching is not allowed.")
         if action not in {"Start-Service", "Stop-Service", "Restart-Service"}:
             raise ToolExecutionError("Unsupported service action.")
         return self._run(f"{action} -Name $data.name -ErrorAction Stop; Get-Service -Name $data.name | Select-Object Name,Status",
@@ -190,6 +194,8 @@ class PowerShellToolPack:
     def _task(self, name: str, task_path: str, action: str) -> dict[str, Any]:
         self._windows_required("scheduled task management")
         task_name = self._string(name, "task name", 256)
+        if any(char in task_name for char in "*?[]"):
+            raise ToolExecutionError("Scheduled task name must be exact; wildcard matching is not allowed.")
         path = self._string(task_path, "task path", 512)
         if not path.startswith("\\") or ".." in path.split("\\"):
             raise ToolExecutionError("Scheduled task path must be an absolute Task Scheduler path.")
@@ -201,6 +207,20 @@ class PowerShellToolPack:
         if action not in scripts:
             raise ToolExecutionError("Unsupported scheduled task action.")
         return self._run(scripts[action], {"name": task_name, "path": path})
+
+    def _registry_path(self, value: str) -> dict[str, Any]:
+        path = self._string(value, "registry path", 512)
+        allowed_prefixes = ("HKLM:\\", "HKCU:\\", "HKCR:\\", "HKU:\\", "HKCC:\\", "Registry::HKEY_")
+        if not path.casefold().startswith(tuple(prefix.casefold() for prefix in allowed_prefixes)):
+            raise ToolExecutionError("Registry path must use an explicit HKLM/HKCU/HKCR/HKU/HKCC registry provider root.")
+        return self._fixed("registry.get", {"path": path})
+
+    def _registry_subkeys(self, value: str) -> dict[str, Any]:
+        path = self._string(value, "registry path", 512)
+        allowed_prefixes = ("HKLM:\\", "HKCU:\\", "HKCR:\\", "HKU:\\", "HKCC:\\", "Registry::HKEY_")
+        if not path.casefold().startswith(tuple(prefix.casefold() for prefix in allowed_prefixes)):
+            raise ToolExecutionError("Registry path must use an explicit registry provider root.")
+        return self._fixed("registry.list_subkeys", {"path": path})
 
     def _module_commands(self, module_name: str) -> dict[str, Any]:
         name = self._string(module_name, "module name", 128)
@@ -223,12 +243,14 @@ def create_powershell_tools(
     allowed_script_hashes: Mapping[str, str] | None = None, script_root: str | Path | None = None,
     allowed_modules: frozenset[str] = frozenset(),
     allowed_computers: frozenset[str] = frozenset(),
+    allowed_environment_names: frozenset[str] = frozenset(),
 ) -> tuple[FunctionTool, ...]:
     """Create PowerShell-native tools with host-defined script/module/remoting trust."""
     pack = PowerShellToolPack(
         executable=executable, working_root=working_root, timeout_seconds=timeout_seconds,
         max_output_bytes=max_output_bytes, allowed_script_hashes=allowed_script_hashes,
-        script_root=script_root, allowed_modules=allowed_modules, allowed_computers=allowed_computers)
+        script_root=script_root, allowed_modules=allowed_modules, allowed_computers=allowed_computers,
+        allowed_environment_names=allowed_environment_names)
     tools: list[FunctionTool] = []
 
     def add(name: str, description: str, props: dict[str, Any], required: list[str],
@@ -241,7 +263,7 @@ def create_powershell_tools(
     string = {"type": "string", "minLength": 1, "maxLength": 2048}
     task_path = {"type": "string", "minLength": 1, "maxLength": 512}
     add("powershell.get_location", "Get current PowerShell working location.", empty, [], "powershell:read", lambda: pack._fixed("shell.get_location"))
-    add("powershell.get_environment", "List environment variables visible to the PowerShell process.", empty, [], "powershell:read:environment", lambda: pack._fixed("shell.get_environment"))
+    add("powershell.get_environment", "List environment variables visible to the PowerShell process.", empty, [], "powershell:read:environment", lambda: pack._fixed("shell.get_environment", {"names": sorted(pack.allowed_environment_names)}))
     add("powershell.get_os_info", "Read Windows operating-system information.", empty, [], "powershell:read:system", lambda: pack._fixed("system.get_os"))
     add("powershell.get_computer_info", "Read computer manufacturer, model, memory and processor information.", empty, [], "powershell:read:system", lambda: pack._fixed("system.get_computer"))
     add("powershell.list_hotfixes", "List recently installed Windows hotfixes.", empty, [], "powershell:read:system", lambda: pack._fixed("system.get_hotfixes"))
@@ -254,8 +276,8 @@ def create_powershell_tools(
     add("powershell.list_tcp_connections", "List bounded Windows TCP connection metadata.", empty, [], "powershell:read:network", lambda: pack._fixed("network.connections"))
     add("powershell.get_dns_cache", "Inspect the Windows DNS client cache.", empty, [], "powershell:read:network", lambda: pack._fixed("network.dns_cache"))
     add("powershell.get_firewall_profiles", "Inspect Windows Defender Firewall profile states and defaults.", empty, [], "powershell:read:firewall", lambda: pack._fixed("firewall.profiles"))
-    add("powershell.get_registry_key", "Read registry values at a supplied registry provider path.", {"path": string}, ["path"], "powershell:read:registry", lambda path: pack._fixed("registry.get", {"path": path}))
-    add("powershell.list_registry_subkeys", "List immediate registry subkeys without modifying them.", {"path": string}, ["path"], "powershell:read:registry", lambda path: pack._fixed("registry.list_subkeys", {"path": path}))
+    add("powershell.get_registry_key", "Read registry values at a supplied registry provider path.", {"path": string}, ["path"], "powershell:read:registry", pack._registry_path)
+    add("powershell.list_registry_subkeys", "List immediate registry subkeys without modifying them.", {"path": string}, ["path"], "powershell:read:registry", pack._registry_subkeys)
     add("powershell.get_event_logs", "Read bounded recent events from a named Windows event log.", {"log_name": {"type": "string", "enum": ["System", "Application", "Security", "Setup"]}, "days": {"type": "integer", "minimum": 1, "maximum": 30}, "limit": {"type": "integer", "minimum": 1, "maximum": 200}}, ["log_name"], "powershell:read:eventlogs", lambda log_name, days=1, limit=50: pack._fixed("events.get", {"log_name": log_name, "days": days, "limit": limit}))
     add("powershell.list_scheduled_tasks", "List scheduled tasks.", empty, [], "powershell:read:tasks", lambda: pack._fixed("tasks.list"))
     add("powershell.get_scheduled_task", "Inspect one scheduled task.", {"name": string, "task_path": task_path}, ["name", "task_path"], "powershell:read:tasks", lambda name, task_path: pack._task(name, task_path, "get"))
