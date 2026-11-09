@@ -309,12 +309,19 @@ class ComputerOSPack:
         return {"monitor": monitor_index, "arranged": result}
 
     # Keyboard shortcuts and bounded sequences.
-    def keyboard_shortcut(self, keys: list[str]) -> dict[str, Any]:
+    @staticmethod
+    def _validate_hotkey(keys: list[str]) -> list[str]:
         if not isinstance(keys, list) or not 1 <= len(keys) <= 5:
             raise ToolExecutionError("A shortcut must contain 1–5 keys.")
-        normalized = [self._text(key, "key", 20).casefold() for key in keys]
+        normalized = [ComputerOSPack._text(key, "key", 20).casefold() for key in keys]
         if any(key not in _SAFE_KEYS for key in normalized):
             raise ToolExecutionError("Shortcut contains a key outside the supported allowlist.")
+        if {"ctrl", "alt", "delete"}.issubset(set(normalized)):
+            raise ToolExecutionError("The secure attention sequence Ctrl+Alt+Delete is blocked.")
+        return normalized
+
+    def keyboard_shortcut(self, keys: list[str]) -> dict[str, Any]:
+        normalized = self._validate_hotkey(keys)
         pyautogui = _optional("pyautogui")
         pyautogui.hotkey(*normalized)
         return {"keys": normalized, "status": "sent"}
@@ -339,10 +346,7 @@ class ComputerOSPack:
                 validated.append((action, key))
             elif action == "hotkey":
                 keys = step.get("keys")
-                if not isinstance(keys, list) or not 1 <= len(keys) <= 5 or any(
-                    not isinstance(key, str) or key.casefold() not in _SAFE_KEYS for key in keys):
-                    raise ToolExecutionError("Invalid hotkey step.")
-                validated.append((action, [key.casefold() for key in keys]))
+                validated.append((action, self._validate_hotkey(keys)))
             elif action == "wait":
                 seconds = step.get("seconds", 0)
                 if type(seconds) not in {int, float} or not 0 <= seconds <= 3:
