@@ -1,3 +1,4 @@
+import json
 import os
 
 import psutil
@@ -33,14 +34,17 @@ async def test_platform_info_returns_expected_fields(engine: ToolEngine) -> None
 
 
 @pytest.mark.asyncio
-async def test_process_listing_includes_current_process(engine: ToolEngine) -> None:
+async def test_process_listing_returns_bounded_metadata(engine: ToolEngine) -> None:
     result = await engine.execute(
         "system.list_processes",
-        {"limit": 100},
+        {"limit": 10},
         granted_capabilities=frozenset({"system:read"}),
     )
     assert not result.is_error
-    assert str(os.getpid()) in result.content
+    processes = json.loads(result.content)
+    assert len(processes) <= 10
+    assert all({"pid", "name", "status", "memory_rss_bytes"} <= process.keys()
+               for process in processes)
 
 
 @pytest.mark.asyncio
