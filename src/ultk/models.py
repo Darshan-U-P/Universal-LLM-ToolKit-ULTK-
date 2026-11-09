@@ -24,6 +24,7 @@ class ToolContext:
     session_id: str = "default"
     granted_capabilities: frozenset[str] = frozenset()
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    arguments: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
