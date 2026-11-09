@@ -47,25 +47,64 @@ def _optional(module: str) -> Any:
 
 
 def _run(argv: list[str], *, timeout: int = 15, output_limit: int = 200_000) -> dict[str, Any]:
-    """Run a fixed native command without a shell, with bounded output and timeout."""
+    """Run a fixed native command without a shell and cap retained output while draining pipes."""
+    import threading
+
+    captured: dict[str, bytearray] = {"stdout": bytearray(), "stderr": bytearray()}
+    truncated = {"stdout": False, "stderr": False}
     try:
         safe_env = {key: value for key, value in os.environ.items()
                     if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP"}}
-        result = subprocess.run(
+        process = subprocess.Popen(
             argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            shell=False, timeout=timeout, check=False, env=safe_env,
+            shell=False, env=safe_env, close_fds=True,
         )
     except FileNotFoundError as exc:
-        raise ToolExecutionError(f"Required platform command is unavailable: {Path(argv[0]).name}") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise ToolExecutionError("Platform operation timed out.") from exc
+        raise ToolExecutionError(
+            f"Required platform command is unavailable: {Path(argv[0]).name}"
+        ) from exc
     except OSError as exc:
         raise ToolExecutionError(f"Platform operation failed ({type(exc).__name__}).") from exc
+
+    def drain(name: str, stream: Any) -> None:
+        while True:
+            chunk = stream.read(8192)
+            if not chunk:
+                break
+            remaining = output_limit + 1 - len(captured[name])
+            if remaining > 0:
+                captured[name].extend(chunk[:remaining])
+            if len(chunk) > max(remaining, 0) or len(captured[name]) > output_limit:
+                truncated[name] = True
+
+    readers = [
+        threading.Thread(target=drain, args=("stdout", process.stdout), daemon=True),
+        threading.Thread(target=drain, args=("stderr", process.stderr), daemon=True),
+    ]
+    for reader in readers:
+        reader.start()
+    try:
+        return_code = process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        process.kill()
+        process.wait()
+        for reader in readers:
+            reader.join(timeout=2)
+        raise ToolExecutionError("Platform operation timed out; the native process was terminated.") from exc
+    finally:
+        for reader in readers:
+            reader.join(timeout=2)
+        if process.stdout:
+            process.stdout.close()
+        if process.stderr:
+            process.stderr.close()
+    stdout = bytes(captured["stdout"][:output_limit])
+    stderr = bytes(captured["stderr"][:output_limit])
     return {
-        "return_code": result.returncode,
-        "stdout": result.stdout[:output_limit].decode("utf-8", errors="replace"),
-        "stderr": result.stderr[:output_limit].decode("utf-8", errors="replace"),
-        "output_truncated": len(result.stdout) > output_limit or len(result.stderr) > output_limit,
+        "return_code": return_code,
+        "stdout": stdout.decode("utf-8", errors="replace"),
+        "stderr": stderr.decode("utf-8", errors="replace"),
+        "output_truncated": truncated["stdout"] or truncated["stderr"],
     }
 
 
@@ -618,7 +657,7 @@ class ComputerOSPack:
             temperatures = {name: [{"label": item.label, "current": item.current,
                                     "high": item.high, "critical": item.critical}
                                    for item in values[:16]] for name, values in temps.items()}
-        except (AttributeError, OSError, NotImplementedError):
+        except (AttributeError, OSError, NotImplementedError, RuntimeError):
             temperatures = {}
         try:
             battery = psutil.sensors_battery()
