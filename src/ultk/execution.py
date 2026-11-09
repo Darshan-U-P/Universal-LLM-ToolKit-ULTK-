@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
 
-from ultk.exceptions import ToolExecutionError, ToolPermissionError, ToolSchemaError
+from ultk.exceptions import ToolNotFoundError, ToolPermissionError, ToolSchemaError
 from ultk.models import ToolCallRequest, ToolContext, ToolResult
 from ultk.permissions import DenyAllPolicy, PermissionPolicy
 from ultk.registry import ToolRegistry
@@ -29,7 +28,13 @@ class ToolDispatcher:
         session_id: str = "default",
         granted_capabilities: frozenset[str] = frozenset(),
     ) -> ToolResult:
-        tool = self.registry.get(request.name)
+        try:
+            tool = self.registry.get(request.name)
+        except ToolNotFoundError:
+            return ToolResult(
+                request.id, request.name, f"Tool is not registered: {request.name}", True
+            )
+
         spec = tool.spec
         context = ToolContext(
             call_id=request.id,
@@ -48,7 +53,7 @@ class ToolDispatcher:
                 value, ensure_ascii=False, default=str
             )
             if len(content) > spec.max_output_chars:
-                content = content[: spec.max_output_chars] + "\n[output truncated]"
+                content = content[: spec.max_output_chars] + "\\n[output truncated]"
             return ToolResult(request.id, spec.name, content)
         except asyncio.TimeoutError:
             return ToolResult(request.id, spec.name, "Tool execution timed out.", True)
