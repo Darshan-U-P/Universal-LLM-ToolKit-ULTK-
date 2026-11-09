@@ -35,6 +35,7 @@ Feature branches currently contain:
 - A host-configured TLS SMTP email sender with recipient allowlists and plain-text messages.
 - A dedicated Git repository tool pack for inspection, branch lifecycle, staging/commits, diffs, merge/conflict workflows, history, tags and allowlisted HTTPS remotes.
 - A dedicated PowerShell-native tool pack for Windows system, process, service, networking, registry, event-log, scheduled-task, module and approved-script workflows.
+- A cross-platform computer/OS pack for persistent logical desktop contexts, multi-monitor and window layout, keyboard shortcuts/sequences, UI accessibility inspection, service management, filesystem permissions, hardware/USB inventory and OS event-log polling.
 
 This list is an implementation snapshot, not a claim that the features have passed final integration tests. See [docs/VERIFICATION_LEDGER.md](docs/VERIFICATION_LEDGER.md).
 
