@@ -431,8 +431,8 @@ class AdvancedPowerShellToolPack:
         return value
 
     def firewall_create(self, name: str, display_name: str, direction: str, action: str,
-                        protocol: str, local_port: int | None, remote_port: int | None,
-                        profile: str, enabled: bool) -> dict[str, Any]:
+                        protocol: str, local_port: int | None = None, remote_port: int | None = None,
+                        profile: str = "Any", enabled: bool = True) -> dict[str, Any]:
         self._windows("firewall management")
         rule_name = self._firewall_name(name)
         title = self._value(display_name, "firewall display name", 256)
@@ -706,6 +706,9 @@ class AdvancedPowerShellToolPack:
         self._windows("Active Directory")
         self._ad_domain(domain)
         base = self._value(search_base, "AD search base", 512)
+        domain_dn = ",".join(f"DC={part}" for part in domain.split("."))
+        if not base.casefold().endswith(domain_dn.casefold()):
+            raise ToolExecutionError("AD search base must be within the selected domain.")
         return self.base._run(
             "Import-Module ActiveDirectory -ErrorAction Stop;"
             "Get-ADGroup -Filter * -SearchBase $data.search_base -ResultSetSize 200 | "
@@ -759,7 +762,7 @@ class AdvancedPowerShellToolPack:
             {"name": name, "target": target, "domain": domain}, timeout=self.timeout)
 
     def tasks_create(self, name: str, template_id: str, schedule: str, at: str,
-                     days: list[str] | None, task_path: str = "\\") -> dict[str, Any]:
+                     days: list[str] | None = None, task_path: str = "\\") -> dict[str, Any]:
         self._windows("scheduled task creation")
         if name not in self.allowed_tasks or template_id not in self.task_templates:
             raise ToolExecutionError("Task name and action template must be host-allowlisted.")
@@ -852,6 +855,9 @@ class AdvancedPowerShellToolPack:
         if path not in self.allowed_gpo_targets:
             raise ToolExecutionError("AD group creation path must be a host-allowlisted OU DN.")
         group_name = self._value(name, "AD group name", 128)
+        expected_dn = f"CN={group_name},{path}"
+        if expected_dn not in self.allowed_ad_groups:
+            raise ToolExecutionError("New AD group distinguished name must be host-allowlisted.")
         return self.base._run(
             "Import-Module ActiveDirectory -ErrorAction Stop;"
             "New-ADGroup -Name $data.name -Path $data.path -GroupScope $data.scope "
