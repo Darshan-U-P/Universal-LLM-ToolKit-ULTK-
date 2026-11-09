@@ -7,7 +7,7 @@ This is a planned taxonomy, not an implementation inventory. Each tool must be i
 | Core | provider/model discovery, registry, schemas, dispatch, retries, telemetry |
 | Computer/OS | filesystem and permissions/ACLs, process management, generic terminal, desktop sessions, multi-monitor/window/virtual-desktop management, keyboard automation, accessibility/UI Automation, cross-platform services, hardware/USB inventory and safe eject, network interface inspection, OS event monitoring |
 | PowerShell/Windows administration | restricted persistent PowerShell runspaces and state, multi-step workflows, authorized persistent/one-shot WinRM remoting, registry writes, Defender Firewall rules, local users/groups, Windows Update, disks/partitions/volumes, certificate stores, pinned package/module installation, Active Directory, Group Policy, separately permissioned scheduled-task create/update/delete, audit/Defender hardening and SHA-256-pinned local security policy templates |
-| Web | search, URL fetch, browser, scraper, downloads, monitoring |
+| Web | search, URL fetch, browser profiles and storage state, tabs/popups/iframes, extensions, cookie management, structured scraping, network/WebSocket inspection, CAPTCHA detection and human handoff, authentication-state heuristics, approval-gated form submissions, browser smoke tests, downloads and website change monitoring |
 | Development | editor, isolated code runner, compiler, debugger, tests, Git repository inspection, branch/index/commit/diff/merge/conflict/history/remote workflows, API testing |
 | Data | SQL/NoSQL, CSV/XLSX, JSON/XML, ETL, vector DB, visualization |
 | Documents | PDF, DOCX, PPTX, XLSX, OCR, conversion, document search |
