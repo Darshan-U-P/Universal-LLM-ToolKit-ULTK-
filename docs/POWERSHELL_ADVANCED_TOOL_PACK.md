@@ -28,6 +28,7 @@ Install the original pack and the advanced pack independently:
             "Write-Output",
         }),
         allowed_remote_commands=frozenset({"Get-Service", "Get-Process", "Get-EventLog"}),
+        allow_insecure_remoting=False,
         advanced_policy={
             "allowed_registry_roots": frozenset({r"HKLM:\Software\ULTK"}),
             "allowed_firewall_rule_names": frozenset({"ULTK-HTTPS-In"}),
@@ -71,6 +72,8 @@ Install the original pack and the advanced pack independently:
 advanced_policy is host application configuration. Do not populate it from an LLM request. Defaults are deny/disabled; only configure resources the host intends to expose.
 
 ## Implemented families
+
+The advanced factory currently declares 71 distinct tool operations. Session, remoting, registry, firewall, identity, update, storage, certificate, package/module, AD/GPO, scheduled-task and security-policy operations each declare their own capability.
 
 ### 1. Persistent interactive PowerShell sessions
 
@@ -150,9 +153,10 @@ This is a deliberately restricted interactive command environment, not a general
 
 ### 11. Scheduled tasks
 
-- Create/update a scheduled task using a host-approved task template; delete an exact host-allowlisted task.
+- Create, update and delete are three separate tools and three separate capabilities. Creation refuses to overwrite an existing task; update refuses to create a missing task; deletion targets an exact host-allowlisted task.
+- Create or update a scheduled task using a host-approved task template; delete an exact host-allowlisted task.
 - The template fixes the executable, arguments and working directory. The model can select the template and a bounded Once/Daily/Weekly trigger, not submit an arbitrary executable or action.
-- Task names and task paths are host-allowlisted. Tasks run as the current user with an interactive logon and limited run level.
+- Task names and task paths are host-allowlisted. Tasks run as the current user with an interactive logon and limited run level. Create never overwrites; update requires an existing task; delete is separately permission-gated.
 - No highest-privilege run level, password credentials, arbitrary triggers, arbitrary task actions or remote scheduled task deployment.
 
 ### 12. Windows security policy
