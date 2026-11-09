@@ -86,7 +86,8 @@ This is a deliberately restricted interactive command environment, not a general
 ### 2. Authorized PowerShell remoting
 
 - remote_invoke invokes one exact host-allowlisted cmdlet on an exact host-allowlisted computer.
-- One-shot remote_invoke uses WS-Management Invoke-Command. Persistent remote_session_open creates a PSSession, remote_session_invoke reuses it, and remote_session_close removes it. UseSSL is enabled by default and configurable at session creation.
+- One-shot remote_invoke uses WS-Management Invoke-Command. Persistent remote_session_open creates a PSSession, remote_session_invoke reuses it, and remote_session_close removes it. UseSSL is enabled by default. Non-SSL WinRM is rejected unless the host explicitly sets allow_insecure_remoting=True.
+- Each allowlisted computer must be a single hostname, FQDN or IPv4 address. Comma-separated host lists, wildcards and IPv6 literals are rejected so one allowlist entry cannot silently target multiple computers.
 - Uses the Windows integrated authentication context of the ULTK process. No model-provided credentials, Basic authentication or arbitrary scriptblocks are accepted. Persistent remote PSSessions are owned by a local ULTK session and are removed on explicit close or best-effort local session shutdown.
 - Remote cmdlet names and parameter keys/values are bounded. Remote hosts and cmdlets must be host-allowlisted; dynamic code execution and remote session-control cmdlets are blocked. The remote endpoint, firewall, WinRM listener, authentication, and machine identity remain host/administrator responsibilities.
 - Remote command/module execution occurs on the remote host with the ULTK identity's remoting privileges. Treat allowlisted remote cmdlets and modules as trusted executable code.
