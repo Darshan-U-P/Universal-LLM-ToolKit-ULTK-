@@ -50,9 +50,24 @@ def _validate_endpoint(alias: str, config: Mapping[str, Any]) -> dict[str, Any]:
     ):
         raise ValueError(f"Endpoint '{alias}' has an invalid token environment variable name.")
     headers = config.get("headers", {})
+    token_header = str(config.get("token_header", "Authorization"))
+    token_prefix = str(config.get("token_prefix", "Bearer "))
+    valid_header_name = re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", token_header)
+    if (
+        not valid_header_name
+        or token_header.casefold() in {"host", "content-length", "cookie"}
+        or "\\r" in token_prefix
+        or "\\n" in token_prefix
+    ):
+        raise ValueError(f"Endpoint '{alias}' has an invalid credential header.")
     if not isinstance(headers, Mapping) or any(
-        not isinstance(key, str) or not isinstance(value, str)
+        not isinstance(key, str)
+        or not isinstance(value, str)
         or key.casefold() in {"host", "content-length", "cookie", "authorization"}
+        or "\\r" in key
+        or "\\n" in key
+        or "\\r" in value
+        or "\\n" in value
         for key, value in headers.items()
     ):
         raise ValueError(f"Endpoint '{alias}' has invalid fixed headers.")
@@ -64,8 +79,8 @@ def _validate_endpoint(alias: str, config: Mapping[str, Any]) -> dict[str, Any]:
         "base_path": parsed.path.rstrip("/"),
         "write_methods": methods,
         "token_env": token_env,
-        "token_header": str(config.get("token_header", "Authorization")),
-        "token_prefix": str(config.get("token_prefix", "Bearer ")),
+        "token_header": token_header,
+        "token_prefix": token_prefix,
         "headers": dict(headers),
     }
 
