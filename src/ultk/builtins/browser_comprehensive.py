@@ -319,26 +319,38 @@ class BrowserControlPlane:
     def form_preview(self, profile: str, selector: str):
         if not selector or len(selector)>500: raise ToolExecutionError("A bounded form selector is required.")
         def run(ctx,pages,active):
-            return pages[active].locator(selector).first.evaluate("""el => {
+            snapshot = pages[active].locator(selector).first.evaluate("""el => {
               if(el.tagName!=='FORM') throw new Error('not a form');
               return {action:el.action,method:(el.method||'get').toUpperCase(),
                 fields:Array.from(el.elements).filter(x=>x.name).slice(0,100).map(x=>({
                   name:x.name,type:x.type||x.tagName.toLowerCase(),required:!!x.required,
                   value:x.type==='password'?'[redacted]':String(x.value||'').slice(0,300)}))};
             }""")
+            fingerprint = hashlib.sha256(json.dumps(snapshot,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
+            return {**snapshot, "form_sha256": fingerprint}
         return self._with_context(profile,run)
 
-    def submit_form(self, profile: str, selector: str):
-        if not selector or len(selector)>500: raise ToolExecutionError("A bounded form selector is required.")
+    def submit_form(self, profile: str, selector: str, expected_form_sha256: str):
+        if not selector or len(selector)>500 or not re.fullmatch(r"[A-Fa-f0-9]{64}", expected_form_sha256):
+            raise ToolExecutionError("A bounded form selector and SHA-256 preview fingerprint are required.")
         def run(ctx,pages,active):
             page=pages[active]; form=page.locator(selector).first
-            dest=form.evaluate("""el => {if(el.tagName!=='FORM') throw new Error('not a form');
+            snapshot=form.evaluate("""el => {
+              if(el.tagName!=='FORM') throw new Error('not a form');
               const u=new URL(el.action||location.href,location.href);
-              return {action:u.href,method:(el.method||'get').toUpperCase()};}""")
-            _url(dest["action"])
+              return {action:u.href,method:(el.method||'get').toUpperCase(),
+                fields:Array.from(el.elements).filter(x=>x.name).slice(0,100).map(x=>({
+                  name:x.name,type:x.type||x.tagName.toLowerCase(),required:!!x.required,
+                  value:x.type==='password'?'[redacted]':String(x.value||'').slice(0,300)}))};
+            }""")
+            fingerprint=hashlib.sha256(json.dumps(snapshot,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
+            if fingerprint.casefold()!=expected_form_sha256.casefold():
+                raise ToolExecutionError("Form changed after preview; obtain a fresh preview and approval.")
+            _url(snapshot["action"])
             form.evaluate("(el) => el.requestSubmit ? el.requestSubmit() : el.submit()")
             page.wait_for_load_state("domcontentloaded",timeout=15000)
-            return {"submitted":True,"url":page.url,"destination":dest["action"],"method":dest["method"]}
+            return {"submitted":True,"url":page.url,"destination":snapshot["action"],"method":snapshot["method"],
+                    "form_sha256":fingerprint}
         return self._with_context(profile,run)
 
     def monitor_add(self,url:str,selector:str|None=None):
@@ -509,9 +521,12 @@ def create_comprehensive_browser_tools(*,profile_root:str|Path="./browser_profil
       FunctionTool("browser.form_preview","Inspect form destination, method and field metadata; password values are redacted.",
         object_schema({"profile":p,"selector":{"type":"string","minLength":1,"maxLength":500}},["profile","selector"]),
         "browser:form:preview",lambda profile,selector:b.form_preview(profile,selector)),
-      FunctionTool("browser.form_submit","Submit a website form; requires explicit browser:submit:consequential approval.",
-        object_schema({"profile":p,"selector":{"type":"string","minLength":1,"maxLength":500}},["profile","selector"]),
-        "browser:submit:consequential",lambda profile,selector:b.submit_form(profile,selector),timeout=40),
+      FunctionTool("browser.form_submit","Submit a website form only if its action, method and field snapshot match a prior preview; requires browser:submit:consequential approval.",
+        object_schema({"profile":p,"selector":{"type":"string","minLength":1,"maxLength":500},
+          "expected_form_sha256":{"type":"string","pattern":"^[A-Fa-f0-9]{64}$"}},
+          ["profile","selector","expected_form_sha256"]),
+        "browser:submit:consequential",
+        lambda profile,selector,expected_form_sha256:b.submit_form(profile,selector,expected_form_sha256),timeout=40),
       FunctionTool("web.change_monitor_add","Create a persistent website change monitor scoped optionally to a CSS selector.",
         object_schema({"url":{"type":"string","format":"uri"},"selector":{"type":"string","maxLength":500}},["url"]),
         "web:monitor:write",b.monitor_add),
