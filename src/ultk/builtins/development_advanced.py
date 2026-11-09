@@ -11,6 +11,7 @@ import json
 import operator
 import re
 import subprocess
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -185,7 +186,7 @@ def _package(action: str, manager: str, package: str, root: str,
     cfg = managers.get(manager)
     if not cfg or action not in {"install", "remove", "list"}:
         raise ToolExecutionError("Package manager or action is not configured.")
-    if action != "list" and not re.fullmatch(r"[A-Za-z0-9@._/-]{1,160}", package):
+    if action != "list" and (package.startswith("-") or not re.fullmatch(r"[A-Za-z0-9@._/-]{1,160}", package)):
         raise ToolExecutionError("Package identifier is invalid.")
     exe = str(Path(cfg["path"]).expanduser().resolve(strict=True))
     ecosystem = cfg.get("ecosystem")
@@ -202,7 +203,7 @@ def _debug_python(path: str, line: int, root: str) -> dict[str, Any]:
     target = _rooted(root, path, must_exist=True)
     if target.suffix != ".py" or not 1 <= line <= 1_000_000:
         raise ToolExecutionError("Debug target must be Python and line must be positive.")
-    return _run(["python", "-m", "pdb", "-c", f"break {target}:{line}",
+    return _run([sys.executable, "-m", "pdb", "-c", f"break {target}:{line}",
                  "-c", "continue", str(target)], root, 60)
 
 
@@ -230,11 +231,22 @@ def _api_request(url: str, method: str, body: dict[str, Any] | None,
     payload = None if body is None else json.dumps(body).encode()
     if payload and len(payload) > 100_000:
         raise ToolExecutionError("API request body exceeds 100 KB.")
+    class AllowlistedRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            redirected = urllib.parse.urlparse(newurl)
+            if redirected.scheme != "https" or redirected.hostname not in allowed_hosts:
+                raise ToolExecutionError("API redirect target is not allowlisted.")
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+
     request = urllib.request.Request(url, data=payload, method=method,
                                      headers={"Content-Type": "application/json",
                                               "Accept": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=15) as response:
+        opener = urllib.request.build_opener(AllowlistedRedirect())
+        with opener.open(request, timeout=15) as response:
+            final = urllib.parse.urlparse(response.geturl())
+            if final.scheme != "https" or final.hostname not in allowed_hosts:
+                raise ToolExecutionError("Final API response host is not allowlisted.")
             data = response.read(100_001)
             return {"status": response.status, "headers": {
                 "content_type": response.headers.get("Content-Type")},
