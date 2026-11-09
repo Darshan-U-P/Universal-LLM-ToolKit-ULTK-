@@ -37,6 +37,7 @@ Install the original pack and the advanced pack independently:
             "allowed_update_kbs": frozenset({"KB5030001"}),
             "allow_windows_update_install": False,
             "allowed_disk_numbers": frozenset({3}),
+            "allowed_drive_letters": frozenset({"R", "S"}),
             "allow_storage_mutations": False,
             "allowed_certificate_stores": frozenset({r"Cert:\CurrentUser\My"}),
             "allowed_certificate_thumbprints": frozenset(),
@@ -79,7 +80,7 @@ advanced_policy is host application configuration. Do not populate it from an LL
 - The parser rejects member access, method invocation, type expressions, subexpressions, scriptblocks, redirection, function/class definitions, loops and control-flow constructs. Assignments are limited to session variables. Several high-impact cmdlets are hard-blocked even if accidentally allowlisted.
 - Sessions are in-memory processes, not durable runspaces: process/service restart destroys them. The host must associate each session ID with an authenticated principal, enforce ownership on every call, expire abandoned sessions and close them on logout.
 
-This is a deliberately restricted interactive command environment, not a general unrestricted PowerShell terminal. Commands such as file writes, process termination, service mutation and remote execution belong to their dedicated tool families.
+This is a deliberately restricted interactive command environment, not a general unrestricted PowerShell terminal. It is not an AST-level sandbox; host allowlisted cmdlets are trusted code and can still have side effects through their own parameters. Commands such as file writes, process termination, service mutation and remote execution belong to their dedicated tool families.
 
 ### 2. Authorized PowerShell remoting
 
