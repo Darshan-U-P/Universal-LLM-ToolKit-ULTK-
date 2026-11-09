@@ -31,11 +31,6 @@ def _with_page(root: str, session_id: str, action):
         context = browser.new_context(storage_state=str(state) if state.exists() else None, service_workers="block")
         page = context.pages[0] if context.pages else context.new_page()
         url_state = state.with_suffix(".url")
-        if url_state.exists():
-            saved_url = url_state.read_text(encoding="utf-8").strip()
-            if saved_url:
-                _validate_public_url(saved_url)
-                page.goto(saved_url, wait_until="domcontentloaded", timeout=20000)
 
         def guard(route):
             try:
@@ -46,6 +41,11 @@ def _with_page(root: str, session_id: str, action):
 
         page.route("**/*", guard)
         try:
+            if url_state.exists():
+                saved_url = url_state.read_text(encoding="utf-8").strip()
+                if saved_url:
+                    _validate_public_url(saved_url)
+                    page.goto(saved_url, wait_until="domcontentloaded", timeout=20000)
             result = action(page)
             context.storage_state(path=str(state))
             if page.url.startswith(("http://", "https://")):
