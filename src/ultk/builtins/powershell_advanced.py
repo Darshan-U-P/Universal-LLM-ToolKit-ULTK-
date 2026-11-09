@@ -804,9 +804,12 @@ class AdvancedPowerShellToolPack:
         if not self.allow_storage:
             raise ToolExecutionError("Storage mutations are disabled by host policy.")
         disk = self._disk(number)
-        return self.base._run("Set-Disk -Number $data.disk -IsOffline $data.offline -ErrorAction Stop | "
-                              "Select-Object Number,IsOffline,IsReadOnly",
-                              {"disk": disk, "offline": not bool(online)}, timeout=self.timeout)
+        return self.base._run(
+            "$target=Get-Disk -Number $data.disk -ErrorAction Stop;"
+            "if($data.offline -and ($target.IsBoot -or $target.IsSystem)){throw 'Boot/system disks cannot be taken offline through this tool.'};"
+            "Set-Disk -Number $data.disk -IsOffline $data.offline -ErrorAction Stop | "
+            "Select-Object Number,IsOffline,IsReadOnly",
+            {"disk": disk, "offline": not bool(online)}, timeout=self.timeout)
 
     def disk_initialize(self, number: int, partition_style: str) -> dict[str, Any]:
         self._windows("disk initialization")
@@ -1570,7 +1573,7 @@ def create_advanced_powershell_tools(
     add("powershell.gpo_unlink", "Remove a host-allowlisted GPO link from a host-allowlisted OU target.", {"name": name, "target": s, "domain": s}, ["name", "target", "domain"], "powershell:gpo:unlink", lambda name, target, domain: pack.gpo_link(name, target, domain, False), 60)
 
     # Scheduled task templates.
-    add("powershell.create_scheduled_task", "Create/update a scheduled task from a host-approved executable template and bounded schedule.", {"name": name, "template_id": name, "schedule": {"type": "string", "enum": ["Once", "Daily", "Weekly"]}, "at": {"type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"}, "days": {"type": "array", "items": {"type": "string"}, "maxItems": 7}, "task_path": s}, ["name", "template_id", "schedule", "at"], "powershell:tasks:create", pack.tasks_create, 60)
+    add("powershell.create_scheduled_task", "Create a new scheduled task from a host-approved executable template and bounded schedule; refuses to overwrite existing tasks.", {"name": name, "template_id": name, "schedule": {"type": "string", "enum": ["Once", "Daily", "Weekly"]}, "at": {"type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"}, "days": {"type": "array", "items": {"type": "string"}, "maxItems": 7}, "task_path": s}, ["name", "template_id", "schedule", "at"], "powershell:tasks:create", pack.tasks_create, 60)
     add("powershell.update_scheduled_task", "Update an existing host-allowlisted scheduled task using a host-approved executable template and bounded schedule.", {"name": name, "template_id": name, "schedule": {"type": "string", "enum": ["Once", "Daily", "Weekly"]}, "at": {"type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"}, "days": {"type": "array", "items": {"type": "string"}, "maxItems": 7}, "task_path": s}, ["name", "template_id", "schedule", "at"], "powershell:tasks:update", pack.tasks_update, 60)
     add("powershell.delete_scheduled_task", "Delete one host-allowlisted scheduled task.", {"name": name, "task_path": s}, ["name", "task_path"], "powershell:tasks:delete", pack.tasks_delete)
 
