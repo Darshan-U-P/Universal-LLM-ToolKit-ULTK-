@@ -314,7 +314,23 @@ class AdvancedPowerShellToolPack:
         timeout_seconds: int = 30,
     ) -> None:
         self.base = base
-        forbidden_commands = {"Invoke-Expression", "Add-Type", "Start-Process", "Set-ExecutionPolicy", "Stop-Computer", "Restart-Computer", "Remove-Item", "Clear-Content", "Set-Content"}
+        forbidden_commands = {
+            "Invoke-Expression", "Add-Type", "Start-Process", "Set-ExecutionPolicy", "Stop-Computer", "Restart-Computer",
+            "Remove-Item", "Clear-Content", "Set-Content", "Out-File", "Export-Csv", "Copy-Item", "Move-Item", "Rename-Item",
+            "Stop-Process", "Stop-Service", "Restart-Service", "Start-Service", "Get-Variable", "Set-Variable",
+            "New-Variable", "Clear-Variable", "Remove-Variable", "Invoke-Command", "New-PSSession", "Remove-PSSession",
+            "Register-ScheduledTask", "Unregister-ScheduledTask", "Set-ItemProperty", "New-ItemProperty", "Remove-ItemProperty",
+            "New-Object", "Add-Member", "Start-Job", "Register-ObjectEvent", "Invoke-WebRequest", "Invoke-RestMethod",
+            "New-Item", "Set-Item", "Add-Content", "Export-Clixml", "New-PSDrive", "Remove-PSDrive",
+            "Clear-Item", "Clear-ItemProperty", "New-Service", "Remove-Service", "Set-Service",
+            "New-NetFirewallRule", "Set-NetFirewallRule", "Remove-NetFirewallRule", "Set-NetFirewallProfile",
+            "New-LocalUser", "Set-LocalUser", "Remove-LocalUser", "New-LocalGroup", "Remove-LocalGroup",
+            "Add-LocalGroupMember", "Remove-LocalGroupMember", "New-ADUser", "Set-ADUser", "Remove-ADUser",
+            "New-ADGroup", "Set-ADGroup", "Remove-ADGroup", "Add-ADGroupMember", "Remove-ADGroupMember",
+            "Install-Module", "Uninstall-Module", "Install-Package", "Uninstall-Package", "Install-WindowsUpdate",
+            "Set-Disk", "Initialize-Disk", "New-Partition", "Resize-Partition", "Import-Certificate",
+            "Remove-GPO", "New-GPO", "New-GPLink", "Remove-GPLink", "Set-GPRegistryValue", "auditpol.exe",
+        }
         if any(command in forbidden_commands for command in allowed_session_commands):
             raise ToolExecutionError("Persistent session allowlist includes a blocked high-risk cmdlet.")
         self.timeout = timeout_seconds
@@ -795,7 +811,7 @@ class AdvancedPowerShellToolPack:
         if name not in self.allowed_tasks:
             raise ToolExecutionError("Scheduled task name is not host-allowlisted.")
         path = self._value(task_path, "task path", 512)
-    allowed_task_paths: frozenset[str] = frozenset({chr(92)}),
+        if not path.startswith("\\") or ".." in path.split("\\") or path not in self.allowed_task_paths:
             raise ToolExecutionError("Task path must be an absolute Task Scheduler path.")
         return self.base._run(
             "Unregister-ScheduledTask -TaskName $data.name -TaskPath $data.path -Confirm:$false -ErrorAction Stop;"
