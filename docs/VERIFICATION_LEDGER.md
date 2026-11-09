@@ -25,9 +25,9 @@ The new increments are deliberately sequential and remain unmerged:
 | Security/orchestration | `feat/security-approval-audit-orchestration` | Persistent exact-argument approvals, SQLite audit hash chain, bounded parallel calls, workflow DAG execution, verification ledger |
 | Data/database | `feat/data-database-tool-pack` | Root-confined CSV/JSON operations, read-only SQLite query/schema, opt-in DML |
 | Documents | `feat/document-extraction-tool-pack` | Bounded TXT/Markdown/PDF/DOCX/PPTX/XLSX extraction and metadata |
-| REST integrations | `feat/allowlisted-rest-integrations` | Host-configured HTTPS endpoints, host-held credentials, read tools and opt-in mutation tools |
+| REST integrations | `feat/allowlisted-rest-integrations` | Host-configured HTTPS endpoints, host-held credentials, read tools and opt-in mutation tools |\n| Provider adapter | `feat/openai-compatible-provider` | Non-streaming OpenAI-compatible chat-completions adapter for hosted HTTPS and loopback HTTP endpoints |\n| Plugin SDK/manager | `feat/plugin-sdk-and-manager` | Metadata-only entry-point discovery, host trust allowlist, API compatibility checks, enable/disable lifecycle |
 
-Latest known REST integration branch commit: `2f49ff5bb6e097c553acff563dbc55aaf127f438`. The feature branches are not pull requests yet; final integration and validation will happen after implementation work is complete.
+Latest feature branch in the current chain: `feat/plugin-sdk-and-manager` (plugin SDK and manager). The provider and plugin branches extend the REST integration branch. The feature branches are not pull requests yet; final integration and validation will happen after implementation work is complete.
 
 ## Known failures and fixes to retain
 
@@ -113,5 +113,5 @@ Latest known REST integration branch commit: `2f49ff5bb6e097c553acff563dbc55aaf1
 - No full Python execution environment; the restricted interpreter is intentionally not a REPL.
 - Data pack currently supports CSV/JSON and SQLite only; PostgreSQL, MySQL, NoSQL, vector databases, ETL and visualization are outstanding.
 - Document pack is read-only text extraction; OCR, editing, signing, redaction and conversion are outstanding.
-- REST transport is not a complete OAuth implementation or vendor-specific connector.
+- REST transport is not a complete OAuth implementation or vendor-specific connector.\n- Provider support currently covers non-streaming OpenAI-compatible chat completions only.\n- Plugin manager supports explicitly trusted Python entry points in-process; it is not a plugin sandbox or marketplace.
 - Communications, media, AI/ML, cloud/infra, marketplace, TypeScript SDK and REST API server remain roadmap work.
