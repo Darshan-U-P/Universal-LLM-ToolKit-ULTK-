@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any
 
 import psutil
@@ -73,7 +74,7 @@ def _app_action(pid: int, expected_create_time: float, action: str) -> dict[str,
         raise ToolExecutionError("Application process is unavailable or access was denied.") from exc
 
 
-def _workflow(steps: list[dict[str, Any]]) -> dict[str, Any]:
+def _workflow(steps: list[dict[str, Any]], image_root: str) -> dict[str, Any]:
     if not 1 <= len(steps) <= 30:
         raise ToolExecutionError("A desktop workflow must contain 1–30 steps.")
     pyautogui = _optional("pyautogui")
@@ -101,9 +102,16 @@ def _workflow(steps: list[dict[str, Any]]) -> dict[str, Any]:
                 raise ToolExecutionError("Workflow waits are limited to 3 seconds.")
             time.sleep(seconds)
         elif action == "screenshot":
+            filename = step.get("path", f"workflow-step-{index}.png")
+            if not isinstance(filename, str) or Path(filename).name != filename or not filename.lower().endswith(".png"):
+                raise ToolExecutionError("Workflow screenshot path must be a simple PNG filename.")
+            root = Path(image_root).expanduser().resolve()
+            root.mkdir(parents=True, exist_ok=True)
+            target = root / filename
             image = pyautogui.screenshot()
+            image.save(target)
             results.append({"step": index, "action": "screenshot",
-                            "width": image.width, "height": image.height})
+                            "path": str(target), "width": image.width, "height": image.height})
             continue
         else:
             raise ToolExecutionError(f"Unsupported desktop workflow action at step {index}.")
@@ -111,7 +119,7 @@ def _workflow(steps: list[dict[str, Any]]) -> dict[str, Any]:
     return {"steps_completed": len(results), "results": results}
 
 
-def create_advanced_computer_tools() -> tuple[FunctionTool, ...]:
+def create_advanced_computer_tools(*, image_root: str | Path = "./screenshots") -> tuple[FunctionTool, ...]:
     """Create additional desktop management tools."""
     return (
         FunctionTool("computer.window_action", "Move, resize, maximize, minimize or restore one uniquely matched window.",
@@ -134,5 +142,5 @@ def create_advanced_computer_tools() -> tuple[FunctionTool, ...]:
         FunctionTool("computer.desktop_workflow", "Run a bounded sequence of desktop mouse, keyboard and wait actions.",
                      object_schema({"steps": {"type": "array", "minItems": 1, "maxItems": 30,
                                                "items": {"type": "object"}}}, ["steps"]),
-                     "computer:workflow", _workflow, timeout=45),
+                     "computer:workflow", lambda steps: _workflow(steps, str(image_root)), timeout=45),
     )
