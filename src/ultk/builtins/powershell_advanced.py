@@ -54,7 +54,7 @@ class PersistentPowerShellSessions:
 
     def _wrapper(self) -> str:
         commands = base64.b64encode(json.dumps(sorted(self.allowed_commands)).encode()).decode()
-        forbidden = json.dumps(self._FORBIDDEN_AST)
+        forbidden = "@(" + ",".join("'" + name.replace("'", "''") + "'" for name in self._FORBIDDEN_AST) + ")"
         return (
             "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false);"
             "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
@@ -166,6 +166,10 @@ class PersistentPowerShellSessions:
         except (queue.Empty, json.JSONDecodeError, AttributeError) as exc:
             process.kill()
             raise ToolExecutionError("PowerShell session initialization timed out or returned invalid output.") from exc
+        with self._lock:
+            if len(self._sessions) >= 16:
+                process.terminate()
+                raise ToolExecutionError("Persistent PowerShell session limit (16) has been reached.")
         session_id = uuid.uuid4().hex
         record = {
             "session_id": session_id, "label": label.strip(), "process": process,
