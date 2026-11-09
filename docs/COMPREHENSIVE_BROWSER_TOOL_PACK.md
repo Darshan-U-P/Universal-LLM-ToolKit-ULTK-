@@ -42,6 +42,10 @@ exact-argument approval for this capability:
         on_request=host_approval_notification,
     )
 
+The caller must first use browser.form_preview and pass its form_sha256 fingerprint to
+browser.form_submit. Submission is refused if the form's action, method, field names, types,
+required flags, values, checked states or selected values changed after preview. Password,
+hidden and file values are redacted from preview output but are included in the fingerprint.
 The host must authenticate the person deciding the approval and display the destination,
 method, selected form and relevant consequence summary. The approval system binds to the
 exact tool arguments, but does not itself establish the user's identity. Do not grant this
@@ -79,8 +83,9 @@ acceptance, purchases, publishing and other high-impact website actions.
   deduplication, daemon scheduling and notification-channel integration are host work.
 - Browser test steps are bounded smoke/functional checks, not a replacement for a full
   Playwright test runner, test fixtures, trace viewer or CI browser matrix.
-- Form preview redacts password values but may expose other personal or financial field
-  values. Tool output is untrusted; the host UI should redact sensitive fields before
+- Form preview redacts password, hidden and file values, hashes all field values for change
+detection, and shows only a bounded excerpt of other field values. Other personal or financial
+field values may still be visible. Tool output is untrusted; the host UI should redact sensitive fields before
   showing approval notices. The form submit operation should always be approval-gated.
 - Playwright operations run with the host user's privileges. This pack does not provide
   OS-level process/container isolation or protection against malicious browser content.
