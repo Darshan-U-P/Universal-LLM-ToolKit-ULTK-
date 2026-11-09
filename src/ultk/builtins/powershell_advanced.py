@@ -12,8 +12,8 @@ import json
 import os
 import queue
 import re
-import subprocess
 import shutil
+import subprocess
 import tempfile
 import threading
 import uuid
