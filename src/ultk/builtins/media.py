@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -154,8 +155,8 @@ def _image_convert(root: Path, source: str, destination: str, output_format: str
 
 
 def _run_ffmpeg(binary: str, arguments: list[str], *, root: Path,
-                output_path: Path | None, timeout_seconds: int,
-                max_output_bytes: int) -> dict[str, Any]:
+                output_path: Path | None, final_path: Path | None = None,
+                timeout_seconds: int, max_output_bytes: int) -> dict[str, Any]:
     try:
         completed = subprocess.run(
             [binary, *arguments],
@@ -189,6 +190,8 @@ def _run_ffmpeg(binary: str, arguments: list[str], *, root: Path,
         if size > max_output_bytes:
             output_path.unlink(missing_ok=True)
             raise ToolExecutionError("Generated media exceeds the configured output limit.")
+        if final_path is not None:
+            os.replace(output_path, final_path)
     return {"return_code": completed.returncode, "bytes_written": size}
 
 
@@ -228,12 +231,15 @@ def _transcode_audio(root: Path, source: str, destination: str, output_format: s
     output_path = _path(root, destination, max_bytes=max_output_bytes, must_exist=False)
     if output_path.suffix.casefold().lstrip(".") != output_format:
         raise ToolExecutionError("Output extension must match the selected audio format.")
+    temporary_path = output_path.with_name(
+        f".ultk-{uuid.uuid4().hex}{output_path.suffix}"
+    )
     result = _run_ffmpeg(
         ffmpeg,
         ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", str(input_path),
-         "-vn", "-c:a", _AUDIO_CODECS[output_format], "-b:a", bitrate, str(output_path)],
-        root=root, output_path=output_path, timeout_seconds=timeout_seconds,
-        max_output_bytes=max_output_bytes,
+         "-vn", "-c:a", _AUDIO_CODECS[output_format], "-b:a", bitrate, str(temporary_path)],
+        root=root, output_path=temporary_path, final_path=output_path,
+        timeout_seconds=timeout_seconds, max_output_bytes=max_output_bytes,
     )
     return {"path": destination, "format": output_format, **result}
 
@@ -248,12 +254,15 @@ def _transcode_video(root: Path, source: str, destination: str, output_format: s
     output_path = _path(root, destination, max_bytes=max_output_bytes, must_exist=False)
     if output_path.suffix.casefold().lstrip(".") != output_format:
         raise ToolExecutionError("Output extension must match the selected video format.")
+    temporary_path = output_path.with_name(
+        f".ultk-{uuid.uuid4().hex}{output_path.suffix}"
+    )
     result = _run_ffmpeg(
         ffmpeg,
         ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", str(input_path),
-         "-c:v", _VIDEO_CODECS[output_format], "-c:a", "aac", str(output_path)],
-        root=root, output_path=output_path, timeout_seconds=timeout_seconds,
-        max_output_bytes=max_output_bytes,
+         "-c:v", _VIDEO_CODECS[output_format], "-c:a", "aac", str(temporary_path)],
+        root=root, output_path=temporary_path, final_path=output_path,
+        timeout_seconds=timeout_seconds, max_output_bytes=max_output_bytes,
     )
     return {"path": destination, "format": output_format, **result}
 
@@ -267,14 +276,17 @@ def _thumbnail(root: Path, source: str, destination: str, at_seconds: float,
     output_path = _path(root, destination, max_bytes=max_output_bytes, must_exist=False)
     if output_path.suffix.casefold() not in {".jpg", ".jpeg", ".png", ".webp"}:
         raise ToolExecutionError("Thumbnail output must be JPG, PNG or WEBP.")
+    temporary_path = output_path.with_name(
+        f".ultk-{uuid.uuid4().hex}{output_path.suffix}"
+    )
     result = _run_ffmpeg(
         ffmpeg,
         ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-ss", str(at_seconds),
          "-i", str(input_path), "-frames:v", "1", "-vf",
          f"scale={width}:{height}:force_original_aspect_ratio=decrease",
-         str(output_path)],
-        root=root, output_path=output_path, timeout_seconds=timeout_seconds,
-        max_output_bytes=max_output_bytes,
+         str(temporary_path)],
+        root=root, output_path=temporary_path, final_path=output_path,
+        timeout_seconds=timeout_seconds, max_output_bytes=max_output_bytes,
     )
     return {"path": destination, **result}
 
