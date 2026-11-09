@@ -11,13 +11,14 @@ ULTK provides a PowerShell-native tool pack separate from generic terminal execu
         working_root=r"C:\Projects",
         executable=r"C:\Program Files\PowerShell\7\pwsh.exe",
         allowed_modules=frozenset({"Microsoft.PowerShell.Management"}),
+        allowed_environment_names=frozenset({"COMPUTERNAME", "USERNAME"}),
     )
 
 If no executable is specified, the pack looks for PowerShell 7 (pwsh) first and Windows PowerShell (powershell.exe) second on Windows. On non-Windows systems it looks for pwsh; Windows administration tools fail closed there.
 
 ## Included tools
 
-- Shell/environment: current location and process-visible environment variables.
+- Shell/environment: current location and environment variables explicitly named in the host allowlist; no environment values are exposed by default.
 - System: OS version, computer manufacturer/model/memory/CPU, installed hotfixes.
 - Processes: bounded process listing.
 - Services: list, start, stop, restart.
@@ -39,7 +40,7 @@ Free-form model-generated PowerShell is deliberately not exposed. A host may con
 - Built-in operations use fixed cmdlet templates; tool arguments are passed as JSON data, not interpolated into command text.
 - Process environment is reduced to basic OS/PowerShell variables; output and execution time are bounded.
 - Each write-capable family has a distinct capability. Require human approval for service/task changes and approved script execution.
-- The host configures executable path, trusted script hashes, allowed modules and remoting computer allowlist.
+- The host configures executable path, trusted script hashes, allowed modules, remoting computer allowlist and environment-variable name allowlist.
 - PowerShell execution policy is not a security boundary. Do not rely on it to sandbox scripts.
 - This pack does not elevate privileges. A tool can perform only actions allowed to the ULTK process identity.
 
