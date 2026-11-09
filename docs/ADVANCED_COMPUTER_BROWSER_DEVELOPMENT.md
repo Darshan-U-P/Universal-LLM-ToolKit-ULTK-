@@ -49,7 +49,7 @@ Added:
 - Process termination/kill after identity verification.
 - Bounded desktop action sequences: move, click, type, restricted key press, wait and screenshot.
 
-The GUI backend uses optional PyGetWindow/PyAutoGUI and inherits their platform/session limitations.
+The GUI backend uses optional PyWinCtl/PyAutoGUI and inherits their platform/session limitations.
 This is not a universal accessibility API; validate the backend on each target OS/window manager.
 Desktop automation can click destructive controls or type into sensitive applications. Keep its
 capabilities disabled by default and require an application-level approval layer for production.
