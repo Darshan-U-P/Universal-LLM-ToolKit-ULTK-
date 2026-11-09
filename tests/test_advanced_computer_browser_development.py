@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from pathlib import Path
 
@@ -7,7 +8,8 @@ import pytest
 
 from ultk.builtins.browser_automation import SiteMonitorStore, _clear_session, create_advanced_browser_tools
 from ultk.builtins.computer_advanced import create_advanced_computer_tools
-from ultk.builtins import web as web_tools\nfrom ultk.builtins.development_advanced import (
+from ultk.builtins import web as web_tools
+from ultk.builtins.development_advanced import (
     RestrictedInterpreter,
     create_advanced_development_tools,
 )
@@ -118,6 +120,7 @@ async def test_advanced_tool_packs_are_capability_gated(tmp_path: Path) -> None:
     assert not allowed.is_error
     assert "4" in allowed.content
 
+
 def test_interpreter_rejects_oversized_range_and_string_multiplication() -> None:
     interpreter = RestrictedInterpreter()
     with pytest.raises(Exception, match="10000"):
@@ -129,7 +132,6 @@ def test_interpreter_rejects_oversized_range_and_string_multiplication() -> None
 def test_browser_session_clear_removes_persisted_state(tmp_path: Path) -> None:
     root = tmp_path / "sessions"
     root.mkdir()
-    import hashlib
     state = root / f"{hashlib.sha256(b'session-1').hexdigest()}.json"
     state.write_text("{}", encoding="utf-8")
     result = _clear_session(str(root), "session-1")
@@ -138,8 +140,6 @@ def test_browser_session_clear_removes_persisted_state(tmp_path: Path) -> None:
 
 
 def test_download_checksum_verification_is_atomic(tmp_path: Path, monkeypatch) -> None:
-    import hashlib
-
     monkeypatch.setattr(
         web_tools,
         "_request",
