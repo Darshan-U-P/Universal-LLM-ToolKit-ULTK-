@@ -11,7 +11,7 @@ from ultk.builtins import web as web_tools\nfrom ultk.builtins.development_advan
     RestrictedInterpreter,
     create_advanced_development_tools,
 )
-from ultk.builtins.scheduler import PersistentScheduler, create_scheduler_tools
+from ultk.builtins.scheduler import PersistentScheduler
 from ultk.engine import ToolEngine
 from ultk.permissions import AllowListPolicy
 
