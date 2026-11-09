@@ -116,7 +116,7 @@ class PowerShellToolPack:
         command = [self.executable, "-NoLogo", "-NoProfile", "-NonInteractive",
                    "-EncodedCommand", base64.b64encode(wrapper.encode("utf-16le")).decode("ascii")]
         env = {key: value for key, value in os.environ.items()
-               if key.upper() in {"SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATH", "PATHEXT", "PSMODULEPATH"}}
+               if key.upper() in {"SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATH", "PATHEXT", "PSMODULEPATH", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA", "PROGRAMDATA", "USERNAME", "USERDOMAIN", "COMPUTERNAME", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "XDG_RUNTIME_DIR"}}
         env["POWERSHELL_TELEMETRY_OPTOUT"] = "1"
         for key, value in (extra_environment or {}).items():
             if not key.startswith("ULTK_") or not isinstance(value, str) or "\x00" in value:
