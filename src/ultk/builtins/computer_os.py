@@ -131,23 +131,35 @@ class ComputerOSPack:
     def session_create(self, name: str, initial_state: dict[str, Any] | None = None) -> dict[str, Any]:
         label = self._text(name, "session name", 120)
         state = initial_state or {}
-        if not isinstance(state, dict) or len(json.dumps(state, default=str)) > 16_000:
+        if not isinstance(state, dict):
             raise ToolExecutionError("Initial desktop session state must be a small JSON object.")
+        try:
+            serialized_state = json.dumps(state, ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ToolExecutionError("Desktop session state must contain JSON-compatible values.") from exc
+        if len(serialized_state) > 16_000:
+            raise ToolExecutionError("Initial desktop session state exceeds 16 KB.")
         session_id = uuid.uuid4().hex
         now = time.time()
         with self._connect() as db:
             db.execute("INSERT INTO desktop_sessions VALUES(?,?,?,?,?,0)",
-                       (session_id, label, now, now, json.dumps(state, ensure_ascii=False)))
+                       (session_id, label, now, now, serialized_state))
         return {"session_id": session_id, "name": label, "created_at": now, "state": state}
 
     def session_update(self, session_id: str, state: dict[str, Any]) -> dict[str, Any]:
         sid = self._text(session_id, "session ID", 80)
-        if not isinstance(state, dict) or len(json.dumps(state, default=str)) > 16_000:
+        if not isinstance(state, dict):
             raise ToolExecutionError("Session state must be a small JSON object.")
+        try:
+            serialized_state = json.dumps(state, ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ToolExecutionError("Session state must contain JSON-compatible values.") from exc
+        if len(serialized_state) > 16_000:
+            raise ToolExecutionError("Session state exceeds 16 KB.")
         with self._connect() as db:
             cursor = db.execute(
                 "UPDATE desktop_sessions SET state_json=?,updated_at=? WHERE session_id=? AND closed=0",
-                (json.dumps(state, ensure_ascii=False), time.time(), sid))
+                (serialized_state, time.time(), sid))
             if cursor.rowcount != 1:
                 raise ToolExecutionError("Desktop session does not exist or is closed.")
         return {"session_id": sid, "status": "updated", "state": state}
@@ -357,7 +369,7 @@ class ComputerOSPack:
         if not 1 <= max_elements <= 300:
             raise ToolExecutionError("max_elements must be between 1 and 300.")
         if os.name == "nt":
-            from pywinauto import Desktop
+            Desktop = _optional("pywinauto").Desktop
             matches = [window for window in Desktop(backend="uia").windows()
                        if title_contains.casefold() in window.window_text().casefold()]
             if len(matches) != 1:
@@ -404,7 +416,7 @@ class ComputerOSPack:
     def accessibility_click(self, title_contains: str, automation_id: str) -> dict[str, Any]:
         if os.name != "nt":
             raise ToolExecutionError("Element invocation is currently supported through Windows UI Automation only.")
-        from pywinauto import Desktop
+        Desktop = _optional("pywinauto").Desktop
         matches = [window for window in Desktop(backend="uia").windows()
                    if title_contains.casefold() in window.window_text().casefold()]
         if len(matches) != 1:
@@ -621,7 +633,9 @@ class ComputerOSPack:
             channel = channel or "System"
             if channel not in _SAFE_CHANNELS:
                 raise ToolExecutionError("Windows event channel is not allowlisted.")
-            result = _run(["wevtutil.exe", "qe", channel, "/c:" + str(limit), "/rd:true", "/f:xml"],
+            milliseconds = since_minutes * 60 * 1000
+            xpath = f"*[System[TimeCreated[timediff(@SystemTime) <= {milliseconds}]]]"
+            result = _run(["wevtutil.exe", "qe", channel, "/c:" + str(limit), "/rd:true", "/f:xml", "/q:" + xpath],
                           timeout=30, output_limit=self.max_output)
             if result["return_code"] != 0:
                 return {"platform": "Windows", "channel": channel, **result, "events": []}
@@ -645,7 +659,8 @@ class ComputerOSPack:
         if platform.system() == "Linux":
             if channel not in {"", "system", "user", "kernel"}:
                 raise ToolExecutionError("Linux journal channel must be system, user, kernel or empty.")
-            command = ["journalctl", "--no-pager", "-n", str(limit), "-o", "json"]
+            command = ["journalctl", "--no-pager", "-n", str(limit), "-o", "json",
+                       "--since", f"{since_minutes} minutes ago"]
             if channel == "user":
                 command.append("--user")
             elif channel == "kernel":
