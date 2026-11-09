@@ -54,7 +54,7 @@ def _run(argv: list[str], *, timeout: int = 15, output_limit: int = 200_000) -> 
     truncated = {"stdout": False, "stderr": False}
     try:
         safe_env = {key: value for key, value in os.environ.items()
-                    if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP"}}
+                    if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"}}
         process = subprocess.Popen(
             argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             shell=False, env=safe_env, close_fds=True,
@@ -247,7 +247,7 @@ class ComputerOSPack:
                              "primary": bool(getattr(monitor, "is_primary", False))})
             if rows:
                 return rows[:16]
-        except ToolExecutionError:
+        except Exception:  # noqa: BLE001 - display backends may fail when no GUI session is attached
             pass
         try:
             pyautogui = _optional("pyautogui")
