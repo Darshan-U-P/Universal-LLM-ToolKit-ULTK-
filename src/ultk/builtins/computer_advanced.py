@@ -104,7 +104,9 @@ def _workflow(steps: list[dict[str, Any]]) -> dict[str, Any]:
                 raise ToolExecutionError("Workflow waits are limited to 3 seconds.")
             time.sleep(seconds)
         elif action == "screenshot":
-            results.append({"step": index, "screenshot": True})
+            image = pyautogui.screenshot()
+            results.append({"step": index, "action": "screenshot",
+                            "width": image.width, "height": image.height})
             continue
         else:
             raise ToolExecutionError(f"Unsupported desktop workflow action at step {index}.")
