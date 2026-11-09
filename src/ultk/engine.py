@@ -309,6 +309,7 @@ class ToolEngine:
         allowed_computers: frozenset[str] = frozenset(),
         allowed_session_commands: frozenset[str] = frozenset(),
         allowed_remote_commands: frozenset[str] = frozenset(),
+        allow_insecure_remoting: bool = False,
         advanced_policy: Mapping[str, Any] | None = None,
     ) -> None:
         """Install isolated PowerShell sessions and advanced, host-scoped Windows administration.
@@ -328,7 +329,7 @@ class ToolEngine:
             allowed_computers=allowed_computers,
         )
         options = dict(advanced_policy or {})
-        reserved = {"base", "allowed_session_commands", "allowed_computers", "allowed_remote_commands", "timeout_seconds"}
+        reserved = {"base", "allowed_session_commands", "allowed_computers", "allowed_remote_commands", "allow_insecure_remoting", "timeout_seconds"}
         if reserved.intersection(options):
             raise ValueError("advanced_policy cannot override core PowerShell host configuration.")
         self.register_tools(create_advanced_powershell_tools(
@@ -336,6 +337,7 @@ class ToolEngine:
             allowed_session_commands=allowed_session_commands,
             allowed_computers=allowed_computers,
             allowed_remote_commands=allowed_remote_commands,
+            allow_insecure_remoting=allow_insecure_remoting,
             timeout_seconds=timeout_seconds,
             **options,
         ))
