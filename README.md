@@ -34,9 +34,9 @@ Feature branches currently contain:
 - Bounded Pillow image operations and host-configured FFmpeg/ffprobe media processing.
 - A host-configured TLS SMTP email sender with recipient allowlists and plain-text messages.
 - A dedicated Git repository tool pack for inspection, branch lifecycle, staging/commits, diffs, merge/conflict workflows, history, tags and allowlisted HTTPS remotes.
-- A dedicated PowerShell-native tool pack for Windows system, process, service, networking, registry, event-log, scheduled-task, module and approved-script workflows.
+- A dedicated PowerShell-native tool pack for Windows system, process, service, networking, registry reads, event logs, scheduled tasks, modules and host-pinned scripts.
+- An advanced PowerShell administration pack with persistent restricted sessions, persistent WinRM sessions, allowlisted registry writes, firewall rules, local identity, Windows Update, disk/partition/volume, certificate, pinned package/module, AD/GPO, scheduled task-template and security policy tools.
 - A cross-platform computer/OS pack for logical desktop sessions, monitor/window/virtual desktop management, keyboard automation, Windows UI Automation/Linux AT-SPI, service control, filesystem permissions and ACLs, hardware/USB inventory, safe device ejection and OS event logs.
-- A cross-platform computer/OS pack for persistent logical desktop contexts, multi-monitor and window layout, keyboard shortcuts/sequences, UI accessibility inspection, service management, filesystem permissions, hardware/USB inventory and OS event-log polling.
 
 This list is an implementation snapshot, not a claim that the features have passed final integration tests. See [docs/VERIFICATION_LEDGER.md](docs/VERIFICATION_LEDGER.md).
 
@@ -201,7 +201,7 @@ print(result.text)
 
 This is an illustrative target API, not an implemented interface in this architecture-only milestone. An LLM API key configures the model connection; third-party services may require separate credentials and permissions.
 
-A dedicated PowerShell-native tool pack is available on the PowerShell feature branch, covering Windows administration, processes, services, networking, registry reads, event logs, scheduled tasks, modules and host-pinned scripts.
+The dedicated PowerShell pack and advanced administration pack are available on sequential feature branches. The advanced pack separates administrative capabilities and uses host-owned resource allowlists; it does not expose unrestricted model-authored PowerShell execution.
 
 ## Development
 
