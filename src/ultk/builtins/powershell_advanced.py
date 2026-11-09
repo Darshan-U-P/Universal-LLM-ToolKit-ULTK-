@@ -755,10 +755,12 @@ class AdvancedPowerShellToolPack:
             {"name": name, "target": target, "domain": domain}, timeout=self.timeout)
 
     def tasks_create(self, name: str, template_id: str, schedule: str, at: str,
-                     days: list[str] | None) -> dict[str, Any]:
+                     days: list[str] | None, task_path: str = "\\") -> dict[str, Any]:
         self._windows("scheduled task creation")
         if name not in self.allowed_tasks or template_id not in self.task_templates:
             raise ToolExecutionError("Task name and action template must be host-allowlisted.")
+        if task_path not in self.allowed_task_paths:
+            raise ToolExecutionError("Task path must be host-allowlisted.")
         if schedule not in {"Once", "Daily", "Weekly"}:
             raise ToolExecutionError("Schedule must be Once, Daily or Weekly.")
         if not isinstance(at, str) or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", at):
@@ -776,7 +778,7 @@ class AdvancedPowerShellToolPack:
             raise ToolExecutionError("Approved task template must specify an absolute executable path.")
         arguments = template.get("arguments", "")
         working = template.get("working_directory", str(self.base.root))
-        payload = {"name": name, "executable": executable, "arguments": arguments,
+        payload = {"name": name, "path": task_path, "executable": executable, "arguments": arguments,
                    "working": working, "schedule": schedule, "at": at, "days": week_days}
         return self.base._run(
             "$action=New-ScheduledTaskAction -Execute $data.executable -Argument $data.arguments -WorkingDirectory $data.working;"
@@ -785,7 +787,7 @@ class AdvancedPowerShellToolPack:
             "elseif($data.schedule -eq 'Daily'){$trigger=New-ScheduledTaskTrigger -Daily -At $clock}"
             "else{$trigger=New-ScheduledTaskTrigger -Weekly -DaysOfWeek $data.days -At $clock};"
             "$principal=New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited;"
-            "Register-ScheduledTask -TaskName $data.name -Action $action -Trigger $trigger -Principal $principal "
+            "Register-ScheduledTask -TaskName $data.name -TaskPath $data.path -Action $action -Trigger $trigger -Principal $principal "
             "-Description 'ULTK approved task template' -Force -ErrorAction Stop | "
             "Select-Object TaskName,TaskPath,State",
             payload, timeout=self.timeout)
@@ -1094,6 +1096,8 @@ def create_advanced_powershell_tools(
     add("powershell.enable_local_user", "Enable one host-allowlisted local user.", {"name": name}, ["name"], "powershell:identity:user:write", lambda name: pack.local_user_enabled(name, True))
     add("powershell.disable_local_user", "Disable one host-allowlisted local user.", {"name": name}, ["name"], "powershell:identity:user:disable", lambda name: pack.local_user_enabled(name, False))
     add("powershell.remove_local_user", "Remove one host-allowlisted local user.", {"name": name}, ["name"], "powershell:identity:user:delete", pack.local_user_remove)
+    add("powershell.create_local_group", "Create one host-allowlisted local group.", {"name": name, "description": {"type": "string", "maxLength": 256}}, ["name"], "powershell:identity:group:create", pack.local_group_create)
+    add("powershell.remove_local_group", "Remove one host-allowlisted local group.", {"name": name}, ["name"], "powershell:identity:group:delete", pack.local_group_remove)
     add("powershell.add_local_group_member", "Add one host-allowlisted user to one host-allowlisted local group.", {"user_name": name, "group_name": name}, ["user_name", "group_name"], "powershell:identity:group:write", lambda user_name, group_name: pack.local_group_member(user_name, group_name, True))
     add("powershell.remove_local_group_member", "Remove one host-allowlisted user from one host-allowlisted local group.", {"user_name": name, "group_name": name}, ["user_name", "group_name"], "powershell:identity:group:remove_member", lambda user_name, group_name: pack.local_group_member(user_name, group_name, False))
 
@@ -1108,6 +1112,7 @@ def create_advanced_powershell_tools(
     add("powershell.list_volumes", "List Windows volumes and free space.", empty, [], "powershell:read:storage", pack.volumes)
     add("powershell.set_disk_online", "Bring one host-allowlisted disk online or offline.", {"disk_number": {"type": "integer", "minimum": 0}, "online": {"type": "boolean"}}, ["disk_number", "online"], "powershell:storage:state", pack.disk_online)
     add("powershell.initialize_disk", "Initialize only a host-allowlisted RAW disk as GPT or MBR.", {"disk_number": {"type": "integer", "minimum": 0}, "partition_style": {"type": "string", "enum": ["GPT", "MBR"]}}, ["disk_number", "partition_style"], "powershell:storage:initialize", pack.disk_initialize)
+    add("powershell.resize_partition", "Resize a partition only within the size bounds reported by Windows Storage cmdlets.", {"disk_number": {"type": "integer", "minimum": 0}, "partition_number": {"type": "integer", "minimum": 1}, "size_bytes": {"type": "integer", "minimum": 1048576, "maximum": 2000000000000}}, ["disk_number", "partition_number", "size_bytes"], "powershell:storage:partition:resize", pack.partition_resize)
     add("powershell.create_partition", "Create a bounded partition on one host-allowlisted disk; formatting is not exposed.", {"disk_number": {"type": "integer", "minimum": 0}, "size_bytes": {"type": "integer", "minimum": 1048576, "maximum": 2000000000000}, "drive_letter": {"type": ["string", "null"], "pattern": "^[D-Zd-z]$"}}, ["disk_number", "size_bytes"], "powershell:storage:partition:create", pack.partition_create)
 
     # Certificate stores.
@@ -1118,20 +1123,28 @@ def create_advanced_powershell_tools(
     # Package/module installation.
     add("powershell.install_module", "Install one host-allowlisted PowerShell module/version from a host-allowlisted repository.", {"name": name, "version": s, "repository": name}, ["name", "version", "repository"], "powershell:modules:install", pack.module_install, 150)
     add("powershell.remove_module", "Remove one host-allowlisted PowerShell module/version.", {"name": name, "version": s}, ["name", "version"], "powershell:modules:remove", pack.module_remove, 150)
-    add("powershell.install_package", "Install one host-allowlisted package from a host-allowlisted package source.", {"name": name, "source": name}, ["name", "source"], "powershell:packages:install", pack.package_install, 150)
+    add("powershell.install_package", "Install one host-allowlisted package/version from a host-allowlisted package source.", {"name": name, "version": s, "source": name}, ["name", "version", "source"], "powershell:packages:install", pack.package_install, 150)
+    add("powershell.remove_package", "Uninstall one host-allowlisted package/version.", {"name": name, "version": s}, ["name", "version"], "powershell:packages:remove", pack.package_remove, 150)
 
     # Active Directory and Group Policy.
     add("powershell.ad_list_users", "List bounded AD users within a host-allowlisted domain/search base.", {"domain": s, "search_base": s}, ["domain", "search_base"], "powershell:read:active_directory", pack.ad_users, 60)
     add("powershell.ad_list_groups", "List bounded AD groups within a host-allowlisted domain/search base.", {"domain": s, "search_base": s}, ["domain", "search_base"], "powershell:read:active_directory", pack.ad_groups, 60)
+    add("powershell.ad_enable_user", "Enable one host-allowlisted Active Directory user DN.", {"distinguished_name": s}, ["distinguished_name"], "powershell:active_directory:user:write", lambda distinguished_name: pack.ad_user_state(distinguished_name, True), 60)
+    add("powershell.ad_disable_user", "Disable one host-allowlisted Active Directory user DN.", {"distinguished_name": s}, ["distinguished_name"], "powershell:active_directory:user:disable", lambda distinguished_name: pack.ad_user_state(distinguished_name, False), 60)
+    add("powershell.ad_remove_user", "Remove one host-allowlisted Active Directory user DN.", {"distinguished_name": s}, ["distinguished_name"], "powershell:active_directory:user:delete", pack.ad_user_remove, 60)
+    add("powershell.ad_create_group", "Create an AD group under a host-allowlisted OU.", {"name": s, "path": s, "scope": {"type": "string", "enum": ["Global", "DomainLocal", "Universal"]}, "category": {"type": "string", "enum": ["Security", "Distribution"]}}, ["name", "path", "scope", "category"], "powershell:active_directory:group:create", pack.ad_group_create, 60)
+    add("powershell.ad_remove_group", "Remove one host-allowlisted AD group DN.", {"group_dn": s}, ["group_dn"], "powershell:active_directory:group:delete", pack.ad_group_remove, 60)
     add("powershell.ad_add_group_member", "Add one host-allowlisted AD member DN to one host-allowlisted group DN.", {"group_dn": s, "member_dn": s}, ["group_dn", "member_dn"], "powershell:active_directory:group:write", lambda group_dn, member_dn: pack.ad_group_member(group_dn, member_dn, True))
     add("powershell.ad_remove_group_member", "Remove one host-allowlisted AD member DN from one host-allowlisted group DN.", {"group_dn": s, "member_dn": s}, ["group_dn", "member_dn"], "powershell:active_directory:group:remove_member", lambda group_dn, member_dn: pack.ad_group_member(group_dn, member_dn, False))
     add("powershell.gpo_list", "List Group Policy Objects in a host-allowlisted AD domain.", {"domain": s}, ["domain"], "powershell:read:gpo", pack.gpo_list, 60)
     add("powershell.gpo_create", "Create a host-allowlisted GPO in a host-allowlisted domain.", {"name": name, "domain": s}, ["name", "domain"], "powershell:gpo:create", pack.gpo_create, 60)
+    add("powershell.gpo_delete", "Delete one host-allowlisted GPO in a host-allowlisted domain.", {"name": name, "domain": s}, ["name", "domain"], "powershell:gpo:delete", pack.gpo_remove, 60)
+    add("powershell.gpo_set_registry_value", "Set one Group Policy registry setting only under a host-allowlisted GPO and registry key.", {"name": name, "domain": s, "key": s, "value_name": s, "value": {}, "value_type": {"type": "string", "enum": ["String", "DWord", "QWord", "ExpandString", "MultiString"]}}, ["name", "domain", "key", "value_name", "value", "value_type"], "powershell:gpo:settings:write", pack.gpo_registry_set, 60)
     add("powershell.gpo_link", "Link a host-allowlisted GPO to a host-allowlisted OU target.", {"name": name, "target": s, "domain": s}, ["name", "target", "domain"], "powershell:gpo:link", lambda name, target, domain: pack.gpo_link(name, target, domain, True), 60)
     add("powershell.gpo_unlink", "Remove a host-allowlisted GPO link from a host-allowlisted OU target.", {"name": name, "target": s, "domain": s}, ["name", "target", "domain"], "powershell:gpo:unlink", lambda name, target, domain: pack.gpo_link(name, target, domain, False), 60)
 
     # Scheduled task templates.
-    add("powershell.create_scheduled_task", "Create/update a scheduled task from a host-approved executable template and bounded schedule.", {"name": name, "template_id": name, "schedule": {"type": "string", "enum": ["Once", "Daily", "Weekly"]}, "at": {"type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"}, "days": {"type": "array", "items": {"type": "string"}, "maxItems": 7}}, ["name", "template_id", "schedule", "at"], "powershell:tasks:create", pack.tasks_create, 60)
+    add("powershell.create_scheduled_task", "Create/update a scheduled task from a host-approved executable template and bounded schedule.", {"name": name, "template_id": name, "schedule": {"type": "string", "enum": ["Once", "Daily", "Weekly"]}, "at": {"type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"}, "days": {"type": "array", "items": {"type": "string"}, "maxItems": 7}, "task_path": s}, ["name", "template_id", "schedule", "at"], "powershell:tasks:create", pack.tasks_create, 60)
     add("powershell.delete_scheduled_task", "Delete one host-allowlisted scheduled task.", {"name": name, "task_path": s}, ["name", "task_path"], "powershell:tasks:delete", pack.tasks_delete)
 
     # Security policy.
