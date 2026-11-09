@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import sqlite3
 import time
 import uuid
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ultk.exceptions import ApprovalRequiredError
+from ultk.exceptions import ApprovalRequiredError, ToolExecutionError
 from ultk.models import ToolContext, ToolSpec
 from ultk.permissions import PermissionPolicy
 
@@ -106,14 +109,29 @@ class SQLiteApprovalStore:
         return [dict(row) for row in rows]
 
 
+@dataclass(frozen=True, slots=True)
+class ApprovalNotice:
+    approval_id: str
+    tool_name: str
+    session_id: str
+    arguments: Mapping[str, Any]
+
+
 class ApprovalPolicy:
     """Wrap a policy and require one-time approval for selected capabilities."""
 
-    def __init__(self, base_policy: PermissionPolicy, store: SQLiteApprovalStore, *,
-                 approval_capabilities: set[str] | frozenset[str]) -> None:
+    def __init__(
+        self,
+        base_policy: PermissionPolicy,
+        store: SQLiteApprovalStore,
+        *,
+        approval_capabilities: set[str] | frozenset[str],
+        on_request: Callable[[ApprovalNotice], Any] | None = None,
+    ) -> None:
         self.base_policy = base_policy
         self.store = store
         self.approval_capabilities = frozenset(approval_capabilities)
+        self.on_request = on_request
 
     async def authorize(self, spec: ToolSpec, context: ToolContext) -> bool:
         if not await self.base_policy.authorize(spec, context):
@@ -127,4 +145,13 @@ class ApprovalPolicy:
                 context.metadata["approval_id"] = consumed_approval_id
             return True
         approval_id = self.store.create(spec.name, context.session_id, arguments)
+        if self.on_request is not None:
+            try:
+                notification = self.on_request(ApprovalNotice(
+                    approval_id, spec.name, context.session_id, arguments
+                ))
+                if inspect.isawaitable(notification):
+                    await notification
+            except Exception as exc:  # noqa: BLE001 - surface host approval UI failures
+                raise ToolExecutionError("Host approval notification callback failed.") from exc
         raise ApprovalRequiredError(approval_id)
