@@ -1205,6 +1205,7 @@ def create_advanced_powershell_tools(
     allowed_audit_subcategories: frozenset[str] = frozenset(),
     allow_security_policy_changes: bool = False,
     allow_audit_disable: bool = False,
+    timeout_seconds: int = 30,
 ) -> tuple[FunctionTool, ...]:
     """Build the advanced PowerShell tool families under explicit host configuration."""
     pack = AdvancedPowerShellToolPack(
@@ -1230,6 +1231,7 @@ def create_advanced_powershell_tools(
         allowed_audit_subcategories=allowed_audit_subcategories,
         allow_security_policy_changes=allow_security_policy_changes,
         allow_audit_disable=allow_audit_disable,
+        timeout_seconds=timeout_seconds,
     )
     tools: list[FunctionTool] = []
 
