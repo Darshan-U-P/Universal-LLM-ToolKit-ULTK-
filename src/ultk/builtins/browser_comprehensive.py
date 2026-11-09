@@ -152,9 +152,10 @@ class BrowserControlPlane:
                     pages = initial_pages or [context.new_page()]
                 active = min(max(active, 0), len(pages)-1)
                 result = action(context, pages, active)
-                new_tabs = [p.url for p in context.pages if p.url.startswith(("http://","https://"))][:self.max_tabs]
+                persisted_pages = [p for p in context.pages if p.url.startswith(("http://","https://"))][:self.max_tabs]
+                new_tabs = [p.url for p in persisted_pages]
                 active_page = result.pop("_active_page", None) if isinstance(result, dict) else None
-                active_index = context.pages.index(active_page) if active_page in context.pages else min(active, max(0,len(new_tabs)-1))
+                active_index = persisted_pages.index(active_page) if active_page in persisted_pages else min(active, max(0,len(new_tabs)-1))
                 with sqlite3.connect(self.db_path) as db:
                     db.execute("UPDATE profiles SET tabs=?,active_tab=? WHERE name=?",
                                (json.dumps(new_tabs), active_index, profile))
@@ -185,8 +186,9 @@ class BrowserControlPlane:
                                 for i,p in enumerate(ctx.pages)]}
             if operation=="new":
                 if len(ctx.pages)>=self.max_tabs: raise ToolExecutionError("Browser tab limit reached.")
+                if not url: raise ToolExecutionError("Creating a persistent tab requires a public URL.")
                 page=ctx.new_page(); self._guard(page)
-                if url: page.goto(_url(url),wait_until="domcontentloaded",timeout=25000)
+                page.goto(_url(url),wait_until="domcontentloaded",timeout=25000)
                 return {"created":True,"tab_index":len(ctx.pages)-1,"url":page.url,"_active_page":page}
             if index is None or not 0<=index<len(ctx.pages): raise ToolExecutionError("A valid tab index is required.")
             page=ctx.pages[index]
