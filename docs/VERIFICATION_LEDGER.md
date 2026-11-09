@@ -33,6 +33,7 @@ The new increments are deliberately sequential and remain unmerged:
 | Git Tool Pack | `feat/git-toolkit-comprehensive` | Repository inspection, branch/index/commit/diff/merge/conflict/history and HTTPS allowlisted remote operations |
 | Dedicated PowerShell | `feat/dedicated-powershell-tool-pack` | PowerShell-native system, process, service, network, registry, event, task, module and approved-script operations |
 | Comprehensive computer/OS | `feat/comprehensive-computer-os-tool-pack` | Persistent logical desktop contexts, monitor/window/virtual desktop control, keyboard, accessibility, cross-platform services, filesystem permissions, Windows ACL, hardware, USB, network and event-log tools |
+| Advanced PowerShell administration | `feat/advanced-powershell-administration` | 70 tools: restricted persistent runspaces, persistent WinRM PSSessions, registry/firewall/identity/update/storage/certificate/package/AD/GPO/task/security policy and SHA-256-pinned security templates |
 
 The provider and plugin branches extend the REST integration branch; media extends the plugin branch; email extends media; Git extends email; PowerShell extends Git; comprehensive computer/OS extends PowerShell; advanced PowerShell administration extends comprehensive computer/OS. These are feature branches, not pull requests. Final integration and validation will happen after implementation work is complete.
 
