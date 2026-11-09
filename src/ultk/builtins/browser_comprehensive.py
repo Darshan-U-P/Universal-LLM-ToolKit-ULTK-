@@ -33,10 +33,15 @@ def _form_snapshot(page, selector: str) -> dict[str, Any]:
         }))};
     }""")
     for field in raw["fields"]:
+        full_value = field.get("value", "")
+        field["value_sha256"] = hashlib.sha256(full_value.encode("utf-8")).hexdigest()
         if field["type"] in {"password", "hidden", "file"}:
-            secret = field.pop("value", "")
             field["value"] = "[redacted]"
-            field["value_sha256"] = hashlib.sha256(secret.encode("utf-8")).hexdigest()
+        else:
+            field["value"] = full_value[:120]
+            field["value_truncated"] = len(full_value) > 120
+        selected = field.get("selected_values", [])
+        field["selected_values"] = [str(x)[:100] for x in selected]
     return raw
 
 
