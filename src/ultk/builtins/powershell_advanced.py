@@ -28,6 +28,15 @@ _NAME = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 _REGISTRY_PREFIXES = ("HKLM:\\", "HKCU:\\", "HKCR:\\", "HKU:\\", "HKCC:\\")
 
 
+def _computer_name(value: str) -> str:
+    if not isinstance(value, str) or not 1 <= len(value) <= 253:
+        raise ToolExecutionError("Invalid remote computer name.")
+    labels = value.split(".")
+    if any(not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label) for label in labels):
+        raise ToolExecutionError("Remote computer must be a single hostname, FQDN or IPv4 address; lists and wildcards are forbidden.")
+    return value
+
+
 class PersistentPowerShellSessions:
     """One isolated long-lived pwsh process per ULTK session."""
 
@@ -60,11 +69,13 @@ class PersistentPowerShellSessions:
         timeout_seconds: int, max_output_bytes: int,
         allowed_computers: frozenset[str] = frozenset(),
         allowed_remote_commands: frozenset[str] = frozenset(),
+        allow_insecure_remoting: bool = False,
     ) -> None:
         self.executable = executable
         self.working_root = working_root
         self.allowed_commands = frozenset(allowed_commands)
-        self.allowed_computers = frozenset(item.casefold() for item in allowed_computers)
+        self.allowed_computers = frozenset(_computer_name(item).casefold() for item in allowed_computers)
+        self.allow_insecure_remoting = allow_insecure_remoting
         self.allowed_remote_commands = frozenset(allowed_remote_commands)
         self.timeout = timeout_seconds
         self.max_output = max_output_bytes
@@ -291,10 +302,13 @@ class PersistentPowerShellSessions:
         if os.name != "nt":
             raise ToolExecutionError("Persistent WinRM remoting is currently supported only from a Windows host.")
         host = PowerShellToolPack._string(computer, "remote computer", 255)
+        host = _computer_name(host)
         if host.casefold() not in self.allowed_computers or not self.allowed_remote_commands:
             raise ToolExecutionError("Remote host and remote cmdlet allowlists must be configured by the host.")
         if type(use_ssl) is not bool:
             raise ToolExecutionError("use_ssl must be boolean.")
+        if not use_ssl and not self.allow_insecure_remoting:
+            raise ToolExecutionError("Non-SSL WinRM requires the separate allow_insecure_remoting host opt-in.")
         local = self.open(label)
         try:
             remote = self._request(local["session_id"], "remote_open", request_timeout=min(120, max(self.timeout, 60)),
@@ -406,6 +420,7 @@ class AdvancedPowerShellToolPack:
         allowed_session_commands: frozenset[str] = frozenset(),
         allowed_computers: frozenset[str] = frozenset(),
         allowed_remote_commands: frozenset[str] = frozenset(),
+        allow_insecure_remoting: bool = False,
         allowed_registry_roots: frozenset[str] = frozenset(),
         allowed_firewall_rule_names: frozenset[str] = frozenset(),
         allowed_local_users: frozenset[str] = frozenset(),
@@ -467,7 +482,10 @@ class AdvancedPowerShellToolPack:
         if local_user_password_env is not None and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", local_user_password_env):
             raise ToolExecutionError("Local user password environment variable name is invalid.")
         self.timeout = timeout_seconds
-        self.allowed_computers = frozenset(item.casefold() for item in allowed_computers)
+        self.allowed_computers = frozenset(_computer_name(item).casefold() for item in allowed_computers)
+        self.allow_insecure_remoting = allow_insecure_remoting
+        if any(not _NAME.fullmatch(command) for command in allowed_session_commands):
+            raise ToolExecutionError("Session cmdlet allowlist contains an invalid command name.")
         if any(not _NAME.fullmatch(command) for command in allowed_remote_commands):
             raise ToolExecutionError("Remote cmdlet allowlist contains an invalid command name.")
         remote_blocked = {"invoke-expression", "add-type", "start-process", "set-executionpolicy",
@@ -511,7 +529,7 @@ class AdvancedPowerShellToolPack:
         self.security_templates = {key: dict(value) for key, value in (approved_security_templates or {}).items()}
         self.sessions = PersistentPowerShellSessions(
             base.executable, base.root, allowed_session_commands, min(base.timeout, timeout_seconds),
-            base.max_output, self.allowed_computers, self.allowed_remote_commands,
+            base.max_output, self.allowed_computers, self.allowed_remote_commands, self.allow_insecure_remoting,
         )
 
     def _windows(self, name: str) -> None:
@@ -1300,6 +1318,7 @@ def create_advanced_powershell_tools(
     allowed_session_commands: frozenset[str] = frozenset(),
     allowed_computers: frozenset[str] = frozenset(),
     allowed_remote_commands: frozenset[str] = frozenset(),
+    allow_insecure_remoting: bool = False,
     allowed_registry_roots: frozenset[str] = frozenset(),
     allowed_firewall_rule_names: frozenset[str] = frozenset(),
     allowed_local_users: frozenset[str] = frozenset(),
