@@ -49,6 +49,12 @@ def test_scheduler_rejects_unconfigured_handler(tmp_path: Path) -> None:
         scheduler.add("arbitrary", {}, 60)
 
 
+def test_scheduler_bounds_persisted_payload(tmp_path: Path) -> None:
+    scheduler = PersistentScheduler(tmp_path / "jobs.sqlite3", {"record": lambda payload: None})
+    with pytest.raises(Exception, match="10 KB"):
+        scheduler.add("record", {"data": "x" * 11000}, 60)
+
+
 def test_browser_pack_exposes_interaction_workflow_and_monitor_tools(tmp_path: Path) -> None:
     tools = create_advanced_browser_tools(
         session_root=tmp_path / "sessions",
