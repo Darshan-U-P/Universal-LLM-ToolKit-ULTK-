@@ -1,0 +1,71 @@
+# Comprehensive Computer and Operating-System Tool Pack
+
+The computer_os pack complements the existing computer, computer_advanced, system, process_management and powershell packs. It provides a single installation surface for desktop context, multi-display/window control, keyboard automation, accessibility, OS services, filesystem permissions, hardware/device inventory and event logs.
+
+## Installation
+
+    from ultk import ToolEngine
+
+    engine = ToolEngine(policy=your_permission_policy)
+    engine.install_computer_os_tools(
+        filesystem_root=r"C:\ULTK-Managed",
+        state_database=r"C:\ULTK-State\computer-os.sqlite3",
+        allowed_services=frozenset({"Spooler"}),
+        allow_posix_chmod=True,
+        allow_posix_chown=False,
+    )
+
+The filesystem root confines metadata and POSIX permission operations. Service mutation is restricted to exact service names supplied by the host. All operations still require the matching ULTK capability.
+
+## Tool families
+
+| Family | Capabilities |
+|---|---|
+| Persistent desktop contexts | Create, update, inspect, list and close SQLite-backed logical desktop sessions |
+| Displays | Enumerate monitor geometry with screeninfo; primary-display fallback |
+| Windows | Enumerate, move, resize, maximize, minimize, restore, activate, close, snap and arrange windows |
+| Virtual desktops | Windows current/create/switch through optional pyvda; Linux X11 list/switch through wmctrl |
+| Keyboard | Allowlisted shortcuts and prevalidated bounded key/type/wait sequences |
+| Accessibility | Windows UI Automation inspection and element click; Linux AT-SPI inspection |
+| Services | Read service inventory on Windows/Linux/macOS; allowlisted start/stop/restart on Windows/Linux |
+| Filesystem permissions | Metadata, POSIX chmod, optional host-enabled chown; paths confined to filesystem_root |
+| Hardware | CPU, memory, disks, thermal sensors and battery where supported |
+| Devices | USB inventory through pyudev (Linux), pnputil (Windows) or system_profiler (macOS) |
+| Networking | Interface addresses, state, MTU and link speed |
+| Events | Bounded recent event snapshots and persistent watch definitions |
+
+## Optional dependencies
+
+Install the optional platform extra:
+
+    pip install "universal-llm-toolkit[computer-os]"
+
+It includes PyWinCtl, PyAutoGUI, screeninfo and platform-marked pywinauto, pyvda or pyudev dependencies. Linux AT-SPI also requires the system accessibility stack and its Python bindings. Native commands such as systemctl, wmctrl, journalctl, wevtutil, pnputil and system_profiler are provided by the operating system.
+
+## Session semantics
+
+desktop_session_* creates persistent logical ULTK context records in SQLite. They retain state such as a selected application, active window, monitor arrangement or workflow context. They do not create, log in to, or isolate an operating-system user session. The host application is responsible for associating session IDs with authenticated users.
+
+Event watches are durable watch definitions. They do not start background daemons; the host scheduler must poll the definition and call read_recent_events at its chosen interval.
+
+## Platform coverage and limitations
+
+- Windows: PyWinCtl window operations, pywinauto UI Automation, optional pyvda virtual desktops, Service Control Manager, Event Log, pnputil USB inventory. Use the PowerShell pack for deeper Windows administration.
+- Linux: PyWinCtl where supported, AT-SPI, systemd service/journal tools, pyudev USB inventory, and wmctrl virtual desktops on X11. Wayland compositors restrict global input/window automation and wmctrl generally does not control Wayland sessions.
+- macOS: PyWinCtl where supported, launchd service listing, unified log snapshots and system_profiler USB inventory. macOS virtual-desktop switching and native accessibility element invocation are not implemented in this increment.
+
+## Security boundaries
+
+- Model input is never passed to a shell. Native commands use fixed executable arguments with shell=False; process environment is reduced to basic OS variables.
+- Window selectors must uniquely identify one window. UIA clicks require an exact automation ID and enabled/visible control.
+- Keyboard shortcuts and sequences have key, step, text and delay bounds. Desktop automation can still trigger consequential actions in the foreground application; use narrow capabilities and host approval.
+- Service mutations require an exact host-configured allowlist. The host must require approval for stop/restart/start operations.
+- Filesystem metadata and permission changes are confined to a host-configured root. Symlinks are rejected for chmod/chown. Path checks do not eliminate filesystem TOCTOU races; this is not an OS sandbox.
+- POSIX ownership changes are disabled by default. Windows ACL editing is not provided here; use separately governed Windows administration tools.
+- Hardware inventory may reveal device identifiers. USB serial numbers are returned only by the Linux pyudev backend; restrict access appropriately.
+- Event log access may require elevated privileges and can expose sensitive operational data. Output and event counts are bounded.
+- The pack does not elevate privileges and cannot bypass OS permissions.
+
+## Not implemented in this increment
+
+Full macOS AX accessibility actions, native macOS virtual desktop switching, Wayland compositor integration, Windows ACL editing, USB eject/eject-safe removal, device driver installation, service creation/deletion, user/account administration, background event-monitor daemons, and remote OS management remain outside this pack.
