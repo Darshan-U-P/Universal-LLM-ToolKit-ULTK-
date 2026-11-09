@@ -34,6 +34,7 @@ Feature branches currently contain:
 - Bounded Pillow image operations and host-configured FFmpeg/ffprobe media processing.
 - A host-configured TLS SMTP email sender with recipient allowlists and plain-text messages.
 - A dedicated Git repository tool pack for inspection, branch lifecycle, staging/commits, diffs, merge/conflict workflows, history, tags and allowlisted HTTPS remotes.
+- A dedicated PowerShell-native tool pack for Windows system, process, service, networking, registry, event-log, scheduled-task, module and approved-script workflows.
 
 This list is an implementation snapshot, not a claim that the features have passed final integration tests. See [docs/VERIFICATION_LEDGER.md](docs/VERIFICATION_LEDGER.md).
 
