@@ -28,6 +28,7 @@ def test_advanced_factory_registers_separate_permission_families(base: PowerShel
     expected = {
         "powershell.session_open", "powershell.session_execute", "powershell.session_workflow",
         "powershell.session_close", "powershell.remote_invoke",
+        "powershell.remote_session_open", "powershell.remote_session_invoke", "powershell.remote_session_close",
         "powershell.registry_set_value", "powershell.firewall_create_rule",
         "powershell.create_local_user", "powershell.create_local_group",
         "powershell.windows_update_install", "powershell.initialize_disk",
@@ -237,3 +238,23 @@ def test_session_tool_factory_requires_separate_capabilities(base: PowerShellToo
     by_name = {tool.spec.name: tool for tool in tools}
     assert by_name["powershell.session_execute"].spec.capabilities == frozenset({"powershell:session:execute"})
     assert by_name["powershell.remote_invoke"].spec.capabilities == frozenset({"powershell:remoting:execute"})
+
+
+
+def test_remote_cmdlet_allowlist_blocks_dynamic_code(base: PowerShellToolPack) -> None:
+    with pytest.raises(ToolExecutionError):
+        AdvancedPowerShellToolPack(
+            base, allowed_computers=frozenset({"srv01"}),
+            allowed_remote_commands=frozenset({"Invoke-Expression"}),
+        )
+
+
+def test_remote_session_manager_requires_explicit_host_and_cmdlet_allowlists(base: PowerShellToolPack) -> None:
+    from ultk.builtins.powershell_advanced import PersistentPowerShellSessions
+
+    manager = PersistentPowerShellSessions(
+        base.executable, base.root, frozenset(), 15, base.max_output,
+        frozenset({"srv01.example.internal"}), frozenset({"Get-Service"}),
+    )
+    assert manager.allowed_computers == frozenset({"srv01.example.internal"})
+    assert manager.allowed_remote_commands == frozenset({"Get-Service"})
