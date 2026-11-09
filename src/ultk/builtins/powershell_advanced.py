@@ -301,12 +301,16 @@ class AdvancedPowerShellToolPack:
         allowed_gpo_names: frozenset[str] = frozenset(),
         allowed_gpo_targets: frozenset[str] = frozenset(),
         allowed_task_names: frozenset[str] = frozenset(),
+        allowed_task_paths: frozenset[str] = frozenset({"\"}),
         approved_task_templates: Mapping[str, Mapping[str, str]] | None = None,
         allowed_audit_subcategories: frozenset[str] = frozenset(),
         allow_security_policy_changes: bool = False,
         timeout_seconds: int = 30,
     ) -> None:
         self.base = base
+        forbidden_commands = {"Invoke-Expression", "Add-Type", "Start-Process", "Set-ExecutionPolicy", "Stop-Computer", "Restart-Computer", "Remove-Item", "Clear-Content", "Set-Content"}
+        if any(command in forbidden_commands for command in allowed_session_commands):
+            raise ToolExecutionError("Persistent session allowlist includes a blocked high-risk cmdlet.")
         self.timeout = timeout_seconds
         self.allowed_computers = frozenset(item.casefold() for item in allowed_computers)
         self.allowed_remote_commands = frozenset(allowed_remote_commands)
@@ -330,6 +334,7 @@ class AdvancedPowerShellToolPack:
         self.allowed_gpos = frozenset(allowed_gpo_names)
         self.allowed_gpo_targets = frozenset(allowed_gpo_targets)
         self.allowed_tasks = frozenset(allowed_task_names)
+        self.allowed_task_paths = frozenset(allowed_task_paths)
         self.task_templates = {key: dict(value) for key, value in (approved_task_templates or {}).items()}
         self.allowed_audit = frozenset(allowed_audit_subcategories)
         self.allow_security = allow_security_policy_changes
@@ -672,7 +677,8 @@ class AdvancedPowerShellToolPack:
         self._windows("Active Directory")
         self._ad_domain(domain)
         base = self._value(search_base, "AD search base", 512)
-        if not base.casefold().endswith(tuple(domain.casefold().split("."))):
+        domain_dn = ",".join(f"DC={part}" for part in domain.split("."))
+        if not base.casefold().endswith(domain_dn.casefold()):
             raise ToolExecutionError("AD search base must be within the selected domain; verify the DN with your directory administrator.")
         return self.base._run(
             "Import-Module ActiveDirectory -ErrorAction Stop;"
@@ -777,7 +783,7 @@ class AdvancedPowerShellToolPack:
         if name not in self.allowed_tasks:
             raise ToolExecutionError("Scheduled task name is not host-allowlisted.")
         path = self._value(task_path, "task path", 512)
-        if not path.startswith("\\") or ".." in path.split("\\"):
+        if not path.startswith("\\") or ".." in path.split("\\") or path not in self.allowed_task_paths:
             raise ToolExecutionError("Task path must be an absolute Task Scheduler path.")
         return self.base._run(
             "Unregister-ScheduledTask -TaskName $data.name -TaskPath $data.path -Confirm:$false -ErrorAction Stop;"
@@ -843,6 +849,7 @@ def create_advanced_powershell_tools(
     allowed_gpo_names: frozenset[str] = frozenset(),
     allowed_gpo_targets: frozenset[str] = frozenset(),
     allowed_task_names: frozenset[str] = frozenset(),
+    allowed_task_paths: frozenset[str] = frozenset({"\"}),
     approved_task_templates: Mapping[str, Mapping[str, str]] | None = None,
     allowed_audit_subcategories: frozenset[str] = frozenset(),
     allow_security_policy_changes: bool = False,
@@ -863,7 +870,8 @@ def create_advanced_powershell_tools(
         allowed_package_sources=allowed_package_sources, allowed_ad_domains=allowed_ad_domains,
         allowed_ad_group_dns=allowed_ad_group_dns, allowed_ad_member_dns=allowed_ad_member_dns,
         allowed_gpo_names=allowed_gpo_names, allowed_gpo_targets=allowed_gpo_targets,
-        allowed_task_names=allowed_task_names, approved_task_templates=approved_task_templates,
+        allowed_task_names=allowed_task_names, allowed_task_paths=allowed_task_paths,
+        approved_task_templates=approved_task_templates,
         allowed_audit_subcategories=allowed_audit_subcategories,
         allow_security_policy_changes=allow_security_policy_changes,
     )
@@ -901,7 +909,7 @@ def create_advanced_powershell_tools(
         if not isinstance(values, dict) or len(values) > 30:
             raise ToolExecutionError("Remote parameters must be an object with at most 30 entries.")
         if any(not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", key) or
-               isinstance(value, (dict, list)) and (not isinstance(value, list) or len(value) > 100) or
+               isinstance(value, dict) or (isinstance(value, list) and (len(value) > 100 or any(not isinstance(item, (str, int, float, bool, type(None))) for item in value))) or
                not isinstance(value, (str, int, float, bool, type(None), list))
                for key, value in values.items()):
             raise ToolExecutionError("Remote parameter names or values are invalid.")
