@@ -146,3 +146,19 @@ The provider and plugin branches extend the REST integration branch; media exten
 - Media tools cover image operations and FFmpeg transcodes/probing only; speech and generative media are not implemented.
 - Communications currently includes plain-text SMTP sending only.
 - Cloud/infra, AI/ML, marketplace, TypeScript SDK and REST API server remain roadmap work.
+
+
+### Git Tool Pack — branch feat/git-toolkit-comprehensive
+- [ ] Implementation added as src/ultk/builtins/git.py; tests authored in tests/test_git_tools.py; tests and CI deliberately not run.
+- [ ] Scope: repository inspection, branch lifecycle, staging/unstaging/commits, working/staged/commit diffs, merge start/abort/complete, conflict listing/resolution, history/show/blame/tags, and HTTPS-allowlisted remote management/fetch/pull/push.
+- [ ] Verify subprocess timeout/cancellation: synchronous subprocess work runs in a worker thread; cancellation may not terminate the Git child process immediately.
+- [ ] Verify Git config threat model, hooks disabled, external diff/textconv disabled, pager disabled, system config disabled, protocol allowlist and credential helper behavior across supported platforms.
+- [ ] Verify remote URL validation including malformed ports, IPv6, encoded userinfo, redirects, URL rewrites, credential helpers, DNS rebinding and HTTP redirect behavior.
+- [ ] Verify push URL separately from fetch URL; verify local remote.pushurl cannot bypass the host allowlist.
+- [ ] Verify pathspec literal behavior for Unicode, newline, colon, leading dash, Windows separators, symlinks/junctions, case-insensitive filesystems and deleted paths.
+- [ ] Verify conflict parsing for paths containing tabs/newlines/non-UTF-8 bytes; current output decoding is UTF-8 replacement and NUL-delimited path parsing needs byte-level validation.
+- [ ] Verify merge lifecycle for fast-forward, already-up-to-date, conflicts, unrelated histories, merge hooks disabled and abort after partially resolved files.
+- [ ] Verify branch/revision validation against Git's full refname rules; current conservative validators may reject valid refs.
+- [ ] Verify remote pull/push semantics and credentials on real GitHub/GitLab test repositories; push is an externally visible mutation and must require host approval.
+- [ ] Review whether repository-local config can execute filters or credential helpers; untrusted repositories require OS sandboxing.
+- [ ] Confirm capability policies can separately gate each mutating operation.
