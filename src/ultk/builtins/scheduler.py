@@ -59,25 +59,29 @@ class PersistentScheduler:
 
     def run_due(self, limit: int = 10) -> dict[str, Any]:
         now = time.time()
-        completed = []
         with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
             rows = db.execute(
                 "SELECT * FROM jobs WHERE enabled=1 AND next_run<=? ORDER BY next_run LIMIT ?",
-                (now, limit)).fetchall()
+                (now, limit),
+            ).fetchall()
             for row in rows:
-                # Advance before invocation to avoid duplicate execution after a crash.
-                next_run = now + row["interval_seconds"]
-                db.execute("UPDATE jobs SET next_run=? WHERE id=?", (next_run, row["id"]))
-                try:
-                    handler = self.handlers[row["handler"]]
-                    handler(json.loads(row["payload"]))
-                    status = "success"
-                except Exception as exc:  # noqa: BLE001 - isolate scheduled task failures
-                    status = f"error:{type(exc).__name__}"
+                # Claim jobs in one transaction so concurrent workers do not double-dispatch.
+                db.execute(
+                    "UPDATE jobs SET next_run=? WHERE id=? AND next_run<=?",
+                    (now + row["interval_seconds"], row["id"], now),
+                )
+        completed = []
+        for row in rows:
+            try:
+                self.handlers[row["handler"]](json.loads(row["payload"]))
+                status = "success"
+            except Exception as exc:  # noqa: BLE001 - isolate scheduled task failures
+                status = f"error:{type(exc).__name__}"
+            with self._connect() as db:
                 db.execute("UPDATE jobs SET last_status=? WHERE id=?", (status, row["id"]))
-                completed.append({"job_id": row["id"], "status": status})
+            completed.append({"job_id": row["id"], "status": status})
         return {"executed": len(completed), "jobs": completed}
-
 
 def create_scheduler_tools(database: str | Path,
                            handlers: dict[str, Callable[[dict[str, Any]], Any]]) -> tuple[FunctionTool, ...]:
