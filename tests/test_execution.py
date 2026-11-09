@@ -57,3 +57,13 @@ async def test_invalid_arguments_never_invoke_tool():
     )
     assert result.is_error
     assert "Invalid arguments" in result.content
+
+
+@pytest.mark.asyncio
+async def test_unknown_tool_returns_structured_error():
+    dispatcher = ToolDispatcher(ToolRegistry(), DenyAllPolicy())
+    result = await dispatcher.execute(
+        ToolCallRequest("missing-1", "missing.tool", {})
+    )
+    assert result.is_error
+    assert "not registered" in result.content
