@@ -35,7 +35,8 @@ def test_advanced_factory_registers_separate_permission_families(base: PowerShel
         "powershell.create_partition", "powershell.resize_partition",
         "powershell.import_public_certificate", "powershell.install_module",
         "powershell.install_package", "powershell.ad_list_users",
-        "powershell.ad_create_group", "powershell.gpo_set_registry_value",
+        "powershell.ad_create_user", "powershell.ad_create_group", "powershell.gpo_set_registry_value",
+        "powershell.apply_security_template",
         "powershell.create_scheduled_task", "powershell.delete_scheduled_task",
         "powershell.inspect_security_policy", "powershell.set_audit_policy",
         "powershell.harden_defender_setting",
@@ -277,3 +278,64 @@ def test_persistent_session_blocks_output_variable_parameter_aliases(base: Power
             manager.validate(session["session_id"], "Get-Process -ov allowed")
     finally:
         manager.close(session["session_id"])
+
+
+
+def test_security_template_requires_host_sha256_pin(base: PowerShellToolPack) -> None:
+    import hashlib
+
+    template = base.root / "approved-policy.inf"
+    template.write_text("[Version]\nSignature=\"$CHICAGO$\"\n", encoding="utf-8")
+    digest = hashlib.sha256(template.read_bytes()).hexdigest()
+    pack = AdvancedPowerShellToolPack(
+        base,
+        allow_security_policy_changes=True,
+        approved_security_templates={
+            "workstation-baseline": {
+                "path": "approved-policy.inf",
+                "sha256": digest,
+                "areas": ["securitypolicy", "user_rights"],
+            }
+        },
+    )
+    resolved = pack._resolve_security_template("workstation-baseline")
+    assert resolved["sha256"] == digest
+    assert resolved["areas"] == ["securitypolicy", "user_rights"]
+
+
+def test_security_template_rejects_modified_and_unapproved_files(base: PowerShellToolPack) -> None:
+    import hashlib
+
+    template = base.root / "approved-policy.inf"
+    template.write_text("[Version]\nSignature=\"$CHICAGO$\"\n", encoding="utf-8")
+    digest = hashlib.sha256(template.read_bytes()).hexdigest()
+    pack = AdvancedPowerShellToolPack(
+        base,
+        approved_security_templates={
+            "baseline": {
+                "path": "approved-policy.inf",
+                "sha256": digest,
+                "areas": ["securitypolicy"],
+            }
+        },
+    )
+    template.write_text("[Version]\nSignature=\"$CHICAGO$\"\n; changed\n", encoding="utf-8")
+    with pytest.raises(ToolExecutionError):
+        pack._resolve_security_template("baseline")
+    with pytest.raises(ToolExecutionError):
+        pack._resolve_security_template("not-approved")
+
+
+def test_security_template_rejects_parent_traversal(base: PowerShellToolPack) -> None:
+    pack = AdvancedPowerShellToolPack(
+        base,
+        approved_security_templates={
+            "escape": {
+                "path": "../outside.inf",
+                "sha256": "0" * 64,
+                "areas": ["securitypolicy"],
+            }
+        },
+    )
+    with pytest.raises(ToolExecutionError):
+        pack._resolve_security_template("escape")
