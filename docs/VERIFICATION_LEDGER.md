@@ -12,7 +12,7 @@ This ledger separates implementation status from verification status. The projec
 | PR #6 — terminal/process management | Passed | Run 42666469124; 24 tests and Ruff passed. |
 | PR #7 — initial computer/web/development | Passed | Run 42672846897 passed after import/lint fixes. |
 | PR #8 — advanced computer/browser/development | Passed | Latest known run 42673036987 (run #168) completed successfully on head 0a48c0e2c986c4d69ccf07dc2e52d5059820c0ef. Earlier run 42672519333 had 16 Ruff findings; fixes were committed before the successful run. |
-| New feature branches after PR #8 | Not run / deferred | Security, data, documents, REST, provider, plugin, media and email additions have not had tests or CI run by design. |
+| New feature branches after PR #8 | Not run / deferred | Security, data, documents, REST, provider, plugin, media, email, Git, PowerShell and comprehensive computer/OS additions have not had tests or CI run by design. |
 
 Historical CI does not establish Windows GUI behavior, browser integration, production security or end-to-end provider compatibility. PRs remain unmerged unless explicitly merged by the project owner.
 
@@ -31,8 +31,10 @@ The new increments are deliberately sequential and remain unmerged:
 | Media processing | `feat/media-processing-tool-pack` | Bounded Pillow image tools and host-configured FFmpeg/ffprobe operations |
 | Email | `feat/secure-email-tool-pack` | Host-configured TLS SMTP sender, exact/domain recipient allowlists, plain-text only |
 | Git Tool Pack | `feat/git-toolkit-comprehensive` | Repository inspection, branch/index/commit/diff/merge/conflict/history and HTTPS allowlisted remote operations |
+| Dedicated PowerShell | `feat/dedicated-powershell-tool-pack` | PowerShell-native system, process, service, network, registry, event, task, module and approved-script operations |
+| Comprehensive computer/OS | `feat/comprehensive-computer-os-tool-pack` | Persistent logical desktop contexts, monitor/window/virtual desktop control, keyboard, accessibility, cross-platform services, filesystem permissions, Windows ACL, hardware, USB, network and event-log tools |
 
-The provider and plugin branches extend the REST integration branch; media extends the plugin branch; email extends media. These are feature branches, not pull requests. Final integration and validation will happen after implementation work is complete.
+The provider and plugin branches extend the REST integration branch; media extends the plugin branch; email extends media; Git extends email; PowerShell extends Git; comprehensive computer/OS extends PowerShell. These are feature branches, not pull requests. Final integration and validation will happen after implementation work is complete.
 
 ## Known failures and fixes to retain
 
@@ -180,3 +182,26 @@ The provider and plugin branches extend the REST integration branch; media exten
 - [ ] Verify WS-Man test behavior, host allowlisting, authentication configuration and network egress controls. General-purpose remote command execution is not implemented.
 - [ ] Confirm script execution capability powershell:script:execute and all service/task mutation capabilities are approval-gated by production host policy.
 - [ ] Validate on the user's Windows 11 environment; no Windows integration tests or CI have been run for this increment.
+
+
+### Comprehensive Computer and Operating-System Pack — branch feat/comprehensive-computer-os-tool-pack
+- [ ] Implementation added in src/ultk/builtins/computer_os.py; 30 FunctionTool operations are registered by ToolEngine.install_computer_os_tools; tests authored in tests/test_computer_os_tools.py; no tests, Ruff, mypy, packaging checks or CI have been run.
+- [ ] Persistent desktop sessions are logical SQLite-backed ULTK context records, not actual Windows logon sessions or isolated desktop processes. Verify session ownership/authentication at the host layer, concurrent updates, SQLite locking, state limits and lifecycle semantics.
+- [ ] Validate PyWinCtl window discovery/action behavior on Windows 11, Linux X11, Wayland and macOS; verify title uniqueness, hidden/minimized windows, DPI scaling, multi-monitor negative coordinates, stale windows, close behavior and race conditions.
+- [ ] Validate screeninfo monitor enumeration and primary-display fallback on all supported display servers; verify monitor rotation, scaling, hotplug and virtual display geometry.
+- [ ] Validate Windows pyvda API/version compatibility and desktop numbering; current Windows enumeration is only a current-desktop view. Linux virtual desktop support requires wmctrl/X11; Wayland and macOS switching are not implemented.
+- [ ] Validate keyboard mapping for Windows/Linux/macOS, shortcut ordering, dead keys, Unicode typing, secure-attention sequence blocking, partial workflow failures and foreground-window focus. Keyboard actions can cause irreversible changes in active applications.
+- [ ] Validate Windows UI Automation with pywinauto on real applications; test duplicate automation IDs, stale controls, modal dialogs, UAC secure desktop, elevated applications and invoke-vs-click semantics.
+- [ ] Validate Linux AT-SPI installation and traversal on GNOME/KDE; check inaccessible applications, recursion bounds, stale accessibility nodes and desktop service availability. AT-SPI element invocation is not implemented.
+- [ ] Validate service inventory and mutation command semantics on Windows SCM and Linux systemd; exact host allowlist is required. Check permission errors, dependencies, service name casing and start/stop/restart result codes. macOS launchd is list-only.
+- [ ] Validate POSIX chmod/chown semantics, uid/gid behavior, sticky/setuid/setgid bit restrictions, symlink/junction races, hard links and filesystem TOCTOU. chown is disabled by default.
+- [ ] Validate Windows icacls parsing and ACL grant semantics on NTFS/ReFS, SID allowlisting, inherited ACE behavior, object/container ACL behavior and error reporting. ACL changes are disabled by default; R/RX/M only.
+- [ ] Validate hardware inspection across Windows/Linux/macOS, missing sensor APIs, permission errors, removable/network filesystems, disk enumeration and potentially sensitive network/device metadata.
+- [ ] Validate USB enumeration on Linux pyudev, Windows pnputil and macOS system_profiler; output parsing, locale differences, device count limits, serial privacy and driver/device permissions.
+- [ ] Validate Linux/macOS safe eject with exact device allowlists, busy mount handling, multi-partition devices and data-loss prevention. Windows safe eject is not implemented.
+- [ ] Validate Windows wevtutil XPath query and XML namespace parsing, Linux journalctl since/channel behavior, macOS log show output format, privilege restrictions, truncation and secret-sensitive event data.
+- [ ] Event watches are persisted definitions only; host scheduler polling is required. Background daemon, incremental cursor/checkpoint, deduplication and notification delivery are not implemented.
+- [ ] Validate subprocess output draining/capping, timeout kill behavior, child-process cleanup, command availability, sanitized environment and Windows process handle behavior.
+- [ ] pyproject.toml had a malformed literal escaped newline between optional dependency declarations in the parent branch; this branch rewrites it as valid separate TOML entries and adds the computer-os extra. Verify TOML parsing, wheel build and installation of platform markers.
+- [ ] Validate optional dependency installation and imports: PyWinCtl, PyAutoGUI, screeninfo, pywinauto, pyvda, pyudev and system-level AT-SPI bindings.
+- [ ] No Windows 11, Linux X11/Wayland or macOS end-to-end integration tests have been run for this increment.
