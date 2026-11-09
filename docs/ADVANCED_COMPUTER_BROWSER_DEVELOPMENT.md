@@ -73,7 +73,7 @@ Added:
 - SQLite website monitor definitions and content-hash change detection.
 - Optional host-provided notifier callback invoked when monitored content changes.
 
-Browser session state contains authentication cookies and must be protected as a credential store.
+Downloads are written atomically and return a SHA-256 digest; callers can provide an expected SHA-256 to verify integrity before the file is committed. Browser session state contains authentication cookies and must be protected as a credential store.
 Do not expose session directories to untrusted users. Browser automation is capable of submitting
 forms and changing external accounts; use exact-argument human approval for consequential actions.
 Network URL checks are defense in depth; enforce network-level egress controls as well. Monitoring
@@ -112,6 +112,7 @@ keeps state in process memory and loses it on restart. It does not execute gener
 | Desktop workflow | `computer:workflow` |
 | Persistent scheduler | `scheduler:read`, `scheduler:write`, `scheduler:execute` |
 | Browser navigation/read | `browser:navigate`, `browser:read` |
+| Browser session lifecycle | `browser:session:manage` |
 | Browser interaction/workflow | `browser:interact`, `browser:workflow` |
 | Website monitoring | `web:monitor:read`, `web:monitor:write`, `web:monitor:check` |
 | Restricted interpreter | `development:interpreter` |
