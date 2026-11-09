@@ -28,6 +28,17 @@ _REGISTRY_PREFIXES = ("HKLM:\\", "HKCU:\\", "HKCR:\\", "HKU:\\", "HKCC:\\")
 class PersistentPowerShellSessions:
     """One isolated long-lived pwsh process per ULTK session."""
 
+    _RESERVED_VARIABLES = frozenset({
+        "allowed", "forbidden", "maxOutput", "reserved", "request", "line", "ast", "tokens",
+        "errors", "bad", "variables", "assignments", "calls", "name", "resolved", "result",
+        "json", "value", "commandName", "arguments", "path", "variable", "assignment",
+        "call", "node", "vars", "item", "data", "ErrorActionPreference", "ProgressPreference",
+        "WarningPreference", "InformationPreference", "ExecutionContext", "PSDefaultParameterValues",
+        "host", "HOME", "PROFILE", "PSHOME", "PID", "PSVersionTable", "Error", "LASTEXITCODE",
+        "MyInvocation", "PSScriptRoot", "PSCommandPath", "PSCmdlet", "PSBoundParameters",
+        "PSCulture", "PSUICulture",
+    })
+
     _FORBIDDEN_AST = [
         "MemberExpressionAst", "InvokeMemberExpressionAst", "TypeExpressionAst",
         "TypeConstraintAst", "UsingExpressionAst", "UsingStatementAst",
@@ -107,7 +118,7 @@ class PersistentPowerShellSessions:
             "Send-Response @{ok=$true;result=$result}"
             "}"
             "'variables' {"
-            "$vars=Get-Variable | Where-Object {$_.Name -notmatch '^(PS|_|args$|input$)'} | "
+            "$vars=Get-Variable | Where-Object {$reserved -notcontains $_.Name -and $_.Name -notmatch '^(PS|_|args$|input$)'} | "
             "Select-Object -First 200 Name,Visibility,Options;"
             "Send-Response @{ok=$true;variables=@($vars)}"
             "}"
@@ -247,8 +258,8 @@ class PersistentPowerShellSessions:
         return self._request(session_id, "variables")
 
     def get_variable(self, session_id: str, name: str) -> dict[str, Any]:
-        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,63}", name):
-            raise ToolExecutionError("Invalid session variable name.")
+        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,63}", name) or name.casefold() in {item.casefold() for item in self._RESERVED_VARIABLES}:
+            raise ToolExecutionError("Invalid or reserved session variable name.")
         return self._request(session_id, "get_variable", name=name)
 
     def list(self) -> list[dict[str, Any]]:
