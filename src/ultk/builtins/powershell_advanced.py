@@ -322,7 +322,7 @@ class PersistentPowerShellSessions:
                       parameters: dict[str, Any] | None = None) -> dict[str, Any]:
         if not isinstance(remote_session_id, str) or not re.fullmatch(r"[0-9a-f]{32}", remote_session_id):
             raise ToolExecutionError("Invalid remote session ID.")
-        if command not in self.allowed_remote_commands:
+        if not isinstance(command, str) or not _NAME.fullmatch(command) or command not in self.allowed_remote_commands:
             raise ToolExecutionError("Remote cmdlet is not host-allowlisted.")
         values = parameters or {}
         if not isinstance(values, dict) or len(values) > 30:
@@ -332,7 +332,11 @@ class PersistentPowerShellSessions:
                not isinstance(value, (str, int, float, bool, type(None), list))
                for key, value in values.items()):
             raise ToolExecutionError("Remote parameter names or values are invalid.")
-        if len(json.dumps(values, ensure_ascii=False)) > 16_000:
+        try:
+            payload_size = len(json.dumps(values, ensure_ascii=False, allow_nan=False).encode("utf-8"))
+        except (TypeError, ValueError) as exc:
+            raise ToolExecutionError("Remote parameters must contain finite JSON-compatible values.") from exc
+        if payload_size > 16_000:
             raise ToolExecutionError("Remote parameter payload exceeds 16 KB.")
         return {"session_id": session_id, **self._request(
             session_id, "remote_invoke", request_timeout=min(120, max(self.timeout, 60)),
@@ -576,6 +580,8 @@ class AdvancedPowerShellToolPack:
             raise ToolExecutionError("DWord/QWord registry values require a non-negative in-range integer.")
         if value_type == "Binary" and (not isinstance(value, list) or any(type(item) is not int or not 0 <= item <= 255 for item in value)):
             raise ToolExecutionError("Binary registry values require a list of byte values.")
+        if len(json.dumps(value, ensure_ascii=False, allow_nan=False).encode("utf-8")) > 16_000:
+            raise ToolExecutionError("Registry value payload exceeds 16 KB.")
         if isinstance(value, (dict,)) or not isinstance(value, (str, int, float, bool, list)):
             raise ToolExecutionError("Registry value must be a scalar or array.")
         if len(json.dumps(value, ensure_ascii=False)) > 16_000:
@@ -1139,6 +1145,8 @@ class AdvancedPowerShellToolPack:
             raise ToolExecutionError("Numeric policy values require an in-range non-negative integer.")
         if value_type == "MultiString" and (not isinstance(value, list) or any(not isinstance(item, str) for item in value)):
             raise ToolExecutionError("MultiString policy values require a list of strings.")
+        if len(json.dumps(value, ensure_ascii=False, allow_nan=False).encode("utf-8")) > 16_000:
+            raise ToolExecutionError("Group Policy value payload exceeds 16 KB.")
         value_name = self._value(value_name, "policy value name", 256)
         return self.base._run(
             "Import-Module GroupPolicy -ErrorAction Stop;"
@@ -1412,7 +1420,7 @@ def create_advanced_powershell_tools(
             raise ToolExecutionError("use_ssl must be boolean.")
         if not use_ssl and not pack.allow_insecure_remoting:
             raise ToolExecutionError("Non-SSL WinRM requires the separate allow_insecure_remoting host opt-in.")
-        if command not in pack.allowed_remote_commands:
+        if not isinstance(command, str) or not _NAME.fullmatch(command) or command not in pack.allowed_remote_commands:
             raise ToolExecutionError("Remote cmdlet is not host-allowlisted.")
         if command.casefold() in {"invoke-expression", "add-type", "start-process", "set-executionpolicy", "invoke-command", "new-pssession"}:
             raise ToolExecutionError("Remote command is blocked by the ULTK remoting safety policy.")
