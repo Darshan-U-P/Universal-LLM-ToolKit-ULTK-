@@ -103,8 +103,16 @@ def test_advanced_development_pack_installs_without_external_toolchains(tmp_path
     } <= names
 
 
-def test_advanced_tool_packs_are_capability_gated(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_advanced_tool_packs_are_capability_gated(tmp_path: Path) -> None:
     engine = ToolEngine(policy=AllowListPolicy({"development.interpreter"}))
     engine.install_advanced_development_tools(project_root=tmp_path)
-    denied = engine.dispatcher
-    assert denied is not None
+    arguments = {"session_id": "s1", "source": "2 + 2"}
+    denied = await engine.execute("development.interpreter", arguments)
+    assert denied.is_error
+    allowed = await engine.execute(
+        "development.interpreter", arguments,
+        granted_capabilities=frozenset({"development:interpreter"}),
+    )
+    assert not allowed.is_error
+    assert "4" in allowed.content
