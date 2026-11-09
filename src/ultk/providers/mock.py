@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 from ultk.exceptions import ConfigurationError
 from ultk.models import AssistantTurn
