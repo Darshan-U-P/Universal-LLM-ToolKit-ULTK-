@@ -67,7 +67,7 @@ class PersistentPowerShellSessions:
         commands = base64.b64encode(json.dumps(sorted(self.allowed_commands)).encode()).decode()
         forbidden = "@(" + ",".join("'" + name.replace("'", "''") + "'" for name in self._FORBIDDEN_AST) + ")"
         return (
-            "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false);"
+            "[Console]::InputEncoding=[System.Text.UTF8Encoding]::new($false);[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false);"
             "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
             "$WarningPreference='SilentlyContinue';$InformationPreference='SilentlyContinue';"
             f"$allowed=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{commands}'))|ConvertFrom-Json;"
@@ -533,8 +533,8 @@ class AdvancedPowerShellToolPack:
         if not self.password_env or not os.environ.get(self.password_env):
             raise ToolExecutionError("Host-configured local_user_password_env is missing or empty.")
         password = os.environ[self.password_env]
-        if len(password) < 12 or "\x00" in password:
-            raise ToolExecutionError("Host-provided local account password must be at least 12 characters.")
+        if not 12 <= len(password) <= 256 or "\x00" in password:
+            raise ToolExecutionError("Host-provided local account password must be 12–256 characters.")
         display = self._value(description, "user description", 256)
         return self.base._run(
             "$secure=ConvertTo-SecureString $env:ULTK_LOCAL_USER_PASSWORD -AsPlainText -Force;"
