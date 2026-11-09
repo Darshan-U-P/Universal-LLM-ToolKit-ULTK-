@@ -398,6 +398,10 @@ class AdvancedPowerShellToolPack:
     def _windows(self, name: str) -> None:
         self.base._windows_required(name)
 
+    def _require_module(self, module_name: str) -> None:
+        if module_name.casefold() not in {item.casefold() for item in self.base.allowed_modules}:
+            raise ToolExecutionError(f"PowerShell module {module_name} is not in the host trusted-module allowlist.")
+
     @staticmethod
     def _value(value: Any, label: str, limit: int = 2048) -> str:
         return PowerShellToolPack._string(value, label, limit)
@@ -575,8 +579,7 @@ class AdvancedPowerShellToolPack:
 
     def windows_update_list(self) -> dict[str, Any]:
         self._windows("Windows Update")
-        if "PSWindowsUpdate" not in self.base.allowed_modules:
-            raise ToolExecutionError("PSWindowsUpdate must be installed and host-allowlisted in allowed_modules.")
+        self._require_module("PSWindowsUpdate")
         return self.base._run(
             "Import-Module PSWindowsUpdate -ErrorAction Stop;"
             "Get-WindowsUpdate -ErrorAction Stop | Select-Object -First 200 KB,Size,Title,IsDownloaded,IsInstalled",
@@ -590,8 +593,9 @@ class AdvancedPowerShellToolPack:
 
     def windows_update_install(self, kb_ids: list[str]) -> dict[str, Any]:
         self._windows("Windows Update")
-        if not self.allow_update_install or "PSWindowsUpdate" not in self.base.allowed_modules:
-            raise ToolExecutionError("Windows Update installation is disabled or PSWindowsUpdate is not host-allowlisted.")
+        if not self.allow_update_install:
+            raise ToolExecutionError("Windows Update installation is disabled by host policy.")
+        self._require_module("PSWindowsUpdate")
         if not isinstance(kb_ids, list) or not 1 <= len(kb_ids) <= 20:
             raise ToolExecutionError("Provide 1–20 approved KB identifiers.")
         normalized = [self._value(item, "KB identifier", 16).upper() for item in kb_ids]
@@ -726,6 +730,7 @@ class AdvancedPowerShellToolPack:
 
     def ad_users(self, domain: str, search_base: str) -> dict[str, Any]:
         self._windows("Active Directory")
+        self._require_module("ActiveDirectory")
         self._ad_domain(domain)
         base = self._value(search_base, "AD search base", 512)
         domain_dn = ",".join(f"DC={part}" for part in domain.split("."))
@@ -739,6 +744,7 @@ class AdvancedPowerShellToolPack:
 
     def ad_groups(self, domain: str, search_base: str) -> dict[str, Any]:
         self._windows("Active Directory")
+        self._require_module("ActiveDirectory")
         self._ad_domain(domain)
         base = self._value(search_base, "AD search base", 512)
         domain_dn = ",".join(f"DC={part}" for part in domain.split("."))
@@ -758,6 +764,7 @@ class AdvancedPowerShellToolPack:
 
     def ad_group_member(self, group_dn: str, member_dn: str, add: bool) -> dict[str, Any]:
         self._windows("Active Directory group membership")
+        self._require_module("ActiveDirectory")
         if group_dn not in self.allowed_ad_groups or member_dn not in self.allowed_ad_members:
             raise ToolExecutionError("AD group and member distinguished names must be host-allowlisted.")
         command = "Add-ADGroupMember" if add else "Remove-ADGroupMember"
@@ -769,6 +776,7 @@ class AdvancedPowerShellToolPack:
 
     def gpo_list(self, domain: str) -> dict[str, Any]:
         self._windows("Group Policy")
+        self._require_module("GroupPolicy")
         self._ad_domain(domain)
         return self.base._run(
             "Import-Module GroupPolicy -ErrorAction Stop;Get-GPO -All -Domain $data.domain | "
@@ -777,6 +785,7 @@ class AdvancedPowerShellToolPack:
 
     def gpo_create(self, name: str, domain: str) -> dict[str, Any]:
         self._windows("Group Policy")
+        self._require_module("GroupPolicy")
         self._ad_domain(domain)
         if name not in self.allowed_gpos:
             raise ToolExecutionError("GPO name must be host-allowlisted.")
@@ -787,6 +796,7 @@ class AdvancedPowerShellToolPack:
 
     def gpo_link(self, name: str, target: str, domain: str, enabled: bool) -> dict[str, Any]:
         self._windows("Group Policy linking")
+        self._require_module("GroupPolicy")
         self._ad_domain(domain)
         if name not in self.allowed_gpos or target not in self.allowed_gpo_targets:
             raise ToolExecutionError("GPO name and target OU must be host-allowlisted.")
@@ -865,6 +875,7 @@ class AdvancedPowerShellToolPack:
 
     def ad_user_state(self, distinguished_name: str, enabled: bool) -> dict[str, Any]:
         self._windows("Active Directory user management")
+        self._require_module("ActiveDirectory")
         if distinguished_name not in self.allowed_ad_members:
             raise ToolExecutionError("AD user DN must be host-allowlisted.")
         command = "Enable-ADAccount" if enabled else "Disable-ADAccount"
@@ -875,6 +886,7 @@ class AdvancedPowerShellToolPack:
 
     def ad_user_remove(self, distinguished_name: str) -> dict[str, Any]:
         self._windows("Active Directory user deletion")
+        self._require_module("ActiveDirectory")
         if distinguished_name not in self.allowed_ad_members:
             raise ToolExecutionError("AD user DN must be host-allowlisted.")
         return self.base._run(
@@ -885,6 +897,7 @@ class AdvancedPowerShellToolPack:
 
     def ad_group_create(self, name: str, path: str, scope: str, category: str) -> dict[str, Any]:
         self._windows("Active Directory group creation")
+        self._require_module("ActiveDirectory")
         if scope not in {"Global", "DomainLocal", "Universal"} or category not in {"Security", "Distribution"}:
             raise ToolExecutionError("Invalid AD group scope or category.")
         if path not in self.allowed_gpo_targets:
@@ -903,6 +916,7 @@ class AdvancedPowerShellToolPack:
 
     def ad_group_remove(self, group_dn: str) -> dict[str, Any]:
         self._windows("Active Directory group deletion")
+        self._require_module("ActiveDirectory")
         if group_dn not in self.allowed_ad_groups:
             raise ToolExecutionError("AD group DN must be host-allowlisted.")
         return self.base._run(
@@ -913,6 +927,7 @@ class AdvancedPowerShellToolPack:
 
     def gpo_remove(self, name: str, domain: str) -> dict[str, Any]:
         self._windows("Group Policy deletion")
+        self._require_module("GroupPolicy")
         self._ad_domain(domain)
         if name not in self.allowed_gpos:
             raise ToolExecutionError("GPO name must be host-allowlisted.")
@@ -925,6 +940,7 @@ class AdvancedPowerShellToolPack:
     def gpo_registry_set(self, name: str, domain: str, key: str, value_name: str,
                          value: Any, value_type: str) -> dict[str, Any]:
         self._windows("Group Policy registry settings")
+        self._require_module("GroupPolicy")
         self._ad_domain(domain)
         if name not in self.allowed_gpos or key not in self.allowed_gpo_registry_keys:
             raise ToolExecutionError("GPO name and registry policy key must be host-allowlisted.")
