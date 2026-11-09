@@ -452,6 +452,8 @@ class AdvancedPowerShellToolPack:
             "Remove-GPO", "New-GPO", "New-GPLink", "Remove-GPLink", "Set-GPRegistryValue", "auditpol.exe",
             "Enable-LocalUser", "Disable-LocalUser", "Enable-NetFirewallRule", "Disable-NetFirewallRule",
             "Enable-ADAccount", "Disable-ADAccount", "Set-Partition", "Set-Volume", "Set-MpPreference",
+            "Import-Module", "Import-PSSession", "Export-PSSession", "New-Module", "Add-PSSnapin",
+            "Invoke-Item", "Start-ThreadJob", "Register-WmiEvent",
         }
         forbidden_folded = {command.casefold() for command in forbidden_commands}
         if any(command.casefold() in forbidden_folded for command in allowed_session_commands):
@@ -466,7 +468,8 @@ class AdvancedPowerShellToolPack:
             raise ToolExecutionError("Remote cmdlet allowlist contains an invalid command name.")
         remote_blocked = {"invoke-expression", "add-type", "start-process", "set-executionpolicy",
                           "invoke-command", "new-pssession", "remove-pssession", "stop-computer",
-                          "restart-computer", "new-object", "add-member"}
+                          "restart-computer", "new-object", "add-member", "import-module", "import-pssession",
+                          "export-pssession", "new-module", "add-pssnapin"}
         if any(command.casefold() in remote_blocked for command in allowed_remote_commands):
             raise ToolExecutionError("Remote cmdlet allowlist includes a blocked code-execution or session-control command.")
         self.allowed_remote_commands = frozenset(allowed_remote_commands)
