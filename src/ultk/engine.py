@@ -25,6 +25,17 @@ class ToolEngine:
         self.audit_logger = audit_logger
         self.dispatcher = ToolDispatcher(self.registry, self.policy, self.audit_logger)
 
+    def configure_plugins(
+        self,
+        *,
+        trusted_plugins: set[str] | frozenset[str] = frozenset(),
+    ) -> Any:
+        from ultk.plugins import PluginManager
+        self.plugin_manager = PluginManager(
+            self.registry, trusted_plugins=trusted_plugins
+        )
+        return self.plugin_manager
+
     def enable_audit(self, database: str | Path) -> Any:
         from ultk.audit import SQLiteAuditLogger
         self.audit_logger = SQLiteAuditLogger(database)
