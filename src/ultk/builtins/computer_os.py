@@ -284,7 +284,7 @@ class ComputerOSPack:
                 return
             if node.get("type") == "workspace":
                 workspace = str(node.get("name", ""))[:120]
-            app_id = node.get("app_id") or node.get("window_properties", {}).get("class")
+            app_id = node.get("app_id") or (node.get("window_properties") or {}).get("class")
             title = node.get("name") or ""
             rect = node.get("rect") or {}
             if node.get("type") == "con" and (app_id or node.get("window")) and title:
@@ -776,21 +776,6 @@ class ComputerOSPack:
             raise ToolExecutionError("macOS Accessibility API could not invoke the selected element.")
         return {"window": app_name, "element_identifier": element_id,
                 "backend": "macOS Accessibility API", "status": "invoke_requested"}
-
-        matches = [window for window in Desktop(backend="uia").windows()
-                   if title_contains.casefold() in window.window_text().casefold()]
-        if len(matches) != 1:
-            raise ToolExecutionError("Accessibility selector must match exactly one window.")
-        element_id = self._text(automation_id, "automation ID", 256)
-        controls = [control for control in matches[0].descendants()
-                    if control.element_info.automation_id == element_id]
-        if len(controls) != 1:
-            raise ToolExecutionError("Automation ID must match exactly one element.")
-        if not controls[0].is_enabled() or not controls[0].is_visible():
-            raise ToolExecutionError("Target UI element is not enabled and visible.")
-        controls[0].click_input()
-        return {"window": matches[0].window_text(), "automation_id": element_id,
-                "status": "click_requested"}
 
     # Virtual desktops (backend-specific; no fake support on unsupported platforms).
     def virtual_desktops(self, action: str, desktop_number: int | None = None) -> dict[str, Any]:
