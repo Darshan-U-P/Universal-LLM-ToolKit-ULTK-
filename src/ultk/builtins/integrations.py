@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import json
 import os
 import re
+from typing import Any
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Mapping
-from typing import Any
 
 from ultk.builtins._common import FunctionTool, object_schema
 from ultk.exceptions import ToolExecutionError
