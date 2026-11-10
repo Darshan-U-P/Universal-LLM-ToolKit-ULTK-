@@ -324,3 +324,21 @@ class ToolEngine:
             max_result_bytes=max_result_bytes,
             max_batch=max_batch,
         ))
+
+    def install_memory_tools(
+        self,
+        *,
+        database: str | Path = "./ultk_memory.sqlite3",
+        namespace: str,
+        embedder: Any = None,
+        max_items: int = 100_000,
+    ) -> None:
+        """Install persistent, namespace-isolated memory tools.
+
+        The namespace must come from authenticated host identity, never model input.
+        An optional trusted embedder callable may provide semantic vector embeddings.
+        """
+        from ultk.builtins.memory import create_memory_tools
+        self.register_tools(create_memory_tools(
+            database, namespace=namespace, embedder=embedder, max_items=max_items,
+        ))
