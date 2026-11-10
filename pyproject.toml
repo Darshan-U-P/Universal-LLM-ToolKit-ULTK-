@@ -16,10 +16,35 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = []
+dependencies = ["jsonschema>=4.22", "psutil>=6.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5", "mypy>=1.10"]
+computer = ["pyautogui>=0.9.54", "pyperclip>=1.9", "PyWinCtl>=0.4.01"]
+computer-visual = ["pyautogui>=0.9.54", "Pillow>=10.0", "pytesseract>=0.3.13"]
+computer-vision = ["pyautogui>=0.9.54", "Pillow>=10.0", "numpy>=1.26", "opencv-python-headless>=4.10"]
+computer-os = [
+  "PyWinCtl>=0.4.01",
+  "pyautogui>=0.9.54",
+  "screeninfo>=0.8.1",
+  "pywinauto>=0.6.8; platform_system == 'Windows'",
+  "pyvda>=0.4; platform_system == 'Windows'",
+  "pyudev>=0.24; platform_system == 'Linux'",
+  "pyobjc-framework-Cocoa>=10; platform_system == 'Darwin'",
+  "pyobjc-framework-Quartz>=10; platform_system == 'Darwin'",
+]
+browser = ["playwright>=1.48"]
+devtools = ["pytest>=8.0", "ruff>=0.5", "mypy>=1.10"]
+documents = ["pypdf>=5.0", "python-docx>=1.1", "python-pptx>=1.0", "openpyxl>=3.1"]
+media = ["Pillow>=10.0"]
+documents-xls = ["xlrd>=2.0"]
+documents-odf = ["odfpy>=1.4"]
+structured-data = ["openpyxl>=3.1", "defusedxml>=0.7"]
+database-mysql = ["mysql-connector-python>=9.0"]
+database-postgresql = ["psycopg[binary]>=3.2"]
+database-mongodb = ["pymongo>=4.8"]
+database-redis = ["redis>=5.0"]
+databases = ["mysql-connector-python>=9.0", "psycopg[binary]>=3.2", "pymongo>=4.8", "redis>=5.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ultk"]
