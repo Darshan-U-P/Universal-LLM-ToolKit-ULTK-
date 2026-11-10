@@ -84,9 +84,9 @@ def main() -> int:
             "max": round(max(latencies, default=0.0), 3),
             "mean": round(statistics.fmean(latencies), 3) if latencies else 0.0,
         },
-        "diagnostics": store and {
+        "diagnostics": {
             "database_bytes": Path(database).stat().st_size,
-            "integrity_check": store.db().__class__.__name__,
+            "integrity_check": None,
         },
         "database": str(database),
     }
