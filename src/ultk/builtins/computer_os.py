@@ -730,6 +730,11 @@ class ComputerOSPack:
     def _mac_accessibility_app(self, title_contains: str) -> tuple[Any, Any, str]:
         appkit = _optional("AppKit")
         quartz = _optional("Quartz")
+        is_trusted = getattr(quartz, "AXIsProcessTrusted", None)
+        if callable(is_trusted) and not is_trusted():
+            raise ToolExecutionError(
+                "macOS Accessibility permission is not granted to the ULTK host process."
+            )
         matches = [app for app in appkit.NSWorkspace.sharedWorkspace().runningApplications()
                    if title_contains.casefold() in (app.localizedName() or "").casefold()]
         if len(matches) != 1:
