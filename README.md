@@ -289,3 +289,24 @@ privileges, so this is not an OS sandbox. See
 The optional document pack provides bounded discovery, metadata, text extraction for PDF and common Office/OpenDocument formats, and guarded PDF merge/page extraction. The structured-data pack reads and writes CSV, JSON, XML and XLSX and provides declarative, bounded ETL operations without evaluating model-supplied code.
 
 Install with `pip install -e ".[documents,structured-data]"`. Legacy XLS and OpenDocument parsers have separate optional extras. See [Documents and Structured Data](docs/DOCUMENTS_AND_STRUCTURED_DATA.md) for capabilities, installation and security boundaries.
+
+
+## Database integrations
+
+The optional database pack connects to host-configured **SQLite, MySQL, PostgreSQL,
+MongoDB and Redis** profiles. Install the needed driver extras (or all drivers with
+\`pip install -e ".[databases]"\`) and call
+\`ToolEngine.install_database_tools(profiles=...)\`.
+
+SQL tools provide table/column discovery, bounded SELECT, parameterized INSERT/UPDATE/DELETE,
+and atomic mutation transactions. MongoDB tools provide collection discovery, bounded filtered
+find, insert, update and delete. Redis tools provide prefixed key get/set/delete, bounded SCAN,
+TTL support and atomic transactions.
+
+Connection settings and credentials are supplied only by the host application. Model calls can
+select configured profile names but cannot supply DSNs, credentials or arbitrary SQL. SQL
+identifiers are validated, values are parameterized, unfiltered UPDATE/DELETE is refused,
+MongoDB executable operators are rejected, and Redis keys are confined to a host-configured
+prefix. Mutating capabilities remain separate from reads. These controls are not a network or
+database sandbox: configure least-privilege database users, TLS, firewall rules, and human
+approval for sensitive writes. See [Database Integrations](docs/DATABASE_INTEGRATIONS.md).
