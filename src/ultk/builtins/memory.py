@@ -58,7 +58,8 @@ class PersistentMemory:
             """)
     @contextmanager
     def db(self):
-        c = sqlite3.connect(self.database, timeout=10)
+        c = sqlite3.connect(self.database, timeout=30)
+        c.execute("PRAGMA busy_timeout=30000")
         c.row_factory = sqlite3.Row
         try:
             yield c
@@ -80,6 +81,7 @@ class PersistentMemory:
         if role not in {"system","user","assistant","tool"} or not isinstance(content,str) or not content.strip() or len(content)>20000:
             raise ToolExecutionError("Invalid context role/content.")
         with self.db() as c:
+            c.execute("BEGIN IMMEDIATE")
             seq=c.execute("SELECT COALESCE(MAX(seq),0)+1 n FROM memory_context WHERE ns=? AND sid=?",
                           (self.namespace,session_id)).fetchone()["n"]
             c.execute("INSERT INTO memory_context VALUES(?,?,?,?,?,?)",
@@ -113,6 +115,7 @@ class PersistentMemory:
         meta=_metadata(metadata or {}); now=time.time(); mid=uuid.uuid4().hex
         vec=self.embedding(content)
         with self.db() as c:
+            c.execute("BEGIN IMMEDIATE")
             count=c.execute("SELECT COUNT(*) n FROM memory_items WHERE ns=?",(self.namespace,)).fetchone()["n"]
             if count>=self.max_items: raise ToolExecutionError("Memory capacity reached; consolidate or forget records.")
             c.execute("INSERT INTO memory_items(id,ns,sid,kind,scope,content,tags,metadata,confidence,vector,fingerprint,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
