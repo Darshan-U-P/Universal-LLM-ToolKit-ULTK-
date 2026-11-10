@@ -42,7 +42,7 @@ def make_engine(tmp_path, dispatcher=None, **kwargs):
 
 @pytest.mark.asyncio
 async def test_dag_resolves_explicit_reference_and_persists_result(tmp_path):
-    dispatcher = FakeDispatcher()
+    dispatcher = FakeDispatcher({"data.lookup": [{"value": 42}]})
     engine = make_engine(tmp_path, dispatcher)
     run_id = engine.submit([
         WorkflowStep("source", "data.lookup", {"key": "answer"}),
