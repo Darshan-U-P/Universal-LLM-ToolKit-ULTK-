@@ -46,6 +46,7 @@ Extension directories and download paths are host configuration. Model input can
 | `browser.download` | Capture a browser-triggered download and save it in the configured directory |
 | `browser.network_inspect` | Capture bounded request/response/failure/WebSocket metadata during a navigation window |
 | `browser.websocket_probe` | Send one bounded text message to a public WebSocket and capture one reply |
+| `browser.profile_workflow` | Run a fully prevalidated bounded multi-tab workflow with navigation, interaction, waits and assertions |
 | `browser.test_run` | Run a bounded sequence of navigation, interaction and assertions |
 | `browser.challenge_detect` | Detect CAPTCHA/anti-bot indicators without attempting to solve them |
 | `browser.auth_handoff` | Open a visible browser for a human to complete login/MFA |
@@ -66,7 +67,7 @@ The active tab index and bounded HTTP(S) tab URLs are persisted in SQLite. A lat
 
 ## Browser interaction and downloads
 
-Selectors are bounded strings passed to Playwright locators. The pack does not accept model-supplied JavaScript. Popup and iframe operations are explicit and bounded. The structured scraper caps returned elements and per-element text/attribute lengths.
+Selectors are bounded strings passed to Playwright locators. The pack does not accept model-supplied JavaScript. Popup and iframe operations are explicit and bounded. The structured scraper caps returned elements and per-element text/attribute lengths. Profile workflows prevalidate every step before dispatching the first browser action; they are bounded but not transactional if the browser or website fails mid-run.
 
 Downloads are initiated by clicking a selected page element. Suggested filenames are sanitized, destination paths are confined to the host-configured download directory, existing files are not overwritten, and a SHA-256 digest is returned. The configured byte limit is checked after Playwright completes the download and saves its temporary file; it is not a pre-transfer network quota. Production hosts should additionally enforce response-size and disk quotas at the network/proxy or OS layer.
 
