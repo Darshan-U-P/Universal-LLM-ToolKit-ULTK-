@@ -54,7 +54,7 @@ def _run(argv: list[str], *, timeout: int = 15, output_limit: int = 200_000) -> 
     truncated = {"stdout": False, "stderr": False}
     try:
         safe_env = {key: value for key, value in os.environ.items()
-                    if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"}}
+                    if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS", "SWAYSOCK"}}
         process = subprocess.Popen(
             argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             shell=False, env=safe_env, close_fds=True,
@@ -259,7 +259,96 @@ class ComputerOSPack:
             return [{"index": 0, "name": "unknown", "x": 0, "y": 0, "width": None,
                      "height": None, "primary": True, "note": "No display backend available."}]
 
+    @staticmethod
+    def _sway_enabled() -> bool:
+        return platform.system() == "Linux" and bool(os.environ.get("SWAYSOCK"))
+
+    def _sway_request(self, *arguments: str, timeout: int = 10) -> Any:
+        executable = shutil.which("swaymsg")
+        if not executable or not self._sway_enabled():
+            raise ToolExecutionError("Sway IPC is unavailable; this operation requires an active Sway session.")
+        result = _run([executable, *arguments], timeout=timeout, output_limit=self.max_output)
+        if result["return_code"] != 0:
+            raise ToolExecutionError("Sway compositor rejected the requested operation.")
+        try:
+            return json.loads(result["stdout"])
+        except json.JSONDecodeError as exc:
+            raise ToolExecutionError("Sway compositor returned malformed IPC data.") from exc
+
+    def _sway_windows(self) -> list[dict[str, Any]]:
+        tree = self._sway_request("-t", "get_tree", "-r")
+        rows: list[dict[str, Any]] = []
+
+        def walk(node: dict[str, Any], workspace: str = "", depth: int = 0) -> None:
+            if depth > 32 or len(rows) >= 200:
+                return
+            if node.get("type") == "workspace":
+                workspace = str(node.get("name", ""))[:120]
+            app_id = node.get("app_id") or (node.get("window_properties") or {}).get("class")
+            title = node.get("name") or ""
+            rect = node.get("rect") or {}
+            if node.get("type") == "con" and (app_id or node.get("window")) and title:
+                rows.append({
+                    "title": str(title)[:300], "app_id": str(app_id or "")[:200],
+                    "left": int(rect.get("x", 0)), "top": int(rect.get("y", 0)),
+                    "width": int(rect.get("width", 0)), "height": int(rect.get("height", 0)),
+                    "active": bool(node.get("focused")), "visible": not bool(node.get("scratchpad_state")),
+                    "scratchpad": bool(node.get("scratchpad_state")),
+                    "workspace": workspace, "container_id": int(node.get("id", 0)),
+                    "backend": "sway-ipc",
+                })
+            for child in [*node.get("nodes", []), *node.get("floating_nodes", [])]:
+                if isinstance(child, dict):
+                    walk(child, workspace, depth + 1)
+
+        walk(tree)
+        return rows
+
+    def _sway_window(self, selector: str) -> dict[str, Any]:
+        needle = self._text(selector, "window selector", 180).casefold()
+        matches = [row for row in self._sway_windows() if needle in row["title"].casefold()]
+        if len(matches) != 1:
+            raise ToolExecutionError("Window selector must match exactly one Sway container.")
+        return matches[0]
+
+    def sway_window_action(
+        self, selector: str, action: str, x: int | None = None, y: int | None = None,
+        width: int | None = None, height: int | None = None,
+    ) -> dict[str, Any]:
+        window = self._sway_window(selector)
+        container_id = window["container_id"]
+        if action == "activate":
+            command = f"[con_id={container_id}] focus"
+        elif action == "close":
+            command = f"[con_id={container_id}] kill"
+        elif action == "maximize":
+            command = f"[con_id={container_id}] fullscreen enable"
+        elif action == "minimize":
+            command = f"[con_id={container_id}] move scratchpad"
+        elif action == "restore":
+            command = (
+                f"[con_id={container_id}] scratchpad show"
+                if window.get("scratchpad")
+                else f"[con_id={container_id}] fullscreen disable"
+            )
+        elif action == "move":
+            if type(x) is not int or type(y) is not int or not -30000 <= x <= 30000 or not -30000 <= y <= 30000:
+                raise ToolExecutionError("Sway move requires bounded integer x and y coordinates.")
+            command = f"[con_id={container_id}] move position {x} {y}"
+        elif action == "resize":
+            if type(width) is not int or type(height) is not int or not 100 <= width <= 20000 or not 100 <= height <= 20000:
+                raise ToolExecutionError("Sway resize requires width and height from 100 to 20000.")
+            command = f"[con_id={container_id}] resize set width {width} px height {height} px"
+        else:
+            raise ToolExecutionError("Sway supports activate, close, move, resize, maximize, minimize and restore.")
+        result = self._sway_request(command)
+        if isinstance(result, list) and any(item.get("success") is False for item in result if isinstance(item, dict)):
+            raise ToolExecutionError("Sway did not complete the requested window action.")
+        return {"title": window["title"], "container_id": container_id, "action": action, "status": "requested", "backend": "sway-ipc"}
+
     def windows(self) -> list[dict[str, Any]]:
+        if self._sway_enabled():
+            return self._sway_windows()
         pywinctl = _optional("pywinctl")
         rows = []
         for window in pywinctl.getAllWindows():
@@ -273,6 +362,23 @@ class ComputerOSPack:
         return rows
 
     def _window(self, selector: str) -> Any:
+        if self._sway_enabled():
+            from types import SimpleNamespace
+
+            row = self._sway_window(selector)
+            title = row["title"]
+            return SimpleNamespace(
+                title=title,
+                moveTo=lambda x, y: self.sway_window_action(title, "move", x=x, y=y),
+                resizeTo=lambda width, height: self.sway_window_action(
+                    title, "resize", width=width, height=height
+                ),
+                activate=lambda: self.sway_window_action(title, "activate"),
+                close=lambda: self.sway_window_action(title, "close"),
+                maximize=lambda: self.sway_window_action(title, "maximize"),
+                minimize=lambda: self.sway_window_action(title, "minimize"),
+                restore=lambda: self.sway_window_action(title, "restore"),
+            )
         needle = self._text(selector, "window selector", 180).casefold()
         pywinctl = _optional("pywinctl")
         matches = [window for window in pywinctl.getAllWindows()
@@ -556,26 +662,149 @@ class ComputerOSPack:
             if not rows:
                 raise ToolExecutionError("No matching accessible application was found.")
             return {"backend": "AT-SPI", "elements": rows}
+        if platform.system() == "Darwin":
+            quartz, root, app_name = self._mac_accessibility_app(title_contains)
+            rows: list[dict[str, Any]] = []
+
+            def walk(node: Any, depth: int = 0) -> None:
+                if len(rows) >= max_elements or depth > 12:
+                    return
+                role = self._mac_ax_value(quartz, node, "AXRole")
+                name = self._mac_ax_value(quartz, node, "AXTitle")
+                description = self._mac_ax_value(quartz, node, "AXDescription")
+                identifier = self._mac_ax_value(quartz, node, "AXIdentifier")
+                enabled = self._mac_ax_value(quartz, node, "AXEnabled")
+                if role or name or description or identifier:
+                    rows.append({
+                        "name": str(name or description or "")[:300],
+                        "role": str(role or "")[:100],
+                        "automation_id": str(identifier or "")[:256],
+                        "enabled": enabled if isinstance(enabled, bool) else None,
+                    })
+                children = self._mac_ax_value(quartz, node, "AXChildren") or []
+                for child in list(children)[:300]:
+                    walk(child, depth + 1)
+                    if len(rows) >= max_elements:
+                        break
+
+            walk(root)
+            return {"backend": "macOS Accessibility API", "application": app_name,
+                    "elements": rows}
         raise ToolExecutionError("Accessibility inspection backend is not implemented for this OS.")
 
     def accessibility_click(self, title_contains: str, automation_id: str) -> dict[str, Any]:
-        if os.name != "nt":
-            raise ToolExecutionError("Element invocation is currently supported through Windows UI Automation only.")
-        Desktop = _optional("pywinauto").Desktop
-        matches = [window for window in Desktop(backend="uia").windows()
-                   if title_contains.casefold() in window.window_text().casefold()]
+        element_id = self._text(automation_id, "accessibility element identifier", 256)
+        if os.name == "nt":
+            Desktop = _optional("pywinauto").Desktop
+            matches = [window for window in Desktop(backend="uia").windows()
+                       if title_contains.casefold() in window.window_text().casefold()]
+            if len(matches) != 1:
+                raise ToolExecutionError("Accessibility selector must match exactly one window.")
+            controls = [control for control in matches[0].descendants()
+                        if control.element_info.automation_id == element_id]
+            if len(controls) != 1:
+                raise ToolExecutionError("Automation ID must match exactly one element.")
+            if not controls[0].is_enabled() or not controls[0].is_visible():
+                raise ToolExecutionError("Target UI element is not enabled and visible.")
+            controls[0].click_input()
+            return {"window": matches[0].window_text(), "automation_id": element_id,
+                    "backend": "Windows UI Automation", "status": "click_requested"}
+        if platform.system() == "Linux":
+            pyatspi = _optional("pyatspi")
+            desktop = pyatspi.Registry.getDesktop(0)
+            apps = [desktop.getChildAtIndex(i) for i in range(desktop.childCount)
+                    if title_contains.casefold() in (desktop.getChildAtIndex(i).name or "").casefold()]
+            if len(apps) != 1:
+                raise ToolExecutionError("Accessibility selector must match exactly one AT-SPI application.")
+            matches: list[Any] = []
+
+            def walk(node: Any, depth: int = 0) -> None:
+                if depth > 12 or len(matches) > 1:
+                    return
+                try:
+                    if (node.name or "").strip() == element_id:
+                        matches.append(node)
+                    for index in range(node.childCount):
+                        walk(node.getChildAtIndex(index), depth + 1)
+                        if len(matches) > 1:
+                            return
+                except Exception:  # noqa: BLE001 - inaccessible AT-SPI subtree
+                    return
+
+            walk(apps[0])
+            if len(matches) != 1:
+                raise ToolExecutionError("Accessible element name must match exactly one AT-SPI element.")
+            try:
+                actions = matches[0].queryAction()
+                names = [actions.getName(i).casefold() for i in range(actions.nActions)]
+                action_index = next((i for i, name in enumerate(names)
+                                     if name in {"click", "press", "activate", "open"}), None)
+                if action_index is None or not actions.doAction(action_index):
+                    raise ToolExecutionError("AT-SPI element does not expose a supported invoke action.")
+            except ToolExecutionError:
+                raise
+            except Exception as exc:  # noqa: BLE001 - native accessibility providers vary
+                raise ToolExecutionError("AT-SPI element invocation failed.") from exc
+            return {"window": apps[0].name, "element_name": element_id,
+                    "backend": "Linux AT-SPI", "status": "invoke_requested"}
+        if platform.system() == "Darwin":
+            return self._mac_accessibility_click(title_contains, element_id)
+        raise ToolExecutionError("Accessibility element invocation is unsupported on this platform.")
+
+    def _mac_accessibility_app(self, title_contains: str) -> tuple[Any, Any, str]:
+        appkit = _optional("AppKit")
+        quartz = _optional("Quartz")
+        is_trusted = getattr(quartz, "AXIsProcessTrusted", None)
+        if callable(is_trusted) and not is_trusted():
+            raise ToolExecutionError(
+                "macOS Accessibility permission is not granted to the ULTK host process."
+            )
+        matches = [app for app in appkit.NSWorkspace.sharedWorkspace().runningApplications()
+                   if title_contains.casefold() in (app.localizedName() or "").casefold()]
         if len(matches) != 1:
-            raise ToolExecutionError("Accessibility selector must match exactly one window.")
-        element_id = self._text(automation_id, "automation ID", 256)
-        controls = [control for control in matches[0].descendants()
-                    if control.element_info.automation_id == element_id]
-        if len(controls) != 1:
-            raise ToolExecutionError("Automation ID must match exactly one element.")
-        if not controls[0].is_enabled() or not controls[0].is_visible():
-            raise ToolExecutionError("Target UI element is not enabled and visible.")
-        controls[0].click_input()
-        return {"window": matches[0].window_text(), "automation_id": element_id,
-                "status": "click_requested"}
+            raise ToolExecutionError("Accessibility selector must match exactly one running macOS application.")
+        app = matches[0]
+        return quartz, quartz.AXUIElementCreateApplication(app.processIdentifier()), app.localizedName()
+
+    @staticmethod
+    def _mac_ax_value(quartz: Any, element: Any, attribute: str) -> Any:
+        try:
+            result = quartz.AXUIElementCopyAttributeValue(element, attribute, None)
+            if isinstance(result, tuple) and len(result) == 2:
+                error, value = result
+                return value if error == quartz.kAXErrorSuccess else None
+            return result
+        except Exception:  # noqa: BLE001 - AX attributes may be unsupported or protected
+            return None
+
+    def _mac_accessibility_click(self, title_contains: str, element_id: str) -> dict[str, Any]:
+        quartz, root, app_name = self._mac_accessibility_app(title_contains)
+        matches: list[Any] = []
+
+        def walk(node: Any, depth: int = 0) -> None:
+            if depth > 12 or len(matches) > 1:
+                return
+            identifier = self._mac_ax_value(quartz, node, "AXIdentifier")
+            title = self._mac_ax_value(quartz, node, "AXTitle")
+            description = self._mac_ax_value(quartz, node, "AXDescription")
+            if element_id in {identifier, title, description}:
+                matches.append(node)
+            children = self._mac_ax_value(quartz, node, "AXChildren") or []
+            for child in list(children)[:300]:
+                walk(child, depth + 1)
+                if len(matches) > 1:
+                    return
+
+        walk(root)
+        if len(matches) != 1:
+            raise ToolExecutionError("Accessibility identifier/title must match exactly one macOS UI element.")
+        result = quartz.AXUIElementPerformAction(matches[0], quartz.kAXPressAction)
+        if isinstance(result, tuple):
+            result = result[0]
+        if result != quartz.kAXErrorSuccess:
+            raise ToolExecutionError("macOS Accessibility API could not invoke the selected element.")
+        return {"window": app_name, "element_identifier": element_id,
+                "backend": "macOS Accessibility API", "status": "invoke_requested"}
 
     # Virtual desktops (backend-specific; no fake support on unsupported platforms).
     def virtual_desktops(self, action: str, desktop_number: int | None = None) -> dict[str, Any]:
@@ -598,6 +827,27 @@ class ComputerOSPack:
                 desktop.go()
                 return {"backend": "pyvda", "switched_to": desktop_number}
             raise ToolExecutionError("Windows virtual desktop action must be current, create or switch.")
+        if platform.system() == "Linux" and self._sway_enabled():
+            if action in {"list", "current"}:
+                workspaces = self._sway_request("-t", "get_workspaces", "-r")
+                if not isinstance(workspaces, list):
+                    raise ToolExecutionError("Sway returned an invalid workspace list.")
+                current = next((item for item in workspaces if item.get("focused")), None)
+                return {"backend": "sway-ipc", "workspaces": workspaces[:100],
+                        "current": current, "count": len(workspaces)}
+            if action in {"create", "switch"}:
+                if type(desktop_number) is not int or not 0 <= desktop_number <= 999:
+                    raise ToolExecutionError("desktop_number must be an integer from 0 to 999.")
+                workspaces = self._sway_request("-t", "get_workspaces", "-r")
+                exists = any(item.get("num") == desktop_number for item in workspaces)
+                if action == "create" and exists:
+                    raise ToolExecutionError("Sway workspace number already exists.")
+                if action == "switch" and not exists:
+                    raise ToolExecutionError("Sway workspace number does not exist.")
+                result = self._sway_request("workspace", "number", str(desktop_number))
+                return {"backend": "sway-ipc", "action": action, "workspace_number": desktop_number,
+                        "result": result}
+            raise ToolExecutionError("Sway workspace action must be list, current, create or switch.")
         if platform.system() == "Linux":
             executable = shutil.which("wmctrl")
             if not executable:
@@ -740,8 +990,42 @@ class ComputerOSPack:
                 raise ToolExecutionError("diskutil is unavailable.")
             result = _run([executable, "eject", device], timeout=30,
                           output_limit=self.max_output)
+        elif os.name == "nt":
+            if len(device) > 200 or "\\x00" in device:
+                raise ToolExecutionError("Windows device instance ID is invalid.")
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                cfgmgr32 = ctypes.WinDLL("cfgmgr32", use_last_error=True)
+                devinst = wintypes.ULONG()
+                locate = cfgmgr32.CM_Locate_DevNodeW
+                locate.argtypes = [ctypes.POINTER(wintypes.ULONG), wintypes.LPWSTR, wintypes.ULONG]
+                locate.restype = wintypes.ULONG
+                status = locate(ctypes.byref(devinst), device, 0)
+                if status != 0:
+                    raise ToolExecutionError(f"Windows could not locate the allowlisted device (CM status {status}).")
+                veto_type = wintypes.DWORD()
+                veto_name = ctypes.create_unicode_buffer(512)
+                eject = cfgmgr32.CM_Request_Device_EjectW
+                eject.argtypes = [wintypes.ULONG, ctypes.POINTER(wintypes.DWORD),
+                                  wintypes.LPWSTR, wintypes.ULONG, wintypes.ULONG]
+                eject.restype = wintypes.ULONG
+                status = eject(devinst, ctypes.byref(veto_type), veto_name, len(veto_name), 0)
+                if status != 0:
+                    reason = veto_name.value[:300]
+                    raise ToolExecutionError(
+                        f"Windows refused safe device ejection (CM status {status}, veto type "
+                        f"{veto_type.value}, reason {reason!r}). Close open files and retry only if safe."
+                    )
+                return {"platform": "Windows", "device": device, "status": "eject_requested",
+                        "api": "CM_Request_Device_EjectW"}
+            except ToolExecutionError:
+                raise
+            except (AttributeError, OSError) as exc:
+                raise ToolExecutionError("Windows Configuration Manager safe-eject API is unavailable.") from exc
         else:
-            raise ToolExecutionError("Safe eject is not implemented for Windows in this increment.")
+            raise ToolExecutionError("Safe eject is unsupported on this platform.")
         return {"device": device, **result}
 
     # Hardware and device inventory.
@@ -988,12 +1272,13 @@ def create_computer_os_tools(
         "computer:window:control",
         pack.arrange_windows,
     )
-    add("computer_os.virtual_desktops", "List or switch Linux virtual desktops, or inspect/create/switch Windows virtual desktops where pyvda is installed.", {"action": {"type": "string", "enum": ["list", "current", "create", "switch"]}, "desktop_number": {"type": "integer", "minimum": 0}}, ["action"], "computer:desktop:control", pack.virtual_desktops)
+    add("computer_os.sway_window_action", "Manage one uniquely matched Sway window through compositor IPC on Linux Wayland.", {"title_contains": selector, "action": {"type": "string", "enum": ["activate", "close", "move", "resize", "maximize", "minimize", "restore"]}, "x": {"type": "integer"}, "y": {"type": "integer"}, "width": {"type": "integer"}, "height": {"type": "integer"}}, ["title_contains", "action"], "computer:window:control", pack.sway_window_action)
+    add("computer_os.virtual_desktops", "List or switch Windows virtual desktops, Linux X11 desktops, or Sway workspaces on supported backends.", {"action": {"type": "string", "enum": ["list", "current", "create", "switch"]}, "desktop_number": {"type": "integer", "minimum": 0}}, ["action"], "computer:desktop:control", pack.virtual_desktops)
     add("computer_os.keyboard_shortcut", "Send a bounded allowlisted keyboard shortcut.", {"keys": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "string"}}}, ["keys"], "computer:keyboard:shortcut", pack.keyboard_shortcut)
     add("computer_os.keyboard_sequence", "Execute a prevalidated bounded keyboard sequence of typing, keypresses, shortcuts and waits.", {"steps": {"type": "array", "minItems": 1, "maxItems": 30, "items": {"type": "object"}}}, ["steps"], "computer:keyboard:sequence", pack.keyboard_sequence, 45)
     add("computer_os.desktop_workflow", "Run a prevalidated bounded desktop workflow across pointer, keyboard, windows, monitors and screenshots.", {"steps": {"type": "array", "minItems": 1, "maxItems": 50, "items": {"type": "object"}}}, ["steps"], "computer:workflow", pack.desktop_workflow, 90)
-    add("computer_os.accessibility_inspect", "Inspect accessible UI elements through Windows UI Automation or Linux AT-SPI.", {"title_contains": selector, "max_elements": {"type": "integer", "minimum": 1, "maximum": 300}}, ["title_contains"], "computer:accessibility:read", pack.accessibility_inspect)
-    add("computer_os.accessibility_click", "Invoke one visible enabled Windows UI Automation element by exact automation ID.", {"title_contains": selector, "automation_id": text}, ["title_contains", "automation_id"], "computer:accessibility:control", pack.accessibility_click)
+    add("computer_os.accessibility_inspect", "Inspect accessible UI elements through Windows UI Automation, Linux AT-SPI or macOS Accessibility API.", {"title_contains": selector, "max_elements": {"type": "integer", "minimum": 1, "maximum": 300}}, ["title_contains"], "computer:accessibility:read", pack.accessibility_inspect)
+    add("computer_os.accessibility_click", "Invoke one uniquely matched accessible element through Windows UI Automation, Linux AT-SPI or macOS Accessibility API.", {"title_contains": selector, "automation_id": text}, ["title_contains", "automation_id"], "computer:accessibility:control", pack.accessibility_click)
     add("computer_os.list_services", "List services using Windows SCM, systemd or launchd.", {}, [], "system:services:read", pack.services, 35)
     add("computer_os.service_action", "Start, stop or restart an exact host-allowlisted Windows/Linux service.", {"service": {"type": "string", "minLength": 1, "maxLength": 128}, "action": {"type": "string", "enum": ["start", "stop", "restart"]}}, ["service", "action"], "system:services:write", pack.service_action, 40)
     add("computer_os.file_metadata", "Inspect file type, size, timestamps, ownership and permission mode within filesystem_root.", {"path": text}, ["path"], "filesystem:metadata:read", pack.file_metadata)
@@ -1002,7 +1287,7 @@ def create_computer_os_tools(
     add("computer_os.chmod", "Change POSIX permission bits for a non-symlink path within filesystem_root.", {"path": text, "mode": {"type": "integer", "minimum": 0, "maximum": 511}}, ["path", "mode"], "filesystem:permissions:write", pack.chmod)
     add("computer_os.chown", "Change POSIX ownership only when explicitly enabled by the host.", {"path": text, "uid": {"type": "integer", "minimum": -1}, "gid": {"type": "integer", "minimum": -1}}, ["path", "uid", "gid"], "filesystem:ownership:write", pack.chown)
     add("computer_os.hardware_info", "Inspect CPU, memory, disk, battery and available thermal sensors.", {}, [], "system:hardware:read", pack.hardware)
-    add("computer_os.eject_usb_device", "Safely power off/eject one exact host-allowlisted USB storage device on Linux or macOS.", {"device_id": {"type": "string", "minLength": 1, "maxLength": 256}}, ["device_id"], "system:devices:eject", pack.eject_device, 40)
+    add("computer_os.eject_usb_device", "Safely eject one exact host-allowlisted USB device through udisksctl (Linux), diskutil (macOS) or Configuration Manager (Windows).", {"device_id": {"type": "string", "minLength": 1, "maxLength": 256}}, ["device_id"], "system:devices:eject", pack.eject_device, 40)
     add("computer_os.network_interfaces", "Inspect network interface state, addresses, MTU and link speed.", {}, [], "system:network:read", pack.network_interfaces)
     add("computer_os.usb_devices", "Enumerate connected USB devices using pyudev, pnputil or system_profiler.", {}, [], "system:devices:read", pack.usb_devices, 40)
     add("computer_os.read_recent_events", "Read a bounded snapshot of recent Windows Event Log, Linux journal or macOS unified log entries.", {"channel": {"type": "string", "maxLength": 32}, "limit": {"type": "integer", "minimum": 1, "maximum": 200}, "since_minutes": {"type": "integer", "minimum": 1, "maximum": 10080}}, [], "system:events:read", pack.recent_events, 40)

@@ -30,6 +30,8 @@ computer-os = [
   "pywinauto>=0.6.8; platform_system == 'Windows'",
   "pyvda>=0.4; platform_system == 'Windows'",
   "pyudev>=0.24; platform_system == 'Linux'",
+  "pyobjc-framework-Cocoa>=10; platform_system == 'Darwin'",
+  "pyobjc-framework-Quartz>=10; platform_system == 'Darwin'",
 ]
 browser = ["playwright>=1.48"]
 devtools = ["pytest>=8.0", "ruff>=0.5", "mypy>=1.10"]
