@@ -200,8 +200,9 @@ class DatabasePack:
 
     def sql_select(self, profile: str, table: str, columns: list[str] | None = None,
                    filters: list[dict[str, Any]] | None = None, order_by: str | None = None,
-                   descending: bool = False, limit: int = 100, offset: int = 0) -> dict[str, Any]:
+                   descending: bool = False, limit: int | None = None, offset: int = 0) -> dict[str, Any]:
         table = _ident(table)
+        limit = min(100, self.max_rows) if limit is None else limit
         if not 1 <= limit <= self.max_rows or not 0 <= offset <= 1_000_000:
             raise ToolExecutionError("Select limit/offset outside configured bounds.")
         fields = "*" if not columns else ",".join(_ident(c) for c in columns)
