@@ -136,3 +136,16 @@ workload-specific load tests, multi-process tests for the chosen storage layer, 
 drills, disk-full and corruption recovery tests, real embedder retrieval evaluation, retention/
 deletion verification for WAL and backups, and platform-specific Windows/macOS testing. SQLite
 remains a single-host store; use a suitable shared database/vector service for multi-host scale.
+
+
+## Automatic host scheduling defaults
+
+The engine's automatic hooks are opt-in by adapter presence. With an extractor configured,
+automatic extraction runs every 4 user messages by default. With a summarizer configured,
+session summarization runs every 20 user messages by default. Configure
+`auto_extract_every` and `auto_summarize_every` on `install_memory_tools`; pass `None` to
+disable a hook while retaining the explicit tools. The counters are persisted per namespace/session
+and are independent of the bounded context retention window. Automatic hooks execute synchronously
+as part of the context-append tool call, so adapters should use bounded inference timeouts and
+resource limits. Adapter failures are reported in the append result without discarding the context
+entry.
