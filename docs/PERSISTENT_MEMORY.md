@@ -149,3 +149,16 @@ and are independent of the bounded context retention window. Automatic hooks exe
 as part of the context-append tool call, so adapters should use bounded inference timeouts and
 resource limits. Adapter failures are reported in the append result without discarding the context
 entry.
+
+
+### Repeatable load benchmark
+
+Run the included benchmark against a temporary database:
+
+    python benchmarks/benchmark_memory.py --records 10000 --queries 250 --workers 8
+
+Increase the record count up to one million and adjust worker/query counts for the target
+deployment. Use `--database` only with a dedicated test database; do not point the benchmark at
+production user memory. The report includes write/query throughput, p50/p95/max query latency,
+database size and SQLite integrity status. Compare results on the actual storage device, Python
+version, embedding adapter and expected concurrency profile before setting capacity targets.
