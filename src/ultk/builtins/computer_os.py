@@ -527,7 +527,7 @@ class ComputerOSPack:
                                  "automation_id": info.automation_id, "class_name": info.class_name,
                                  "enabled": control.is_enabled(), "visible": control.is_visible(),
                                  "rectangle": str(control.rectangle())})
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001, S112 - skip inaccessible accessibility elements
                     continue
             return {"backend": "Windows UI Automation", "window": matches[0].window_text(),
                     "elements": rows}
