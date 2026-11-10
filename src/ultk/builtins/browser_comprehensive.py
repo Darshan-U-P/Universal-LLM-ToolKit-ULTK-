@@ -131,9 +131,10 @@ class BrowserControlPlane:
                        (name, now, now, "[]"))
         try:
             if source is not None:
-                if not source.is_dir():
-                    raise ToolExecutionError("Source browser profile data is missing.")
-                shutil.copytree(source, target, dirs_exist_ok=True)
+                with self._profile_lock(source_name):
+                    if not source.is_dir():
+                        raise ToolExecutionError("Source browser profile data is missing.")
+                    shutil.copytree(source, target, dirs_exist_ok=True)
         except Exception:
             with sqlite3.connect(self.db_path) as db:
                 db.execute("DELETE FROM profiles WHERE name=?", (name,))
