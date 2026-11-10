@@ -39,8 +39,9 @@ def test_advanced_git_pack_registers_operations(tmp_path: Path) -> None:
     tools = create_advanced_git_tools(project_root=tmp_path)
     names = {tool.spec.name for tool in tools}
     assert {
-        "git.history", "git.stash", "git.stash_drop", "git.worktree",
-        "git.worktree_remove", "git.submodule", "git.submodule_deinit",
+        "git.history", "git.stash", "git.stash_inspect", "git.stash_drop",
+        "git.worktree", "git.worktree_inspect", "git.worktree_remove",
+        "git.submodule", "git.submodule_inspect", "git.submodule_deinit",
         "git.conflict_inspect", "git.conflict_resolve",
         "git.pull_request_read", "git.pull_request_write", "git.pull_request_merge",
     } <= names
