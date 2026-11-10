@@ -1,5 +1,6 @@
 """Built-in ULTK tool packs."""
 from ultk.builtins.browser_automation import create_advanced_browser_tools
+from ultk.builtins.browser_comprehensive import create_comprehensive_browser_tools
 from ultk.builtins.browser_semantic import create_semantic_browser_tools
 from ultk.builtins.computer import create_computer_tools
 from ultk.builtins.computer_advanced import create_advanced_computer_tools
@@ -22,6 +23,7 @@ __all__ = [
     "create_advanced_development_tools",
     "create_computer_grounding_tools",
     "create_computer_os_tools",
+    "create_comprehensive_browser_tools",
     "create_computer_tools",
     "create_computer_vision_tools",
     "create_computer_visual_tools",
