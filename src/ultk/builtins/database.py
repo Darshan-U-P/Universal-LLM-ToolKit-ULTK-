@@ -441,6 +441,8 @@ class DatabasePack:
         if not 1 <= count <= self.max_rows or not isinstance(match, str) or len(match) > 200:
             raise ToolExecutionError("Redis scan arguments outside configured bounds.")
         prefix = cfg.get("key_prefix", "")
+        if not prefix:
+            raise ToolExecutionError("Redis SCAN requires a non-empty host-configured key_prefix.")
         try:
             keys = []
             for key in client.scan_iter(match=prefix + match, count=min(count, 100)):
