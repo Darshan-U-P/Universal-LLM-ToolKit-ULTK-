@@ -146,7 +146,8 @@ def test_linux_event_watch_channel_validation(pack: ComputerOSPack) -> None:
 
 def test_desktop_workflow_prevalidates_all_steps_before_input(pack: ComputerOSPack, monkeypatch) -> None:
     from types import SimpleNamespace
-    import ultk.builtins.computer_os as computer_os
+
+    from ultk.builtins import computer_os
 
     calls = []
     backend = SimpleNamespace(
