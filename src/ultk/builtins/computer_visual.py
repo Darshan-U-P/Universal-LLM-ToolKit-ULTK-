@@ -160,7 +160,7 @@ class ComputerVisualPack:
 
     def ocr_screen(
         self, region: list[int] | None = None, language: str = "eng",
-        max_lines: int = 100,
+        max_lines: int | None = None,
     ) -> dict[str, Any]:
         rows = self._ocr(region=region, language=language, max_lines=max_lines)
         return {"line_count": len(rows), "lines": rows}
