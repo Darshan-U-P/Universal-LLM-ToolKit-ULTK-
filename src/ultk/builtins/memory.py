@@ -25,7 +25,8 @@ def _vector(s:str,n:int=256)->list[float]:
 def _cos(a:list[float],b:list[float])->float:
     return max(0.0,min(1.0,sum(x*y for x,y in zip(a,b)))) if len(a)==len(b) else 0.0
 def _fingerprint(s:str)->str:
-    return hashlib.sha256(" ".join(s.casefold().split()).encode()).hexdigest()
+    normalized = " ".join(_tokens(s))
+    return hashlib.sha256(normalized.encode()).hexdigest()
 def _metadata(value:Any)->dict[str,Any]:
     if not isinstance(value,dict): raise ToolExecutionError("metadata must be an object.")
     try: raw=json.dumps(value,ensure_ascii=False,allow_nan=False)
@@ -42,23 +43,30 @@ class PersistentMemory:
         self.database=str(Path(database).expanduser().resolve()); self.namespace=namespace
         self.embedder=embedder; self.max_items=max_items
         Path(self.database).parent.mkdir(parents=True,exist_ok=True)
-        with self.db() as c:
-            c.execute("PRAGMA journal_mode=WAL")
-            c.executescript("""
-            CREATE TABLE IF NOT EXISTS memory_items(
-              id TEXT PRIMARY KEY, ns TEXT NOT NULL, sid TEXT NOT NULL, kind TEXT NOT NULL,
-              scope TEXT NOT NULL, content TEXT NOT NULL, tags TEXT NOT NULL, metadata TEXT NOT NULL,
-              confidence REAL NOT NULL, vector TEXT NOT NULL, fingerprint TEXT NOT NULL,
-              created REAL NOT NULL, updated REAL NOT NULL, accesses INTEGER NOT NULL DEFAULT 0);
-            CREATE INDEX IF NOT EXISTS memory_ns_idx ON memory_items(ns,kind,updated DESC);
-            CREATE INDEX IF NOT EXISTS memory_fp_idx ON memory_items(ns,fingerprint);
-            CREATE TABLE IF NOT EXISTS memory_context(
-              ns TEXT NOT NULL,sid TEXT NOT NULL,seq INTEGER NOT NULL,role TEXT NOT NULL,
-              content TEXT NOT NULL,created REAL NOT NULL,PRIMARY KEY(ns,sid,seq));
-            CREATE TABLE IF NOT EXISTS memory_session_stats(
-              ns TEXT NOT NULL,sid TEXT NOT NULL,user_messages INTEGER NOT NULL DEFAULT 0,
-              PRIMARY KEY(ns,sid));
-            """)
+        for attempt in range(60):
+            try:
+                with self.db() as c:
+                    c.execute("PRAGMA journal_mode=WAL")
+                    c.executescript("""
+                    CREATE TABLE IF NOT EXISTS memory_items(
+                      id TEXT PRIMARY KEY, ns TEXT NOT NULL, sid TEXT NOT NULL, kind TEXT NOT NULL,
+                      scope TEXT NOT NULL, content TEXT NOT NULL, tags TEXT NOT NULL, metadata TEXT NOT NULL,
+                      confidence REAL NOT NULL, vector TEXT NOT NULL, fingerprint TEXT NOT NULL,
+                      created REAL NOT NULL, updated REAL NOT NULL, accesses INTEGER NOT NULL DEFAULT 0);
+                    CREATE INDEX IF NOT EXISTS memory_ns_idx ON memory_items(ns,kind,updated DESC);
+                    CREATE INDEX IF NOT EXISTS memory_fp_idx ON memory_items(ns,fingerprint);
+                    CREATE TABLE IF NOT EXISTS memory_context(
+                      ns TEXT NOT NULL,sid TEXT NOT NULL,seq INTEGER NOT NULL,role TEXT NOT NULL,
+                      content TEXT NOT NULL,created REAL NOT NULL,PRIMARY KEY(ns,sid,seq));
+                    CREATE TABLE IF NOT EXISTS memory_session_stats(
+                      ns TEXT NOT NULL,sid TEXT NOT NULL,user_messages INTEGER NOT NULL DEFAULT 0,
+                      PRIMARY KEY(ns,sid));
+                    """)
+                break
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).casefold() or attempt == 59:
+                    raise
+                time.sleep(min(0.05 * (attempt + 1), 0.5))
     @contextmanager
     def db(self):
         c = sqlite3.connect(self.database, timeout=30)
