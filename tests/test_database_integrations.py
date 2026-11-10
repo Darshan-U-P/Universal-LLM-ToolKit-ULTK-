@@ -105,6 +105,7 @@ def test_installer_registers_only_configured_backends(tmp_path: Path) -> None:
     names = {tool.spec.name for tool in engine.registry.list()}
     assert "database.sql_select" in names
     assert "database.mongo_find" in names
+    assert "database.mongo_transaction" in names
     assert "database.redis_set" in names
     assert "database.sql_transaction" in names
     assert all("mysql" not in name and "postgres" not in name for name in names)
