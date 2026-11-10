@@ -88,8 +88,8 @@ def test_profiles_are_host_configured_and_backend_scoped(tmp_path: Path) -> None
     pack = make_pack(tmp_path)
     with pytest.raises(ToolExecutionError, match="Unknown profile"):
         pack.sql_tables("model_supplied_dsn")
-    with pytest.raises(ToolExecutionError, match="SQL database"):
-        pack.sql_tables("local") if False else pack._cfg("local", "mongodb")
+    with pytest.raises(ToolExecutionError, match="incompatible"):
+        pack._cfg("local", "mongodb")
 
 
 def test_installer_registers_only_configured_backends(tmp_path: Path) -> None:
