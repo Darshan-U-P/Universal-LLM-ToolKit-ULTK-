@@ -255,3 +255,30 @@ The provider and plugin branches extend the REST integration branch; media exten
   concurrency bounds, dependency skip/fail-fast semantics, retry persistence/backoff, concurrent
   cancellation, crash recovery, replay definition fidelity, SQLite locking/corruption/disk-full,
   secret-bearing argument/output storage, and multiple simultaneous workflow runners.
+
+
+## Visual computer automation increment
+
+- Branch: feat/visual-computer-automation
+- Base: feat/durable-workflow-orchestration (PR #10 head).
+- Added src/ultk/builtins/computer_visual.py with OCR-backed screen text extraction, exact line
+  matching, unique-match text clicking, bounded wait-for-text polling, scroll, drag, and a
+  prevalidated visual desktop workflow.
+- Added ToolEngine.install_computer_visual_tools and the public built-in factory export.
+- Added the optional computer-visual dependency group; Tesseract executable and language data are
+  host-installed system dependencies, not installed by pip.
+- Added tests/test_computer_visual_tools.py and docs/COMPUTER_VISUAL_AUTOMATION.md; README and tool
+  catalog updated.
+- Tests and Ruff must be confirmed by GitHub Actions after the PR is opened. No platform integration
+  test has yet been run.
+- Validate OCR language allowlists, Tesseract version/language availability, OCR confidence and
+  coordinate accuracy, false/duplicate matches, monitor coordinate transforms, screen scaling,
+  screenshot backend differences, OCR timeout/cancellation, and sensitive visible text handling.
+- Visual workflow prevalidation checks all step schemas and bounds before actions begin, but runtime
+  OCR and OS failures can occur after earlier steps have executed. No rollback/transaction is claimed.
+- This increment does not add image-template matching, semantic object recognition, screenshot
+  streaming, or unattended background desktop sessions.
+- GitHub Actions run #527 completed successfully on commit 36e204d: pytest passed (84 tests) and
+  Ruff passed. The only failures in earlier runs were corrected: the configured OCR line cap now
+  supplies the default, the aggregate-wait test exceeds the limit it asserts, and two unused-code
+  lint findings were removed. Platform-specific GUI/Tesseract integration tests remain pending.

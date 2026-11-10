@@ -127,6 +127,24 @@ class ToolEngine:
         from ultk.builtins.computer_advanced import create_advanced_computer_tools
         self.register_tools(create_advanced_computer_tools(image_root=image_root))
 
+
+    def install_computer_visual_tools(
+        self,
+        *,
+        allowed_ocr_languages: tuple[str, ...] = ("eng",),
+        max_ocr_lines: int = 100,
+    ) -> None:
+        """Install OCR-backed visual desktop interaction tools.
+
+        The host must install the Tesseract executable and selected language data
+        separately; the Python OCR wrapper is an optional dependency.
+        """
+        from ultk.builtins.computer_visual import create_computer_visual_tools
+        self.register_tools(create_computer_visual_tools(
+            allowed_ocr_languages=allowed_ocr_languages,
+            max_ocr_lines=max_ocr_lines,
+        ))
+
     def install_scheduler_tools(self, database: str | Path,
                                 handlers: dict[str, Any]) -> None:
         from ultk.builtins.scheduler import create_scheduler_tools
