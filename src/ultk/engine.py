@@ -145,6 +145,21 @@ class ToolEngine:
             max_ocr_lines=max_ocr_lines,
         ))
 
+    def install_computer_vision_tools(
+        self,
+        *,
+        template_root: str | Path = "./computer_templates",
+        max_template_bytes: int = 2_000_000,
+        max_template_pixels: int = 2_000_000,
+    ) -> None:
+        """Install bounded image-template recognition and desktop targeting tools."""
+        from ultk.builtins.computer_vision import create_computer_vision_tools
+        self.register_tools(create_computer_vision_tools(
+            template_root=template_root,
+            max_template_bytes=max_template_bytes,
+            max_template_pixels=max_template_pixels,
+        ))
+
     def install_scheduler_tools(self, database: str | Path,
                                 handlers: dict[str, Any]) -> None:
         from ultk.builtins.scheduler import create_scheduler_tools
