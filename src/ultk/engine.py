@@ -240,6 +240,7 @@ class ToolEngine:
         from ultk.builtins.development_advanced import create_advanced_development_tools
         self.register_tools(create_advanced_development_tools(
             project_root=project_root, **configuration))
+
     def install_advanced_git_tools(
         self,
         *,
