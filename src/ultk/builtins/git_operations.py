@@ -11,8 +11,9 @@ import json
 import os
 import re
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlparse
 
 from ultk.builtins._common import FunctionTool, object_schema

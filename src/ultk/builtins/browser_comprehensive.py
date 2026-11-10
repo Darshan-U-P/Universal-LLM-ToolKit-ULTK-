@@ -10,8 +10,8 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from urllib.parse import urlsplit
 from typing import Any
+from urllib.parse import urlsplit
 from ultk.builtins._common import FunctionTool, object_schema
 from ultk.builtins.web import _validate_public_url
 from ultk.exceptions import ToolExecutionError
@@ -178,7 +178,7 @@ class BrowserControlPlane:
             try:
                 _url(route.request.url)
                 route.continue_()
-            except Exception:
+            except Exception:  # noqa: BLE001 - abort unsafe or malformed requests
                 route.abort()
         context.route("**/*", guard)
 
@@ -189,7 +189,7 @@ class BrowserControlPlane:
             try:
                 _url(route.request.url)
                 route.continue_()
-            except Exception:
+            except Exception:  # noqa: BLE001 - abort unsafe or malformed requests
                 route.abort()
         page.route("**/*", guard)
 
@@ -235,16 +235,16 @@ class BrowserControlPlane:
                         page = context.new_page()
                         page.goto(_url(saved_url), wait_until="domcontentloaded", timeout=20000)
                         pages.append(page)
-                    except Exception:
+                    except Exception:  # noqa: BLE001 - discard pages that fail to restore
                         try:
                             page.close()
-                        except Exception:
+                        except Exception:  # noqa: BLE001, S110 - best-effort cleanup
                             pass
                 if pages:
                     for initial in initial_pages:
                         try:
                             initial.close()
-                        except Exception:
+                        except Exception:  # noqa: BLE001, S110 - best-effort cleanup
                             pass
                 else:
                     pages = initial_pages or [context.new_page()]
@@ -455,7 +455,7 @@ class BrowserControlPlane:
             locator = page.locator(login_selector).first
             try:
                 visible = locator.is_visible(timeout=3000)
-            except Exception:
+            except Exception:  # noqa: BLE001 - stale or detached locator is not visible
                 visible = False
             if not visible:
                 return {"handoff_started": True, "completed": False,
@@ -464,7 +464,7 @@ class BrowserControlPlane:
                         "note": "No authentication success was inferred; verify the account state explicitly."}
             try:
                 locator.wait_for(state="hidden", timeout=timeout_seconds * 1000)
-            except Exception:
+            except Exception:  # noqa: BLE001 - browser wait errors end the human handoff
                 return {"handoff_started": True, "completed": False,
                         "reason": "human_action_timeout", "url": page.url}
             return {"handoff_started": True, "completed": True, "url": page.url,
@@ -481,7 +481,7 @@ class BrowserControlPlane:
                 try:
                     if page.locator(selector).count():
                         found.append(selector)
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 - invalid selectors are ignored
                     pass
             return {"url":page.url,"title":page.title(),"authenticated_heuristic":not bool(found),
                     "login_indicators_found":found,"warning":"Selector heuristic only; not authoritative identity verification."}
@@ -720,7 +720,7 @@ class BrowserControlPlane:
                     else:
                         raise ToolExecutionError("Unsupported browser test action.")
                     results.append({"step":index,"action":action,"passed":True,"url":page.url})
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - report individual browser-step failures
                     results.append({"step":index,"action":action,"passed":False,
                                     "error":str(exc)[:500],"url":page.url})
                     break

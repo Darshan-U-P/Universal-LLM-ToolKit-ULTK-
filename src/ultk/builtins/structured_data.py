@@ -11,10 +11,10 @@ import math
 import os
 import tempfile
 import xml.etree.ElementTree as ET
-from pathlib import Path
-from typing import Any
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
+from typing import Any
 
 from ultk.builtins._common import FunctionTool, object_schema
 from ultk.exceptions import ToolExecutionError
@@ -501,7 +501,6 @@ def create_structured_data_tools(*, root_dir: str | Path, max_file_bytes: int = 
     if not 1 <= max_columns <= 2000 or not 1 <= max_operations <= 100:
         raise ValueError("Invalid structured-data column or operation limit.")
     path_prop = {"type": "string", "minLength": 1, "maxLength": 500}
-    scalar = {"type": ["string", "number", "integer", "boolean", "null"]}
     return (
         FunctionTool("data.read_table", "Read a bounded CSV, JSON, XML or XLSX table.",
             object_schema({"path": path_prop, "sheet": {"type": "string", "maxLength": 31},

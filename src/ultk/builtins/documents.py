@@ -5,11 +5,11 @@ Parsing untrusted office/PDF files should still run in an OS-restricted worker.
 """
 from __future__ import annotations
 
+import os
+import tempfile
 from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any
-import os
-import tempfile
 
 from ultk.builtins._common import FunctionTool, object_schema
 from ultk.exceptions import ToolExecutionError
@@ -193,7 +193,8 @@ def _xls(path: Path, max_units: int, max_chars: int, max_rows: int) -> dict[str,
 
 def _odf(path: Path, extension: str, max_units: int, max_chars: int) -> dict[str, Any]:
     try:
-        from odf import text as odf_text, table as odf_table
+        from odf import table as odf_table
+        from odf import text as odf_text
         from odf.opendocument import load
         from odf.teletype import extractText
     except ImportError as exc:

@@ -743,7 +743,7 @@ class ComputerOSPack:
                     raise ToolExecutionError("AT-SPI element does not expose a supported invoke action.")
             except ToolExecutionError:
                 raise
-            except Exception as exc:  # noqa: BLE001 - native accessibility providers vary
+            except Exception as exc:
                 raise ToolExecutionError("AT-SPI element invocation failed.") from exc
             return {"window": apps[0].name, "element_name": element_id,
                     "backend": "Linux AT-SPI", "status": "invoke_requested"}

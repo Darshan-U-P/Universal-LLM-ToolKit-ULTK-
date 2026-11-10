@@ -6,11 +6,13 @@ from pathlib import Path
 import pytest
 
 from ultk.builtins.documents import (
-    _extract, _list, _metadata, _pdf_extract_pages, _pdf_merge, create_document_tools,
+    _extract,
+    _list,
+    _metadata,
+    _pdf_extract_pages,
+    _pdf_merge,
 )
-from ultk.builtins.structured_data import (
-    _load, _serialize, _transform, _validate, create_structured_data_tools,
-)
+from ultk.builtins.structured_data import _load, _serialize, _transform, _validate
 from ultk.engine import ToolEngine
 from ultk.permissions import AllowListPolicy
 
