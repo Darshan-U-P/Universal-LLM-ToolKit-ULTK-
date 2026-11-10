@@ -240,3 +240,25 @@ class ToolEngine:
         from ultk.builtins.development_advanced import create_advanced_development_tools
         self.register_tools(create_advanced_development_tools(
             project_root=project_root, **configuration))
+
+    def install_advanced_git_tools(
+        self,
+        *,
+        project_root: str | Path,
+        worktree_root: str | Path | None = None,
+        allowed_submodule_hosts: tuple[str, ...] = (),
+        pull_request_adapter: Any = None,
+    ) -> None:
+        """Install repository-confined advanced Git operations.
+
+        The optional PR adapter is trusted host code with signature
+        adapter(action: str, payload: dict) -> dict. Credentials and network access
+        remain the host application's responsibility.
+        """
+        from ultk.builtins.git_operations import create_advanced_git_tools
+        self.register_tools(create_advanced_git_tools(
+            project_root=project_root,
+            worktree_root=worktree_root,
+            allowed_submodule_hosts=allowed_submodule_hosts,
+            pull_request_adapter=pull_request_adapter,
+        ))

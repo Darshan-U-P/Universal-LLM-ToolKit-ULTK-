@@ -268,3 +268,17 @@ Install desktop dependencies with `pip install -e '.[computer]'`, provide a trus
 `ToolEngine.install_computer_grounding_tools(grounder=...)`. See
 [AI Visual Grounding](docs/AI_VISUAL_GROUNDING.md) for the adapter contract, privacy boundary and
 safety limits.
+
+## Advanced Git operations
+
+The optional advanced Git pack adds bounded rebase, cherry-pick and revert workflows; stash
+management; confined linked worktrees; allowlisted submodule operations; conflict inspection and
+explicit stage selection; and host-adapted pull-request operations. Install it with
+ToolEngine.install_advanced_git_tools(project_root=..., worktree_root=...).
+
+GitHub/GitLab PR access is provided through an optional host-injected adapter; ULTK does not bundle
+provider credentials or a network client. Destructive actions and PR merges have separate
+capabilities. Interactive rebase todo editing, force push and automatic semantic conflict
+resolution are intentionally not exposed. Git hooks and external helpers execute with host-user
+privileges, so this is not an OS sandbox. See
+[Advanced Git Operations](docs/ADVANCED_GIT_OPERATIONS.md).
