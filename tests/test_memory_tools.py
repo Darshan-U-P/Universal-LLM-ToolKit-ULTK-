@@ -1,4 +1,5 @@
 from __future__ import annotations
+# ruff: noqa: E401, E701, E702
 import asyncio, json
 from pathlib import Path
 import pytest
