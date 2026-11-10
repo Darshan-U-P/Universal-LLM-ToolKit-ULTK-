@@ -418,3 +418,8 @@ The provider and plugin branches extend the REST integration branch; media exten
 - Security boundary: Git hooks, filters, credential helpers, external merge/diff drivers and
   repository configuration can execute with host-user privileges. This pack is not a sandbox;
   untrusted repositories require a disposable container/VM and restricted network egress.
+
+- Follow-up refinement: read-only stash listing/show, worktree listing/inspection and submodule
+  status are separate tools/capabilities from mutations. Conflict inspection is also separate
+  from conflict staging. Conflict staging permits deleted paths so an explicit working-tree
+  deletion can be staged as a resolution. Default worktree storage is outside the repository.
