@@ -37,6 +37,7 @@ def _environment() -> dict[str, str]:
     env["GIT_EDITOR"] = "true"
     env["GIT_SEQUENCE_EDITOR"] = "true"
     env["GIT_MERGE_AUTOEDIT"] = "no"
+    env["GIT_LITERAL_PATHSPECS"] = "1"
     return env
 
 
@@ -211,8 +212,9 @@ def _stash(root: str, action: str, *, message: str | None = None,
 def _worktree_path(worktree_root: str, relative: str, *, must_exist: bool = False) -> Path:
     base = Path(worktree_root).resolve()
     candidate = Path(relative)
-    if candidate.is_absolute() or not relative or "\x00" in relative:
-        raise ToolExecutionError("Worktree paths must be relative to the configured worktree root.")
+    if (candidate.is_absolute() or not relative or "\x00" in relative
+            or ".." in candidate.parts or "\\" in relative):
+        raise ToolExecutionError("Worktree paths must be safe relative paths under the configured root.")
     target = (base / candidate).resolve()
     if not target.is_relative_to(base) or target == base:
         raise ToolExecutionError("Worktree path escapes its configured root.")
@@ -280,8 +282,9 @@ def _worktree(root: str, worktree_root: str, action: str, *,
 def _project_path(root: str, relative: str, *, must_exist: bool = False) -> Path:
     base = Path(root).resolve()
     candidate = Path(relative)
-    if candidate.is_absolute() or not relative or "\x00" in relative:
-        raise ToolExecutionError("Submodule paths must be project-relative.")
+    if (candidate.is_absolute() or not relative or "\x00" in relative
+            or ".." in candidate.parts or "\\" in relative):
+        raise ToolExecutionError("Submodule paths must be safe project-relative paths.")
     target = (base / candidate).resolve()
     if not target.is_relative_to(base) or target == base:
         raise ToolExecutionError("Submodule path escapes the configured project root.")
