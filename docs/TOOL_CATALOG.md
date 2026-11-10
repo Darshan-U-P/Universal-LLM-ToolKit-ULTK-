@@ -6,7 +6,7 @@ This is a planned taxonomy, not an implementation inventory. Each tool must be i
 |---|---|
 | Core | provider/model discovery, registry, schemas, dispatch, retries, telemetry |
 | Computer/OS | filesystem, process management, terminal, clipboard, persistent desktop sessions, multi-monitor/window/virtual desktop control, keyboard and accessibility automation, OCR text recognition and targeting, multi-scale image-template recognition, icon/control matching, unique-match clicking, scrolling, dragging, bounded visual GUI workflows, natural-language AI visual grounding, candidate-box inspection and unique-candidate clicking, native macOS/Linux accessibility actions, Sway Wayland window/workspace control, allowlisted Windows safe USB ejection |
-| Web | search, URL fetch, headless browser sessions, accessible DOM inspection and interaction, bounded browser workflows, scraper, downloads, monitoring |
+| Web | search, URL fetch, headless browser sessions, accessible DOM inspection and interaction, persistent Chromium profiles, tabs/popups/iframes, cookie management, structured scraping, authenticated downloads, bounded network/WebSocket inspection, CAPTCHA detection and human auth handoff, preview-fingerprinted approval-gated form submission, browser test assertions, persistent website monitoring |
 | Development | editor, isolated code runner, compiler, debugger, tests, Git, API testing |
 | Data | SQL/NoSQL, CSV/XLSX, JSON/XML, ETL, vector DB, visualization |
 | Documents | PDF, DOCX, PPTX, XLSX, OCR, conversion, document search |
