@@ -21,6 +21,14 @@ dependencies = ["jsonschema>=4.22", "psutil>=6.0"]
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5", "mypy>=1.10"]
 computer = ["pyautogui>=0.9.54", "pyperclip>=1.9", "PyWinCtl>=0.4.01"]
+computer-os = [
+  "PyWinCtl>=0.4.01",
+  "pyautogui>=0.9.54",
+  "screeninfo>=0.8.1",
+  "pywinauto>=0.6.8; platform_system == 'Windows'",
+  "pyvda>=0.4; platform_system == 'Windows'",
+  "pyudev>=0.24; platform_system == 'Linux'",
+]
 browser = ["playwright>=1.48"]
 devtools = ["pytest>=8.0", "ruff>=0.5", "mypy>=1.10"]
 
