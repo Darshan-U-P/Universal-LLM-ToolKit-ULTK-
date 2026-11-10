@@ -2,7 +2,7 @@
 
 A provider-independent, extensible tool execution framework for compatible large language models.
 
-**Status:** Architecture and foundation stage. This repository describes the target architecture and roadmap; it does not yet contain a production agent runtime or the complete tool catalog.
+**Status:** Active implementation. The repository contains the provider-independent runtime and incrementally delivered, capability-gated tool packs; the full target catalog and production deployment hardening are still in progress.
 
 ## Vision
 
