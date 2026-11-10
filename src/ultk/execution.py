@@ -1,4 +1,4 @@
-"""Policy-gated, bounded tool execution."""
+"""Policy-gated, bounded tool execution with optional audit logging."""
 
 from __future__ import annotations
 
