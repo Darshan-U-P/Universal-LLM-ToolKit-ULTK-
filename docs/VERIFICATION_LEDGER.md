@@ -239,8 +239,11 @@ The provider and plugin branches extend the REST integration branch; media exten
   re-execution from a saved definition.
 - Integrated through ToolEngine.create_workflow_engine and public WorkflowStep/WorkflowEngine exports.
 - Added tests/test_orchestration.py and docs/WORKFLOW_ORCHESTRATION.md.
-- Tests, Ruff, mypy, packaging, and CI intentionally not executed; all implementation remains
-  unverified until the consolidated validation campaign.
+- GitHub Actions run #476 executed against the first integrated head: pytest passed (69 tests),
+  while Ruff reported 13 findings. The workflow-module findings (ClassVar and closure binding) and
+  inherited desktop-pack findings (import ordering, exception-handler annotations, subprocess
+  capture style and test imports) have been corrected in the current branch. A new check against
+  the fully synchronized head is still required; mypy and platform integration checks remain pending.
 - Recovery is at-least-once. A crash after an external side effect but before checkpoint persistence
   can cause a repeated tool call. Exactly-once side effects and distributed worker leasing are not
   implemented. Recovery must only be run after the prior worker is stopped.
