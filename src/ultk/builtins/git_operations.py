@@ -398,7 +398,7 @@ def create_advanced_git_tools(
     for destructive operations and PR merges. No PR credentials or network client are bundled.
     """
     root = str(Path(project_root).expanduser().resolve())
-    worktrees = str(Path(worktree_root or (Path(root) / ".ultk-worktrees")).expanduser().resolve())
+    worktrees = str(Path(worktree_root or (Path(root).parent / f"{Path(root).name}.ultk-worktrees")).expanduser().resolve())
     hosts = tuple(allowed_submodule_hosts)
     pr_adapter = pull_request_adapter
     tools = [
