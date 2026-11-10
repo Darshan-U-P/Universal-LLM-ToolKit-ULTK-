@@ -74,3 +74,23 @@ Event watches are durable watch definitions. They do not start background daemon
 ## Not implemented in this increment
 
 Full macOS AX accessibility actions, native macOS virtual desktop switching, Wayland compositor integration, Windows ACL editing, USB eject/eject-safe removal, device driver installation, service creation/deletion, user/account administration, background event-monitor daemons, and remote OS management remain outside this pack.
+
+
+## Multi-monitor GUI workflows
+
+The computer_os pack exposes monitor discovery, window enumeration, window actions,
+monitor-relative snapping and batch window arrangement. Coordinates returned by monitor
+enumeration use the desktop's virtual-screen coordinate space; monitor-relative placement
+is translated to the selected monitor's physical origin, including monitors positioned left
+of or above the primary display.
+
+The computer_os.desktop_workflow tool accepts up to 50 prevalidated steps: pointer move/click,
+text entry, allowlisted key presses and shortcuts, bounded waits, window actions, monitor
+snapping and screenshots. The workflow validates the complete sequence before dispatching
+input so an invalid later step does not leave a partially executed sequence. It is bounded
+but not transactional: an OS/window-manager failure during execution can still leave earlier
+steps applied. Consequential desktop actions should require application-level approval.
+
+The existing computer.mouse, computer.keyboard and computer.desktop_workflow tools remain
+available for backward compatibility. The new computer_os workflow is the monitor-aware
+composition surface.
