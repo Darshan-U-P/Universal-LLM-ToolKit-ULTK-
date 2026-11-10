@@ -393,7 +393,7 @@ class DatabasePack:
         results = []
         try:
             with client.start_session() as session, session.start_transaction():
-            for op in operations:
+                for op in operations:
                     kind, collection = op.get("operation"), _ident(op.get("collection"))
                     coll = client[cfg["database"]][collection]
                     if kind == "insert":
