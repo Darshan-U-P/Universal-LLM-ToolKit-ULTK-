@@ -168,7 +168,7 @@ def test_desktop_workflow_prevalidates_all_steps_before_input(pack: ComputerOSPa
 
 def test_desktop_workflow_executes_bounded_pointer_and_keyboard_steps(pack: ComputerOSPack, monkeypatch) -> None:
     from types import SimpleNamespace
-    import ultk.builtins.computer_os as computer_os
+    from ultk.builtins import computer_os
 
     calls = []
     backend = SimpleNamespace(
