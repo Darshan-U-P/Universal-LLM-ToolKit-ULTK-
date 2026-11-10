@@ -5,8 +5,8 @@ import smtplib
 import pytest
 
 from ultk.builtins.communications import SMTPEmailSender
-from ultk.exceptions import ToolExecutionError
 from ultk.engine import ToolEngine
+from ultk.exceptions import ToolExecutionError
 from ultk.permissions import AllowListPolicy
 
 
