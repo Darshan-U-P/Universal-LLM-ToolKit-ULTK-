@@ -461,3 +461,27 @@ The provider and plugin branches extend the REST integration branch; media exten
   TLS/authentication variants, driver/version matrix, transaction isolation and rollback
   behavior on remote engines, and Windows/macOS integration. Use least-privilege service
   accounts and network egress controls; the Python pack is not an OS/network sandbox.
+
+
+## Persistent memory — branch feat/persistent-memory-system
+
+- Base: feat/database-integrations (PR #19 head ead3c3f9fc12d92e001a3ad538c1fb91e4f715bb).
+- Added src/ultk/builtins/memory.py with SQLite persistence, host-fixed namespace isolation,
+  dispatcher-injected session identity, role-tagged bounded working context, episodic/semantic/
+  procedural records, hybrid lexical/vector retrieval, update, hard-delete and exact duplicate
+  consolidation.
+- Added ToolEngine.install_memory_tools(...) and exported create_memory_tools.
+- Added tests/test_memory_tools.py and docs/PERSISTENT_MEMORY.md; README and tool catalog updated.
+- Built-in offline feature-hash vectors provide cosine similarity without model downloads. A trusted
+  host-injected embedder callable enables semantic vectors. The default vectors are lexical features,
+  not semantic model embeddings.
+- Memory capabilities are separated into context read/write/delete, memory read/write/delete and
+  maintenance. User namespace is fixed by host configuration; session IDs come only from ToolContext.
+- Tests and CI for this increment are pending. Do not infer a passing result from PR #19 CI.
+- Deferred verification: full suite/Ruff, multi-process SQLite contention, database corruption and
+  disk-full behavior, backup/restore, concurrent context appends, embedding dimension mismatch,
+  external embedder failures, recall ranking quality, namespace routing in a multi-user host,
+  retention/deletion across WAL and backups, and Windows/macOS filesystem behavior.
+- Boundaries: no automatic LLM-turn ingestion, autonomous memory extraction, summarization-based
+  consolidation, automatic forgetting/decay deletion, distributed vector index or managed backup.
+  The host agent must decide what to append and remember; use an authenticated namespace router.
