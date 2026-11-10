@@ -370,3 +370,20 @@ The provider and plugin branches extend the REST integration branch; media exten
 - Added macOS PyObjC framework dependencies to the computer-os extra and updated the platform coverage documentation.
 - Still outside this desktop-automation increment: native macOS Spaces management (private APIs intentionally avoided), non-Sway Wayland compositor adapters and global Wayland input, recursive/inherited Windows ACL and owner changes, USB driver installation/configuration, isolated OS desktop sessions, and background event-monitor daemons. These require separate OS-specific design/privilege boundaries and are not represented as implemented.
 - Cross-platform native integration is not verified merely by unit tests. Validate on Windows 10/11, macOS with Accessibility permission, Linux X11, and Sway/Wayland before production use.
+
+
+### Comprehensive browser automation completion — branch feat/browser-automation-completion
+
+- Base: platform desktop automation branch feat/platform-desktop-automation-completion.
+- Ported the previously staged BrowserControlPlane implementation into the current sequential branch and exposed ToolEngine.install_comprehensive_browser_tools plus the built-in factory export.
+- Persistent named Chromium profiles with bounded tabs and active-tab URL persistence; per-profile in-process locks serialize same-profile calls within one process. This is not a cross-process lock or isolated OS browser sandbox.
+- Added browser-triggered downloads to a host-configured directory, sanitized filenames, no-overwrite hard-link commit, SHA-256 output and post-download byte limit. The limit is checked after Playwright has completed the temporary download; it is not a pre-transfer quota.
+- Added bounded request/response/failure/WebSocket metadata capture with a fixed observation window and capped retained event arrays. This is not a full HAR/DevTools capture and WebSocket frames are not captured.
+- Added persistent monitor list/delete operations and changed notifier ordering so a notifier failure leaves the monitor checkpoint unchanged for retry. Delivery remains at-least-once in the case where notification succeeds but the subsequent DB write fails.
+- Bounded structured scraping to a configured number of locator results; fixed active-tab persistence when closing tabs; required non-empty authentication heuristic selectors; restricted guarded form submission to GET/POST and standards-based requestSubmit.
+- Added tests/test_browser_comprehensive_tools.py covering profile validation/lifecycle, locking, tool registration/engine installation, monitor retry semantics, download path/size/hash behavior, bounded scraping, auth selector validation and form-field redaction. Tests and CI are deferred under the implementation-phase validation policy.
+- Added docs/COMPREHENSIVE_BROWSER_AUTOMATION.md and updated README/tool catalog.
+- Security boundaries: browser context routes use public-URL validation, but DNS rebinding and resolution-to-connection races still require host firewall/proxy egress controls. WebSocket handshakes are not covered by the ordinary Playwright route guard. Profiles contain persistent authentication state and must be protected as credential stores.
+- CAPTCHA/anti-bot behavior is detect-and-handoff only; no solving or bypass. Visible login/MFA handoff is heuristic and not identity proof. Form submission uses a dedicated consequential capability, but host policy must enforce explicit human approval for exact arguments.
+- Website monitors are host-polled; no background daemon or scheduler is launched by this pack. Browser sessions do not preserve in-memory page state between calls; saved tab URLs are recreated.
+- Live Playwright/Chromium, authenticated download, real-site SSRF, DNS rebinding, popup/frame, multi-process profile contention, extension loading and cross-platform integration remain unverified.
