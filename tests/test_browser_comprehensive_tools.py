@@ -281,3 +281,63 @@ def test_network_capture_window_is_bounded(tmp_path: Path) -> None:
     pack = BrowserControlPlane(tmp_path / "profiles")
     with pytest.raises(ToolExecutionError, match="100 and 10000"):
         pack.network("work", capture_ms=10001)
+
+
+def test_profile_workflow_prevalidates_all_steps_before_opening_browser(tmp_path: Path, monkeypatch) -> None:
+    import ultk.builtins.browser_comprehensive as module
+
+    monkeypatch.setattr(module, "_url", lambda value: value)
+    pack = BrowserControlPlane(tmp_path / "profiles")
+    pack._with_context = lambda profile, action: pytest.fail("workflow should reject before opening a browser")
+    with pytest.raises(ToolExecutionError, match="unsupported action"):
+        pack.workflow("work", [
+            {"action": "navigate", "url": "https://example.com"},
+            {"action": "execute_javascript", "script": "alert(1)"},
+        ])
+
+
+def test_profile_workflow_executes_prevalidated_steps_and_returns_active_page(tmp_path: Path) -> None:
+    pack = BrowserControlPlane(tmp_path / "profiles")
+
+    class Locator:
+        first = None
+
+        def click(self, timeout):
+            return None
+
+        def inner_text(self, timeout):
+            return "hello"
+
+        def is_visible(self, timeout):
+            return True
+
+    locator = Locator()
+    locator.first = locator
+
+    class Page:
+        url = "https://example.com"
+        def __init__(self):
+            self.visited = []
+        def goto(self, url, wait_until, timeout):
+            self.url = url
+            self.visited.append(url)
+        def locator(self, selector):
+            return locator
+        def title(self):
+            return "Example"
+        def wait_for_timeout(self, milliseconds):
+            self.waited = milliseconds
+
+    page = Page()
+    context = SimpleNamespace(pages=[page])
+    pack._with_context = lambda profile, action: action(context, [page], 0)
+    result = pack.workflow("work", [
+        {"action": "navigate", "url": "https://example.com/page"},
+        {"action": "click", "selector": "button"},
+        {"action": "expect_text", "text": "hello"},
+        {"action": "wait", "milliseconds": 100},
+    ])
+    assert result["steps_completed"] == 4
+    assert page.visited == ["https://example.com/page"]
+    assert page.waited == 100
+    assert result["_active_page"] is page
