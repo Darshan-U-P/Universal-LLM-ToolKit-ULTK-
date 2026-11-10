@@ -116,7 +116,7 @@ def test_backend_exception_is_normalized() -> None:
 
 def test_click_target_requires_exactly_one_accepted_candidate() -> None:
     for candidates in ([], [_candidate(), _candidate(x=50)]):
-        pack = ComputerGroundingPack(lambda image, target: candidates)
+        pack = ComputerGroundingPack(lambda image, target, _candidates=candidates: _candidates)
         pack._capture = lambda region: (b"png", 100, 100, 0, 0)
         with pytest.raises(ToolExecutionError, match="exactly one candidate"):
             pack.click_target("settings gear")
