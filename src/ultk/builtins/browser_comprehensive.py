@@ -410,6 +410,71 @@ class BrowserControlPlane:
                     "form_sha256":fingerprint}
         return self._with_context(profile,run)
 
+    def download(
+        self,
+        profile: str,
+        selector: str,
+        filename: str | None = None,
+        timeout_ms: int = 15000,
+    ) -> dict[str, Any]:
+        if not selector or len(selector) > 500 or not 500 <= timeout_ms <= 30000:
+            raise ToolExecutionError("Download selector or timeout is invalid.")
+        if filename is not None and (
+            not isinstance(filename, str)
+            or not filename
+            or len(filename) > 180
+            or filename in {".", ".."}
+            or Path(filename).name != filename
+            or "/" in filename
+            or "\\" in filename
+            or any(ord(char) < 32 for char in filename)
+        ):
+            raise ToolExecutionError("Download filename must be a simple file name.")
+
+        def run(ctx, pages, active):
+            page = pages[active]
+            try:
+                with page.expect_download(timeout=timeout_ms) as download_info:
+                    page.locator(selector).first.click(timeout=min(timeout_ms, 10000))
+                download = download_info.value
+                suggested = download.suggested_filename or f"download-{uuid.uuid4().hex}"
+                safe_suggested = re.sub(r"[^A-Za-z0-9._ -]", "_", Path(suggested.replace("\\", "/")).name)
+                safe_suggested = safe_suggested.strip(" .")[:180] or f"download-{uuid.uuid4().hex}"
+                final_name = filename or safe_suggested
+                target = (self.download_root / final_name).resolve()
+                if not target.is_relative_to(self.download_root) or target.exists():
+                    raise ToolExecutionError("Download destination already exists or escapes the configured root.")
+                temporary = self.download_root / f".{uuid.uuid4().hex}.part"
+                try:
+                    download.save_as(str(temporary))
+                    size = temporary.stat().st_size
+                    if size > self.max_download_bytes:
+                        raise ToolExecutionError(
+                            f"Download exceeded the configured {self.max_download_bytes}-byte limit."
+                        )
+                    digest = hashlib.sha256()
+                    with temporary.open("rb") as handle:
+                        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                            digest.update(chunk)
+                    os.replace(temporary, target)
+                finally:
+                    if temporary.exists():
+                        temporary.unlink()
+                return {
+                    "url": page.url,
+                    "path": str(target),
+                    "filename": final_name,
+                    "bytes_written": size,
+                    "sha256": digest.hexdigest(),
+                    "status": "saved",
+                }
+            except ToolExecutionError:
+                raise
+            except Exception as exc:
+                raise ToolExecutionError(f"Browser download failed ({type(exc).__name__}).") from exc
+
+        return self._with_context(profile, run)
+
     def monitor_add(self,url:str,selector:str|None=None):
         _url(url)
         if selector is not None and (not selector or len(selector)>500): raise ToolExecutionError("Monitor selector is invalid.")
@@ -422,13 +487,49 @@ class BrowserControlPlane:
         with sqlite3.connect(self.db_path) as db:
             row=db.execute("SELECT url,selector,last_hash FROM site_changes WHERE monitor_id=? AND enabled=1",(monitor_id,)).fetchone()
         if row is None: raise ToolExecutionError("Website monitor not found or disabled.")
-        result=self._fetch_monitor(row[0],row[1]); digest=hashlib.sha256(result["text"].encode()).hexdigest()
-        changed=row[2] is not None and row[2]!=digest
-        with sqlite3.connect(self.db_path) as db: db.execute("UPDATE site_changes SET last_hash=? WHERE monitor_id=?",(digest,monitor_id))
-        event = {"monitor_id":monitor_id,"url":row[0],"changed":changed,"title":result["title"],"text_excerpt":result["text"][:3000]}
+        result = self._fetch_monitor(row[0], row[1])
+        digest = hashlib.sha256((result["title"] + "\\n" + result["text"]).encode()).hexdigest()
+        changed = row[2] is not None and row[2] != digest
+        event = {
+            "monitor_id": monitor_id,
+            "url": row[0],
+            "changed": changed,
+            "title": result["title"],
+            "text_excerpt": result["text"][:3000],
+        }
         if changed and self.notifier is not None:
-            self.notifier(event)
+            try:
+                self.notifier(event)
+            except Exception as exc:
+                raise ToolExecutionError(
+                    "Website changed but the configured notifier failed; monitor checkpoint was not advanced."
+                ) from exc
+        with sqlite3.connect(self.db_path) as db:
+            db.execute("UPDATE site_changes SET last_hash=? WHERE monitor_id=?", (digest, monitor_id))
         return event
+
+    def monitor_list(self):
+        with sqlite3.connect(self.db_path) as db:
+            rows = db.execute(
+                "SELECT monitor_id,url,selector,last_hash,enabled FROM site_changes ORDER BY monitor_id LIMIT 500"
+            ).fetchall()
+        return {
+            "monitors": [
+                {"monitor_id": row[0], "url": row[1], "selector": row[2],
+                 "initialized": row[3] is not None, "enabled": bool(row[4])}
+                for row in rows
+            ],
+            "count": len(rows),
+        }
+
+    def monitor_delete(self, monitor_id: str):
+        if not isinstance(monitor_id, str) or not re.fullmatch(r"[A-Fa-f0-9]{32}", monitor_id):
+            raise ToolExecutionError("Invalid monitor identifier.")
+        with sqlite3.connect(self.db_path) as db:
+            cursor = db.execute("DELETE FROM site_changes WHERE monitor_id=?", (monitor_id,))
+        if cursor.rowcount != 1:
+            raise ToolExecutionError("Website monitor was not found.")
+        return {"monitor_id": monitor_id, "deleted": True}
 
     def websocket_probe(self, profile: str, ws_url: str, message: str, timeout_ms: int = 5000):
         parsed = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(ws_url)
