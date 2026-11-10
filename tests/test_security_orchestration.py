@@ -6,7 +6,6 @@ from ultk.approvals import ApprovalPolicy, SQLiteApprovalStore
 from ultk.audit import SQLiteAuditLogger
 from ultk.execution import ToolDispatcher
 from ultk.models import ToolCallRequest, ToolContext, ToolSpec
-from ultk.orchestration import WorkflowEngine, WorkflowStep
 from ultk.permissions import AllowListPolicy
 from ultk.registry import ToolRegistry
 
