@@ -407,3 +407,21 @@ class WorkflowEngine:
 
     def get_events(self, run_id: str, *, limit: int = 500) -> list[dict[str, Any]]:
         return self.store.events(run_id, limit=limit)
+
+
+    def replay(self, run_id: str, *, new_run_id: str | None = None) -> str:
+        """Create a fresh run from the original definition; this re-executes tools."""
+        with self.store._connect() as db:
+            row = db.execute(
+                "SELECT definition_json FROM workflow_runs WHERE run_id=?", (run_id,)
+            ).fetchone()
+        if row is None:
+            raise WorkflowError(f"Workflow run not found: {run_id}")
+        definition = json.loads(row["definition_json"])
+        steps = [WorkflowStep(
+            step_id=item["step_id"], tool_name=item["tool_name"],
+            arguments=item["arguments"], depends_on=tuple(item["depends_on"]),
+            max_attempts=item["max_attempts"],
+            retry_delay_seconds=item["retry_delay_seconds"],
+        ) for item in definition]
+        return self.submit(steps, run_id=new_run_id)
