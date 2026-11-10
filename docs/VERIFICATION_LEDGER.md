@@ -332,3 +332,25 @@ The provider and plugin branches extend the REST integration branch; media exten
   the export order was corrected in commit 263a40b. A further test now exercises the matching
   pipeline with stubbed OpenCV/PyAutoGUI boundaries; real OpenCV and live-desktop integration
   remain separate validation requirements.
+
+
+## AI visual grounding increment
+
+- Branch: feat/ai-visual-grounding
+- Base: feat/image-template-computer-vision (PR #13 head).
+- Added src/ultk/builtins/computer_grounding.py with a host-injected VisualGrounder adapter
+  contract, bounded screenshot capture, natural-language target descriptions, candidate-box
+  validation, confidence filtering, and unique-candidate-only clicking.
+- Added ToolEngine.install_computer_grounding_tools and the public built-in factory export.
+- Added tests/test_computer_grounding_tools.py and docs/AI_VISUAL_GROUNDING.md.
+- The pack is provider/model independent: it does not bundle model weights, provider SDKs,
+  network clients, or credentials. The host adapter is trusted in-process application code.
+- Unit tests cover registration, engine installation, screenshot/target handoff, region coordinate
+  offsets, confidence filtering, malformed/out-of-bounds candidate rejection, missing/failing
+  backends, ambiguity rejection, unique-match click coordinates and candidate bounds.
+- CI validation is pending for this branch. Live model quality, latency, privacy/data-transfer,
+  real screenshot capture and cross-platform coordinate integration remain unverified.
+- Backend-reported confidence is not assumed to be calibrated. A unique candidate may still be
+  incorrect; high-impact actions require host approval bound to the exact arguments and fresh
+  screenshot context. Screenshots may contain sensitive content, and hosted adapters may transmit
+  it externally.
