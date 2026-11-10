@@ -235,6 +235,9 @@ class SQLiteDataStore:
             connection.commit()
             return {"row_count": row_count, "last_row_id": last_row_id,
                     "columns": columns, "rows": normalized}
+        except sqlite3.DatabaseError as exc:
+            connection.rollback()
+            raise ToolExecutionError("SQLite write was rejected or failed.") from exc
         except Exception:
             connection.rollback()
             raise
