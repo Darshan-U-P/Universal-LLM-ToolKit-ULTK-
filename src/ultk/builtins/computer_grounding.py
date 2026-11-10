@@ -10,7 +10,6 @@ from __future__ import annotations
 import io
 import math
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any, Protocol
 
 from ultk.builtins._common import FunctionTool, object_schema
@@ -166,8 +165,8 @@ class ComputerGroundingPack:
                 or y + height > screen_height
             ):
                 raise ToolExecutionError("Visual-grounding backend returned an invalid bounding box.")
-            left, top = int(round(x)), int(round(y))
-            box_width, box_height = int(round(width)), int(round(height))
+            left, top = round(x), round(y)
+            box_width, box_height = round(width), round(height)
             if box_width < 1 or box_height < 1:
                 raise ToolExecutionError("Visual-grounding bounding box is too small.")
             candidates.append({
