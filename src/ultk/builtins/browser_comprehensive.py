@@ -724,6 +724,8 @@ class BrowserControlPlane:
             if not isinstance(step, dict):
                 raise ToolExecutionError(f"Workflow step {index} must be an object.")
             action = step.get("action")
+            if not isinstance(action, str):
+                raise ToolExecutionError(f"Workflow step {index} needs a string action.")
             item = {"action": action}
             if action in {"navigate", "new_tab"}:
                 item["url"] = _url(step.get("url", ""))
@@ -744,7 +746,13 @@ class BrowserControlPlane:
             elif action == "press":
                 selector = step.get("selector", "")
                 key = step.get("key")
-                if not isinstance(selector, str) or not selector or len(selector) > 500 or key not in allowed_keys:
+                if (
+                    not isinstance(selector, str)
+                    or not selector
+                    or len(selector) > 500
+                    or not isinstance(key, str)
+                    or key not in allowed_keys
+                ):
                     raise ToolExecutionError(f"Workflow step {index} has an invalid key target.")
                 item.update({"selector": selector, "key": key})
             elif action in {"select_tab", "close_tab"}:
