@@ -485,3 +485,26 @@ The provider and plugin branches extend the REST integration branch; media exten
 - Boundaries: no automatic LLM-turn ingestion, autonomous memory extraction, summarization-based
   consolidation, automatic forgetting/decay deletion, distributed vector index or managed backup.
   The host agent must decide what to append and remember; use an authenticated namespace router.
+
+
+### Persistent memory intelligence extension — branch feat/persistent-memory-system
+
+- Added `src/ultk/builtins/memory_intelligence.py` with host-adapted extraction, conversation
+  summarization, fact/decision capture, conservative similarity-based consolidation and SQLite
+  integrity diagnostics.
+- Added tools `memory.extract_context`, `memory.summarize_context`,
+  `memory.consolidate_related` and `memory.diagnostics`; wired trusted extractor and summarizer
+  callables into `ToolEngine.install_memory_tools(...)`. Host owns model selection, consent and
+  scheduling.
+- Extraction rejects low-confidence/invalid candidates, filters likely credential strings, skips
+  exact duplicates and stores provenance. Summaries preserve session/message provenance. Related
+  consolidation requires same kind/scope and high vector similarity; it writes the replacement
+  before attempting source deletion.
+- SQLite now uses a 30-second busy timeout and immediate transactions for concurrent context
+  sequence allocation and capacity-checked memory writes.
+- Added `tests/test_memory_intelligence.py` for extraction, duplicate rejection, provenance,
+  summarization, consolidation, diagnostics and concurrent writers. CI status remains pending
+  until the workflow associated with the latest head commit completes.
+- Remaining production qualification: real embedding quality/recall benchmarks, multiprocess
+  load tests, backup/restore, disk-full/corruption recovery, WAL/backup erasure, Windows/macOS
+  behavior, and host multi-tenant identity routing. SQLite is not multi-host storage.
