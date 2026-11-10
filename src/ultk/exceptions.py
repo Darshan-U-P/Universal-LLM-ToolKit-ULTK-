@@ -30,3 +30,7 @@ class ToolExecutionError(ULTKError):
 
 class AgentStepLimitError(ULTKError):
     """The agent exceeded its configured tool-call step limit."""
+
+
+class WorkflowError(ULTKError):
+    """A workflow definition, state transition, or orchestration operation is invalid."""

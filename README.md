@@ -194,3 +194,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md), [Architecture](docs/ARCHITECTURE.md), [R
 ## License
 
 A license will be selected and added before the first implementation release.
+
+
+## Workflow orchestration implementation
+
+The LLM-independent workflow engine executes bounded DAGs through the same policy-gated dispatcher
+as direct tool calls. It supports dependency-aware parallel steps, explicit JSON output references,
+persistent SQLite checkpoints and event history, bounded retries with backoff, cooperative
+cancellation, recovery after interruption, and re-execution from a saved definition. Recovery is
+at-least-once: an interrupted external side effect may be repeated, so mutating tools should be
+idempotent. Distributed worker coordination and exactly-once side effects are not provided.
+
+See [Workflow Orchestration](docs/WORKFLOW_ORCHESTRATION.md) for the API, semantics, security
+boundaries, and validation status.
