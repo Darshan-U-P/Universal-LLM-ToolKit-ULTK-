@@ -432,9 +432,9 @@ def create_advanced_git_tools(
         ),
         FunctionTool(
             "git.stash",
-            "Create, list, inspect, apply or pop Git stashes; drop is separately capability-gated.",
+            "Create, apply or pop Git stashes; listing/inspection and dropping use separate capabilities.",
             object_schema({
-                "action": {"type": "string", "enum": ["push", "list", "show", "apply", "pop"]},
+                "action": {"type": "string", "enum": ["push", "apply", "pop"]},
                 "message": {"type": "string", "maxLength": 200},
                 "reference": {"type": "string", "maxLength": 32},
                 "include_untracked": {"type": "boolean"},
