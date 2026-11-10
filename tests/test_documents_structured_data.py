@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from ultk.builtins.documents import _extract, _list, _metadata, create_document_tools
+from ultk.builtins.documents import (
+    _extract, _list, _metadata, _pdf_extract_pages, _pdf_merge, create_document_tools,
+)
 from ultk.builtins.structured_data import (
     _load, _serialize, _transform, _validate, create_structured_data_tools,
 )
@@ -105,3 +107,52 @@ def test_etl_file_pipeline_and_permission_registration(tmp_path: Path) -> None:
 def test_etl_rejects_unknown_operation(tmp_path: Path) -> None:
     with pytest.raises(Exception, match="Unsupported ETL operation"):
         _transform(tmp_path, [{"a": 1}], [{"op": "eval", "code": "1+1"}], 10, 10, 10)
+
+
+def test_office_extractors_and_pdf_operations(tmp_path: Path) -> None:
+    from docx import Document
+    from openpyxl import Workbook
+    from pptx import Presentation
+    from pptx.util import Inches
+    from pypdf import PdfReader, PdfWriter
+
+    doc = Document()
+    doc.add_paragraph("DOCX body text")
+    table = doc.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "left"
+    table.cell(0, 1).text = "right"
+    doc.save(tmp_path / "brief.docx")
+
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    shape = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(4), Inches(1))
+    shape.text = "PPTX slide text"
+    presentation.save(tmp_path / "slides.pptx")
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Metrics"
+    sheet.append(["metric", "value"])
+    sheet.append(["users", 42])
+    workbook.save(tmp_path / "metrics.xlsx")
+    workbook.close()
+
+    assert "DOCX body text" in _extract(tmp_path, "brief.docx", 100_000, 10, 2000, 100)["text"]
+    assert "PPTX slide text" in _extract(tmp_path, "slides.pptx", 100_000, 10, 2000, 100)["text"]
+    xlsx_text = _extract(tmp_path, "metrics.xlsx", 100_000, 10, 2000, 100)["text"]
+    assert "Metrics" in xlsx_text and "users" in xlsx_text
+
+    for filename, page_count in (("first.pdf", 2), ("second.pdf", 1)):
+        writer = PdfWriter()
+        for _ in range(page_count):
+            writer.add_blank_page(width=72, height=72)
+        with (tmp_path / filename).open("wb") as handle:
+            writer.write(handle)
+
+    merged = _pdf_merge(tmp_path, ["first.pdf", "second.pdf"], "merged.pdf",
+                        100_000, 10, False)
+    assert merged["pages"] == 3
+    extracted = _pdf_extract_pages(tmp_path, "merged.pdf", "selected.pdf",
+                                   2, 2, 100_000, 10, False)
+    assert extracted["pages"] == 1
+    assert len(PdfReader(str(tmp_path / "selected.pdf")).pages) == 1
