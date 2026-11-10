@@ -254,3 +254,8 @@ The provider and plugin branches extend the REST integration branch; media exten
   concurrency bounds, dependency skip/fail-fast semantics, retry persistence/backoff, concurrent
   cancellation, crash recovery, replay definition fidelity, SQLite locking/corruption/disk-full,
   secret-bearing argument/output storage, and multiple simultaneous workflow runners.
+
+- Follow-up GitHub Actions run #495: pytest passed; Ruff found only two remaining import-order /
+  import-style findings in the inherited desktop test file. Those final findings were corrected
+  on the base branch and synchronized into this branch. A fresh run against the latest head is
+  required before marking CI clean.
