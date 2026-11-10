@@ -247,7 +247,7 @@ class ComputerOSPack:
                              "primary": bool(getattr(monitor, "is_primary", False))})
             if rows:
                 return rows[:16]
-        except Exception:  # noqa: BLE001 - display backends may fail when no GUI session is attached
+        except Exception:  # noqa: BLE001, S110 - display backends may fail without an interactive GUI session
             pass
         try:
             pyautogui = _optional("pyautogui")
