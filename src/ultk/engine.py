@@ -336,22 +336,68 @@ class ToolEngine:
         max_items: int = 100_000,
         max_context_entries: int = 100,
         max_candidates: int = 30,
+        auto_extract_every: int | None = 4,
+        auto_summarize_every: int | None = 20,
     ) -> None:
-        """Install persistent memory plus optional host-adapted intelligence.
+        """Install persistent memory with optional automatic host-adapted intelligence.
 
-        The namespace must come from authenticated host identity, never model input.
-        Embedding, extraction and summarization adapters are trusted host callables;
-        provider credentials and model configuration are not exposed to tools.
+        When adapters are supplied, user context appends trigger extraction and summaries
+        at the configured user-message intervals. Set either interval to None to disable
+        that automatic hook; the explicit memory intelligence tools remain available.
         """
         from ultk.builtins.memory import PersistentMemory, create_memory_tools
-        from ultk.builtins.memory_intelligence import create_memory_intelligence_tools
+        from ultk.builtins.memory_intelligence import (
+            MemoryIntelligence, create_memory_intelligence_tools,
+        )
 
-        self.register_tools(create_memory_tools(
-            database, namespace=namespace, embedder=embedder, max_items=max_items,
-        ))
+        for name, interval in (
+            ("auto_extract_every", auto_extract_every),
+            ("auto_summarize_every", auto_summarize_every),
+        ):
+            if interval is not None and (isinstance(interval, bool) or interval < 1):
+                raise ValueError(f"{name} must be a positive integer or None.")
+
         store = PersistentMemory(
             database, namespace=namespace, embedder=embedder, max_items=max_items,
         )
+        intelligence = MemoryIntelligence(
+            store,
+            extractor=extractor,
+            summarizer=summarizer,
+            max_context_entries=max_context_entries,
+            max_candidates=max_candidates,
+        )
+
+        def after_context_append(*, session_id: str, role: str, content: str) -> dict[str, Any]:
+            if role != "user":
+                return {}
+            entries = store.context_get(session_id, limit=200)["entries"]
+            user_messages = sum(1 for entry in entries if entry["role"] == "user")
+            outcome: dict[str, Any] = {}
+            if extractor is not None and auto_extract_every and user_messages % auto_extract_every == 0:
+                try:
+                    outcome["extraction"] = intelligence.extract_context(
+                        session_id=session_id, limit=min(max_context_entries, 200),
+                    )
+                except Exception as exc:
+                    outcome["extraction_error"] = type(exc).__name__
+            if summarizer is not None and auto_summarize_every and user_messages % auto_summarize_every == 0:
+                try:
+                    outcome["summary"] = intelligence.summarize_context(
+                        session_id=session_id, limit=min(max_context_entries, 200),
+                    )
+                except Exception as exc:
+                    outcome["summary_error"] = type(exc).__name__
+            return outcome
+
+        self.register_tools(create_memory_tools(
+            database,
+            namespace=namespace,
+            embedder=embedder,
+            max_items=max_items,
+            store=store,
+            after_context_append=after_context_append,
+        ))
         self.register_tools(create_memory_intelligence_tools(
             store,
             extractor=extractor,
