@@ -302,3 +302,25 @@ class ToolEngine:
             max_columns=max_columns,
             max_operations=max_operations,
         ))
+
+
+    def install_database_tools(
+        self,
+        profiles: dict[str, dict[str, Any]],
+        *,
+        max_rows: int = 500,
+        max_result_bytes: int = 100_000,
+        max_batch: int = 100,
+    ) -> None:
+        """Install optional SQL, MongoDB and Redis tools.
+
+        Profiles are trusted host configuration. Keep credentials in a secret manager
+        or inject them from environment-backed configuration; never expose them to a model.
+        """
+        from ultk.builtins.database import create_database_tools
+        self.register_tools(create_database_tools(
+            profiles,
+            max_rows=max_rows,
+            max_result_bytes=max_result_bytes,
+            max_batch=max_batch,
+        ))
