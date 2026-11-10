@@ -24,7 +24,7 @@ Connect an LLM to a governed, discoverable ecosystem of tools through one consis
 
 The advanced desktop branch adds a dedicated cross-platform computer/OS pack for persistent logical desktop contexts, monitor discovery, window placement and snapping, virtual desktops where supported, keyboard shortcuts/sequences, accessibility inspection, and bounded desktop workflows combining pointer, keyboard, window and screenshot actions.
 
-Platform support is backend-dependent. PyAutoGUI/PyWinCtl provide GUI input and window operations where supported; Windows UI Automation and Linux AT-SPI provide accessibility support. Linux Wayland, macOS accessibility actions and some virtual-desktop operations remain platform-specific limitations. See [Computer/OS Tool Pack](docs/COMPUTER_OS_TOOL_PACK.md).
+Platform support is backend-dependent. Windows UI Automation and safe device ejection use native APIs; macOS accessibility uses the Accessibility API through PyObjC; Linux Wayland window/workspace operations have a Sway IPC backend, while Linux AT-SPI supports inspection and action invocation. Global Wayland input and native macOS Spaces management remain compositor/OS-specific limitations. See [Computer/OS Tool Pack](docs/COMPUTER_OS_TOOL_PACK.md).
 
 ## Architecture
 
