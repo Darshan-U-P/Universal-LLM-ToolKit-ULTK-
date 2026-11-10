@@ -142,3 +142,74 @@ def test_linux_event_watch_channel_validation(pack: ComputerOSPack) -> None:
         pytest.skip("Linux journal channel validation is not applicable.")
     with pytest.raises(ToolExecutionError):
         pack.create_event_watch("arbitrary-command", "bad channel")
+
+
+def test_desktop_workflow_prevalidates_all_steps_before_input(pack: ComputerOSPack, monkeypatch) -> None:
+    from types import SimpleNamespace
+    import ultk.builtins.computer_os as computer_os
+
+    calls = []
+    backend = SimpleNamespace(
+        click=lambda **kwargs: calls.append(("click", kwargs)),
+        moveTo=lambda *args, **kwargs: calls.append(("move", args)),
+        write=lambda *args, **kwargs: calls.append(("write", args)),
+        press=lambda *args, **kwargs: calls.append(("press", args)),
+        hotkey=lambda *args, **kwargs: calls.append(("hotkey", args)),
+    )
+    monkeypatch.setattr(computer_os, "_optional", lambda name: backend)
+    with pytest.raises(ToolExecutionError, match="unsupported action"):
+        pack.desktop_workflow([
+            {"action": "click", "x": 20, "y": 30},
+            {"action": "unknown"},
+        ])
+    assert calls == []
+
+
+def test_desktop_workflow_executes_bounded_pointer_and_keyboard_steps(pack: ComputerOSPack, monkeypatch) -> None:
+    from types import SimpleNamespace
+    import ultk.builtins.computer_os as computer_os
+
+    calls = []
+    backend = SimpleNamespace(
+        click=lambda **kwargs: calls.append(("click", kwargs)),
+        moveTo=lambda *args, **kwargs: calls.append(("move", args)),
+        write=lambda *args, **kwargs: calls.append(("write", args)),
+        press=lambda *args, **kwargs: calls.append(("press", args)),
+        hotkey=lambda *args, **kwargs: calls.append(("hotkey", args)),
+    )
+    monkeypatch.setattr(computer_os, "_optional", lambda name: backend)
+    result = pack.desktop_workflow([
+        {"action": "move", "x": 120, "y": 240},
+        {"action": "click", "x": 120, "y": 240, "button": "right"},
+        {"action": "type", "text": "ULTK"},
+        {"action": "hotkey", "keys": ["ctrl", "s"]},
+    ])
+    assert result["steps_completed"] == 4
+    assert [item[0] for item in calls] == ["move", "click", "write", "hotkey"]
+
+
+def test_multi_monitor_snap_uses_monitor_origin(pack: ComputerOSPack, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    window = SimpleNamespace(
+        title="Editor",
+        moveTo=lambda x, y: setattr(window, "position", (x, y)),
+        resizeTo=lambda width, height: setattr(window, "size", (width, height)),
+    )
+    monkeypatch.setattr(pack, "monitors", lambda: [
+        {"index": 0, "x": -1920, "y": 0, "width": 1920, "height": 1080, "primary": False},
+        {"index": 1, "x": 0, "y": 0, "width": 2560, "height": 1440, "primary": True},
+    ])
+    monkeypatch.setattr(pack, "_window", lambda selector: window)
+    result = pack.snap_window("Editor", 0, "right")
+    assert result["geometry"] == {"x": -960, "y": 0, "width": 960, "height": 1080}
+    assert window.position == (-960, 0)
+    assert window.size == (960, 1080)
+
+
+def test_desktop_workflow_tool_is_registered(tmp_path: Path) -> None:
+    names = {tool.spec.name for tool in create_computer_os_tools(
+        filesystem_root=tmp_path / "files",
+        state_database=tmp_path / "state.sqlite3",
+    )}
+    assert "computer_os.desktop_workflow" in names
