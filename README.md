@@ -295,8 +295,8 @@ Install with `pip install -e ".[documents,structured-data]"`. Legacy XLS and Ope
 
 The optional database pack connects to host-configured **SQLite, MySQL, PostgreSQL,
 MongoDB and Redis** profiles. Install the needed driver extras (or all drivers with
-\`pip install -e ".[databases]"\`) and call
-\`ToolEngine.install_database_tools(profiles=...)\`.
+`pip install -e ".[databases]"`) and call
+`ToolEngine.install_database_tools(profiles=...)`.
 
 SQL tools provide table/column discovery, bounded SELECT, parameterized INSERT/UPDATE/DELETE,
 and atomic mutation transactions. MongoDB tools provide collection discovery, bounded filtered
