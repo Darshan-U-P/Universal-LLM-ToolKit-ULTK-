@@ -216,3 +216,15 @@ def test_windows_safe_eject_uses_configuration_manager_api(pack, monkeypatch) ->
 def test_windows_safe_eject_rejects_device_not_in_allowlist(pack) -> None:
     with pytest.raises(ToolExecutionError, match="allowlist"):
         pack.eject_device("USB\\VID_9999&PID_9999\\UNKNOWN")
+
+
+def test_generic_window_action_routes_through_sway_proxy(pack, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(pack, "_sway_enabled", lambda: True)
+    monkeypatch.setattr(pack, "_sway_window", lambda selector: {
+        "title": "Editor", "container_id": 12, "scratchpad": False,
+    })
+    monkeypatch.setattr(pack, "_sway_request", lambda *args: calls.append(args) or [{"success": True}])
+    result = pack.window_action("Editor", "maximize")
+    assert result["action"] == "maximize"
+    assert calls == [("[con_id=12] fullscreen enable",)]
