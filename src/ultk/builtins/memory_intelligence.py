@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import re
 import time
 from collections import defaultdict
@@ -114,6 +113,9 @@ class MemoryIntelligence:
                     "extractor": getattr(self.extractor, "__name__", type(self.extractor).__name__),
                 }
                 metadata = _metadata(metadata)
+                if _contains_secret(json.dumps(metadata, ensure_ascii=False)):
+                    skipped += 1
+                    continue
                 fingerprint = _fingerprint(body)
                 with self.store.db() as connection:
                     duplicate = connection.execute(
