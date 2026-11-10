@@ -616,9 +616,23 @@ class BrowserControlPlane:
             finally: browser.close()
 
 
-def create_comprehensive_browser_tools(*,profile_root:str|Path="./browser_profiles",headless:bool=True,
-                                        extension_dirs:tuple[str|Path,...]=(),notifier=None):
-    b=BrowserControlPlane(profile_root,headless=headless,extension_dirs=extension_dirs,notifier=notifier)
+def create_comprehensive_browser_tools(
+    *,
+    profile_root: str | Path = "./browser_profiles",
+    headless: bool = True,
+    extension_dirs: tuple[str | Path, ...] = (),
+    notifier=None,
+    download_root: str | Path | None = None,
+    max_download_bytes: int = 25_000_000,
+):
+    b = BrowserControlPlane(
+        profile_root,
+        headless=headless,
+        extension_dirs=extension_dirs,
+        notifier=notifier,
+        download_root=download_root,
+        max_download_bytes=max_download_bytes,
+    )
     p={"type":"string","minLength":1,"maxLength":64}
     return (
       FunctionTool("browser.profile_create","Create a named persistent browser profile; optional clone copies saved cookies/storage state.",
@@ -655,9 +669,16 @@ def create_comprehensive_browser_tools(*,profile_root:str|Path="./browser_profil
           "attributes":{"type":"array","items":{"type":"string","maxLength":64},"maxItems":8},
           "limit":{"type":"integer","minimum":1,"maximum":200}},["profile","selector"]),
         "browser:scrape",lambda profile,selector,attributes=None,limit=50:b.scrape(profile,selector,attributes,limit),timeout=40),
-      FunctionTool("browser.network_inspect","Capture request, response, failure and WebSocket metadata during navigation.",
-        object_schema({"profile":p,"url":{"type":"string","format":"uri"}},["profile"]),
-        "browser:network:inspect",lambda profile,url=None:b.network(profile,url),timeout=40),
+      FunctionTool("browser.download","Download a browser-triggered file to a host-configured directory with a post-download byte limit and SHA-256 digest.",
+        object_schema({"profile":p,"selector":{"type":"string","minLength":1,"maxLength":500},
+          "filename":{"type":"string","minLength":1,"maxLength":180},
+          "timeout_ms":{"type":"integer","minimum":500,"maximum":30000}},["profile","selector"]),
+        "browser:download",lambda profile,selector,filename=None,timeout_ms=15000:
+          b.download(profile,selector,filename,timeout_ms),timeout=40),
+      FunctionTool("browser.network_inspect","Capture bounded request, response, failure and WebSocket metadata during a navigation and observation window.",
+        object_schema({"profile":p,"url":{"type":"string","format":"uri"},
+          "capture_ms":{"type":"integer","minimum":100,"maximum":10000}},["profile"]),
+        "browser:network:inspect",lambda profile,url=None,capture_ms=1000:b.network(profile,url,capture_ms),timeout=40),
       FunctionTool("browser.websocket_probe","Send one bounded text message to a public WebSocket and capture one bounded reply.",
         object_schema({"profile":p,"url":{"type":"string","minLength":1,"maxLength":2048},
           "message":{"type":"string","maxLength":4000},"timeout_ms":{"type":"integer","minimum":500,"maximum":10000}},
@@ -690,7 +711,12 @@ def create_comprehensive_browser_tools(*,profile_root:str|Path="./browser_profil
       FunctionTool("web.change_monitor_add","Create a persistent website change monitor scoped optionally to a CSS selector.",
         object_schema({"url":{"type":"string","format":"uri"},"selector":{"type":"string","maxLength":500}},["url"]),
         "web:monitor:write",b.monitor_add),
-      FunctionTool("web.change_monitor_check","Check a website monitor for selected-content changes.",
+      FunctionTool("web.change_monitor_check","Check a website monitor for selected-content changes; notifier failure leaves the checkpoint unchanged for retry.",
         object_schema({"monitor_id":{"type":"string","minLength":32,"maxLength":32}},["monitor_id"]),
         "web:monitor:check",b.monitor_check,timeout=40),
+      FunctionTool("web.change_monitor_list","List bounded website monitor definitions and initialization status.",
+        object_schema({}),"web:monitor:read",b.monitor_list),
+      FunctionTool("web.change_monitor_delete","Delete one website monitor definition.",
+        object_schema({"monitor_id":{"type":"string","pattern":"^[A-Fa-f0-9]{32}$"}},["monitor_id"]),
+        "web:monitor:write",b.monitor_delete),
     )
