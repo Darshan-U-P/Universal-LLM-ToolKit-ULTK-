@@ -437,3 +437,26 @@ The provider and plugin branches extend the REST integration branch; media exten
 - GitHub Actions run #42779245676 on commit `813852d3016a831cedd8be7e213c9c32d1bc6945` passed: **178 tests passed and Ruff passed**. The run installed the document, legacy XLS, OpenDocument and structured-data extras. This validates the Linux/Python 3.12 CI environment, not all target platforms or real-world parser interoperability.
 - Deferred verification: parser behavior on malformed/encrypted/large files; actual optional dependency installs; PDF merge/extract; XLS/XLSX/ODF interoperability; XML hostile-input cases; ETL type edge cases, joins and output limits; Windows path and atomic-write behavior; full integrated pytest/Ruff.
 - Boundaries: scanned-PDF OCR, handwriting, layout-faithful format conversion, document editing/signing/redaction, XLSB, arbitrary XML schema mapping, database adapters, streaming/distributed ETL and dataframe acceleration are not included. Parser processes should run in a restricted worker for hostile files; path/size bounds are not a sandbox.
+
+
+## Database integrations — branch feat/database-integrations
+
+- Added \`src/ultk/builtins/database.py\` with host-configured SQLite, MySQL, PostgreSQL,
+  MongoDB and Redis profiles. Profile credentials and connection parameters are never
+  accepted as model-call arguments.
+- SQL: table/column discovery, bounded SELECT, parameterized INSERT/UPDATE/DELETE and
+  bounded atomic mutation transactions. Identifiers are allowlisted; values use driver
+  parameters; unfiltered UPDATE/DELETE is refused.
+- MongoDB: collection discovery, bounded find, insert, update and delete. Filters reject
+  executable and unknown operators; update/delete require non-empty filters.
+- Redis: prefixed key get/set/delete, bounded SCAN, JSON value encoding, TTLs and atomic
+  MULTI/EXEC transactions.
+- Added separate read, schema-read, write, delete and transaction capabilities and
+  optional driver extras. Credentials should be injected by the host from a secret manager.
+- Tests are authored in \`tests/test_database_integrations.py\`. CI will run pytest and Ruff
+  with all four optional database drivers installed. No test result is claimed until the
+  GitHub Actions run completes.
+- Deferred verification: live MySQL/PostgreSQL/MongoDB/Redis service interoperability,
+  TLS/authentication variants, driver/version matrix, transaction isolation and rollback
+  behavior on remote engines, and Windows/macOS integration. Use least-privilege service
+  accounts and network egress controls; the Python pack is not an OS/network sandbox.
