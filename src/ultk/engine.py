@@ -160,6 +160,27 @@ class ToolEngine:
             max_template_pixels=max_template_pixels,
         ))
 
+    def install_computer_grounding_tools(
+        self,
+        *,
+        grounder: Any,
+        max_screenshot_pixels: int = 16_000_000,
+        max_screenshot_bytes: int = 12_000_000,
+        max_candidates: int = 10,
+    ) -> None:
+        """Install natural-language visual grounding with a host-provided model adapter.
+
+        The grounder receives PNG screenshot bytes and a target description, and
+        returns validated candidate boxes. ULTK does not choose or bundle a model.
+        """
+        from ultk.builtins.computer_grounding import create_computer_grounding_tools
+        self.register_tools(create_computer_grounding_tools(
+            grounder=grounder,
+            max_screenshot_pixels=max_screenshot_pixels,
+            max_screenshot_bytes=max_screenshot_bytes,
+            max_candidates=max_candidates,
+        ))
+
     def install_scheduler_tools(self, database: str | Path,
                                 handlers: dict[str, Any]) -> None:
         from ultk.builtins.scheduler import create_scheduler_tools
