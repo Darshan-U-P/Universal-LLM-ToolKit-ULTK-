@@ -196,6 +196,8 @@ class SQLiteDataStore:
                 for row in rows
             ]
             return {"columns": columns, "rows": normalized, "row_count": len(normalized)}
+        except sqlite3.DatabaseError as exc:
+            raise ToolExecutionError("SQLite query was rejected or failed.") from exc
         finally:
             connection.close()
 
