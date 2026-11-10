@@ -17,7 +17,7 @@ This is a planned taxonomy, not an implementation inventory. Each tool must be i
 | Integrations | REST, GraphQL, WebSocket, OAuth, webhooks, MCP, SDK connectors |
 | Productivity/business | tasks, projects, notes, reminders, knowledge bases, commerce, analytics |
 | Security | credential references, authentication, authorization, sandbox, audit, redaction |
-| Agent systems | delegation, multi-agent communication, reflection, scheduling, resumable jobs |
+| Agent systems | dependency-aware workflow DAGs, parallel steps, persistent checkpoints, retries/recovery, cooperative cancellation, execution traces, replay from saved definitions, delegation, scheduling and resumable jobs |
 
 ## Selection rules
 
