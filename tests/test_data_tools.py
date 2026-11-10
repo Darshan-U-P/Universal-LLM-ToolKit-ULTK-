@@ -60,7 +60,7 @@ def test_sqlite_write_requires_host_opt_in_and_allows_only_dml(tmp_path) -> None
     writable = SQLiteDataStore(database, allow_writes=True)
     result = writable._write("INSERT INTO items(label) VALUES (?)", ["alpha"])
     assert result["row_count"] == 1
-    with pytest.raises(Exception):
+    with pytest.raises(ToolExecutionError):
         writable._write("DROP TABLE items", [])
     assert writable._schema()["objects"][0]["name"] == "items"
 
