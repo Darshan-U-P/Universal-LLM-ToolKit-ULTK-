@@ -1,6 +1,8 @@
 """Direct, LLM-independent tool execution engine."""
+
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -10,11 +12,10 @@ from ultk.execution import ToolDispatcher
 from ultk.models import ToolCallRequest, ToolResult
 from ultk.permissions import DenyAllPolicy, PermissionPolicy
 from ultk.registry import ToolRegistry
-from ultk.tool import Tool
 
 
 class ToolEngine:
-    """Register and execute tools directly, without configuring an LLM provider."""
+    """Register, govern and execute tools without requiring an LLM provider."""
 
     def __init__(self, *, registry: ToolRegistry | None = None,
                  policy: PermissionPolicy | None = None) -> None:
@@ -22,10 +23,24 @@ class ToolEngine:
         self.policy = policy or DenyAllPolicy()
         self.dispatcher = ToolDispatcher(self.registry, self.policy)
 
-    def register_tool(self, tool: Tool) -> None:
+    def create_workflow_engine(
+        self,
+        database: str | Path = "./ultk_workflows.sqlite3",
+        *,
+        max_steps: int = 100,
+        max_concurrency: int = 4,
+    ) -> Any:
+        """Create a persistent workflow engine sharing this engine's policy-gated dispatcher."""
+        from ultk.orchestration import WorkflowEngine
+        return WorkflowEngine(
+            self.dispatcher, database, max_steps=max_steps,
+            max_concurrency=max_concurrency,
+        )
+
+    def register_tool(self, tool: Any) -> None:
         self.registry.register(tool)
 
-    def register_tools(self, tools: Iterable[Tool]) -> None:
+    def register_tools(self, tools: Iterable[Any]) -> None:
         for tool in tools:
             self.register_tool(tool)
 
@@ -33,8 +48,26 @@ class ToolEngine:
                       session_id: str = "default",
                       granted_capabilities: frozenset[str] = frozenset()) -> ToolResult:
         request = ToolCallRequest(id=uuid.uuid4().hex, name=name, arguments=arguments)
-        return await self.dispatcher.execute(request, session_id=session_id,
-                                             granted_capabilities=granted_capabilities)
+        return await self.dispatcher.execute(
+            request, session_id=session_id, granted_capabilities=granted_capabilities)
+
+    async def execute_many(self, calls: Iterable[ToolCallRequest], *,
+                           session_id: str = "default",
+                           granted_capabilities: frozenset[str] = frozenset(),
+                           max_concurrency: int = 4) -> tuple[ToolResult, ...]:
+        """Execute independent calls concurrently while preserving input order."""
+        requests = tuple(calls)
+        if max_concurrency < 1 or max_concurrency > 64:
+            raise ValueError("max_concurrency must be between 1 and 64.")
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def run(request: ToolCallRequest) -> ToolResult:
+            async with semaphore:
+                return await self.dispatcher.execute(
+                    request, session_id=session_id,
+                    granted_capabilities=granted_capabilities)
+
+        return tuple(await asyncio.gather(*(run(request) for request in requests)))
 
     def install_filesystem_tools(self, root_dir: str | Path, *,
                                  max_file_bytes: int = 2_000_000) -> None:
