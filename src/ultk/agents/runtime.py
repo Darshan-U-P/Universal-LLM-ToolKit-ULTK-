@@ -1,4 +1,4 @@
-"""Bounded provider-neutral tool-calling loop."""
+"""Bounded provider-neutral tool-calling loop with host context and lifecycle events."""
 
 from __future__ import annotations
 
