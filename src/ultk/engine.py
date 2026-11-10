@@ -345,9 +345,13 @@ class ToolEngine:
         at the configured user-message intervals. Set either interval to None to disable
         that automatic hook; the explicit memory intelligence tools remain available.
         """
+        import sqlite3
+
         from ultk.builtins.memory import PersistentMemory, create_memory_tools
+        from ultk.exceptions import ToolExecutionError
         from ultk.builtins.memory_intelligence import (
-            MemoryIntelligence, create_memory_intelligence_tools,
+            MemoryIntelligence,
+            create_memory_intelligence_tools,
         )
 
         for name, interval in (
@@ -383,14 +387,14 @@ class ToolEngine:
                     outcome["extraction"] = intelligence.extract_context(
                         session_id=session_id, limit=min(max_context_entries, 200),
                     )
-                except Exception as exc:
+                except (ToolExecutionError, sqlite3.Error) as exc:
                     outcome["extraction_error"] = type(exc).__name__
             if summarizer is not None and auto_summarize_every and user_messages % auto_summarize_every == 0:
                 try:
                     outcome["summary"] = intelligence.summarize_context(
                         session_id=session_id, limit=min(max_context_entries, 200),
                     )
-                except Exception as exc:
+                except (ToolExecutionError, sqlite3.Error) as exc:
                     outcome["summary_error"] = type(exc).__name__
             return outcome
 
