@@ -85,15 +85,18 @@ class ToolEngine:
 
     async def execute(self, name: str, arguments: dict[str, Any], *,
                       session_id: str = "default",
-                      granted_capabilities: frozenset[str] = frozenset()) -> ToolResult:
+                      granted_capabilities: frozenset[str] = frozenset(),
+                      metadata: Mapping[str, Any] | None = None) -> ToolResult:
         request = ToolCallRequest(id=uuid.uuid4().hex, name=name, arguments=arguments)
         return await self.dispatcher.execute(
-            request, session_id=session_id, granted_capabilities=granted_capabilities)
+            request, session_id=session_id,
+            granted_capabilities=granted_capabilities, metadata=metadata)
 
     async def execute_many(self, calls: Iterable[ToolCallRequest], *,
                            session_id: str = "default",
                            granted_capabilities: frozenset[str] = frozenset(),
-                           max_concurrency: int = 4) -> tuple[ToolResult, ...]:
+                           max_concurrency: int = 4,
+                           metadata: Mapping[str, Any] | None = None) -> tuple[ToolResult, ...]:
         """Execute independent calls concurrently while preserving input order."""
         requests = tuple(calls)
         if max_concurrency < 1 or max_concurrency > 64:
@@ -104,7 +107,8 @@ class ToolEngine:
             async with semaphore:
                 return await self.dispatcher.execute(
                     request, session_id=session_id,
-                    granted_capabilities=granted_capabilities)
+                    granted_capabilities=granted_capabilities,
+                    metadata=metadata)
 
         return tuple(await asyncio.gather(*(run(request) for request in requests)))
 
