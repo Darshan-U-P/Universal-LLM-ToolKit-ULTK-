@@ -348,11 +348,11 @@ class ToolEngine:
         import sqlite3
 
         from ultk.builtins.memory import PersistentMemory, create_memory_tools
-        from ultk.exceptions import ToolExecutionError
         from ultk.builtins.memory_intelligence import (
             MemoryIntelligence,
             create_memory_intelligence_tools,
         )
+        from ultk.exceptions import ToolExecutionError
 
         for name, interval in (
             ("auto_extract_every", auto_extract_every),
