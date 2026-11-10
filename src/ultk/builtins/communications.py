@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from email.message import EmailMessage
-from email.utils import make_msgid, parseaddr
 import os
 import re
 import smtplib
 import ssl
+from collections.abc import Iterable
+from email.message import EmailMessage
+from email.utils import make_msgid, parseaddr
 from typing import Any
 
 from ultk.builtins._common import FunctionTool, object_schema
