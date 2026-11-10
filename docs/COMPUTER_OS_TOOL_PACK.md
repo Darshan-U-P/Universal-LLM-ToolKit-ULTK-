@@ -26,7 +26,7 @@ The filesystem root confines metadata and POSIX permission operations. Service m
 |---|---|
 | Persistent desktop contexts | Create, update, inspect, list and close SQLite-backed logical desktop sessions |
 | Displays | Enumerate monitor geometry with screeninfo; primary-display fallback |
-| Windows | Enumerate, move, resize, maximize, minimize, restore, activate, close, snap and arrange windows |
+| Windows / Wayland windows | Enumerate, move, resize, maximize, minimize, restore, activate, close, snap and arrange windows; Sway IPC handles Wayland window/workspace operations and is integrated into generic window placement actions |
 | Virtual desktops | Windows current/create/switch through optional pyvda; Linux X11 list/switch through wmctrl; Sway workspace list/current/create/switch through compositor IPC |
 | Keyboard | Allowlisted shortcuts and prevalidated bounded key/type/wait sequences |
 | Accessibility | Windows UI Automation inspection and click; Linux AT-SPI inspection and exact accessible-name action invocation; macOS Accessibility API inspection and AXPress invocation |
@@ -45,7 +45,7 @@ Install the optional platform extra:
 
     pip install "universal-llm-toolkit[computer-os]"
 
-It includes PyWinCtl, PyAutoGUI, screeninfo and platform-marked pywinauto, pyvda or pyudev dependencies. Linux AT-SPI also requires the system accessibility stack and its Python bindings. Native commands such as systemctl, wmctrl, journalctl, wevtutil, pnputil and system_profiler are provided by the operating system.
+It includes PyWinCtl, PyAutoGUI, screeninfo and platform-marked pywinauto, pyvda, pyudev or PyObjC framework dependencies. Linux AT-SPI also requires the system accessibility stack and its Python bindings. Sway support requires an active Sway session, its SWAYSOCK IPC environment variable and swaymsg. Native commands such as systemctl, wmctrl, journalctl, wevtutil, pnputil and system_profiler are provided by the operating system.
 
 ## Session semantics
 
@@ -62,7 +62,7 @@ Event watches are durable watch definitions. They do not start background daemon
 ## Security boundaries
 
 - Model input is never passed to a shell. Native commands use fixed executable arguments with shell=False; subprocess environment is restricted to required OS, user-session and display-session variables; no model-supplied environment is accepted.
-- Window selectors must uniquely identify one window. UIA clicks require an exact automation ID and enabled/visible control.
+- Window selectors must uniquely identify one window. UIA clicks require an exact automation ID and enabled/visible control. Linux AT-SPI and macOS AX actions require an exact unique accessible name/identifier; macOS additionally requires the host process to have Accessibility permission. Sway actions use compositor container IDs after unique title matching.
 - Keyboard shortcuts and sequences have key, step, text and delay bounds. Desktop automation can still trigger consequential actions in the foreground application; use narrow capabilities and host approval.
 - Service mutations require an exact host-configured allowlist. The host must require approval for stop/restart/start operations.
 - Filesystem metadata and permission changes are confined to a host-configured root. Symlinks are rejected for chmod/chown. Path checks do not eliminate filesystem TOCTOU races; this is not an OS sandbox.
