@@ -117,8 +117,17 @@ class BrowserControlPlane:
             db.execute("INSERT INTO profiles(name,created,last_used,tabs,active_tab) VALUES (?,?,?,?,0)",
                        (name, now, now, "[]"))
         target = self._profile_path(name)
-        if source is not None and source.is_dir():
-            shutil.copytree(source, target, dirs_exist_ok=True)
+        try:
+            if source is not None:
+                if not source.is_dir():
+                    raise ToolExecutionError("Source browser profile data is missing.")
+                shutil.copytree(source, target, dirs_exist_ok=True)
+        except Exception:
+            with sqlite3.connect(self.db_path) as db:
+                db.execute("DELETE FROM profiles WHERE name=?", (name,))
+            if target.exists():
+                shutil.rmtree(target, ignore_errors=True)
+            raise
         return {"profile": name, "created": True, "cloned": clone_from is not None}
 
     def list_profiles(self):
@@ -500,7 +509,8 @@ class BrowserControlPlane:
                     with temporary.open("rb") as handle:
                         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                             digest.update(chunk)
-                    os.replace(temporary, target)
+                    os.link(temporary, target)
+                    temporary.unlink()
                 finally:
                     if temporary.exists():
                         temporary.unlink()
