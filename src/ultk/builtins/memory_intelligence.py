@@ -8,9 +8,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sqlite3
 import time
 from collections import defaultdict
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from ultk.builtins._common import object_schema
 from ultk.builtins.memory import MemoryTool, PersistentMemory, _fingerprint, _metadata
@@ -256,7 +258,7 @@ class MemoryIntelligence:
             for memory_id in source_ids:
                 if self.store.forget(session_id, memory_id)["forgotten"]:
                     deleted += 1
-        except Exception:
+        except (ToolExecutionError, sqlite3.Error, OSError):
             # The replacement is durable; retaining any source is safer than data loss.
             return {"consolidated": True, "summary_memory_id": created["memory_id"],
                     "source_records_deleted": deleted, "source_records_retained": len(source_ids) - deleted}
