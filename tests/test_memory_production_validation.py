@@ -97,8 +97,7 @@ def test_memory_scale_smoke_1500_records_and_bounded_recall(tmp_path):
     result = store.recall("load-session", "subsystem 7 component 14", limit=20)
     assert result["count"] > 0
     assert result["count"] <= 20
-    diagnostics = store
-    with diagnostics.db() as connection:
+    with store.db() as connection:
         count = connection.execute(
             "SELECT COUNT(*) FROM memory_items WHERE ns=?", ("scale",)
         ).fetchone()[0]
