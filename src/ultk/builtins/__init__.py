@@ -9,6 +9,10 @@ from ultk.builtins.computer_os import create_computer_os_tools
 from ultk.builtins.computer_vision import create_computer_vision_tools
 from ultk.builtins.computer_visual import create_computer_visual_tools
 from ultk.builtins.database import create_database_tools
+from ultk.builtins.data import create_data_tools
+from ultk.builtins.integrations import create_rest_tools
+from ultk.builtins.media import create_media_tools
+from ultk.builtins.communications import create_email_tools
 from ultk.builtins.development import create_development_tools
 from ultk.builtins.development_advanced import create_advanced_development_tools
 from ultk.builtins.documents import create_document_tools
@@ -34,6 +38,10 @@ __all__ = [
     "create_computer_vision_tools",
     "create_computer_visual_tools",
     "create_database_tools",
+    "create_data_tools",
+    "create_email_tools",
+    "create_media_tools",
+    "create_rest_tools",
     "create_development_tools",
     "create_document_tools",
     "create_filesystem_tools",
