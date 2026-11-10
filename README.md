@@ -318,5 +318,15 @@ approval for sensitive writes. See [Database Integrations](docs/DATABASE_INTEGRA
 ULTK now includes an optional SQLite-backed memory pack with session-scoped working context,
 long-term episodic/semantic/procedural records, namespace isolation, hybrid vector/lexical recall,
 update/forget operations and duplicate consolidation. The host binds a memory namespace to the
-authenticated user and can inject a trusted semantic embedding callable. See
+authenticated user and can inject trusted embedding, extraction and summarization callables. See
 [Persistent Memory](docs/PERSISTENT_MEMORY.md) for installation, capabilities and privacy boundaries.
+
+
+### Automatic and intelligent memory
+
+`ToolEngine.install_memory_tools(...)` also accepts trusted host `extractor` and
+`summarizer` callables. These enable context-to-memory extraction, conversation summaries,
+fact/decision capture, conservative high-similarity consolidation and SQLite integrity
+diagnostics. The host controls consent, model selection and scheduling; ULTK validates outputs
+and records provenance. See [Persistent Memory](docs/PERSISTENT_MEMORY.md) for adapter
+contracts and production-validation requirements.
