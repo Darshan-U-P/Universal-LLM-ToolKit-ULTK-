@@ -711,6 +711,143 @@ class BrowserControlPlane:
                     "steps_completed":len(results),"results":results}
         return self._with_context(profile,run)
 
+    def workflow(self, profile: str, steps: list[dict[str, Any]]):
+        if not isinstance(steps, list) or not 1 <= len(steps) <= 30:
+            raise ToolExecutionError("Browser profile workflow must contain 1-30 steps.")
+        allowed_keys = {
+            "Enter", "Tab", "Escape", "ArrowUp", "ArrowDown", "ArrowLeft",
+            "ArrowRight", "Backspace", "Delete",
+        }
+        prepared: list[dict[str, Any]] = []
+        for index, step in enumerate(steps):
+            if not isinstance(step, dict):
+                raise ToolExecutionError(f"Workflow step {index} must be an object.")
+            action = step.get("action")
+            item = {"action": action}
+            if action in {"navigate", "new_tab"}:
+                item["url"] = _url(step.get("url", ""))
+            elif action in {"click", "expect_visible"}:
+                selector = step.get("selector", "")
+                if not isinstance(selector, str) or not selector or len(selector) > 500:
+                    raise ToolExecutionError(f"Workflow step {index} needs a bounded selector.")
+                item["selector"] = selector
+            elif action in {"fill", "type"}:
+                selector = step.get("selector", "")
+                value = step.get("value")
+                limit = 5000 if action == "fill" else 2000
+                if not isinstance(selector, str) or not selector or len(selector) > 500:
+                    raise ToolExecutionError(f"Workflow step {index} needs a bounded selector.")
+                if not isinstance(value, str) or len(value) > limit:
+                    raise ToolExecutionError(f"Workflow step {index} has an invalid text value.")
+                item.update({"selector": selector, "value": value})
+            elif action == "press":
+                selector = step.get("selector", "")
+                key = step.get("key")
+                if not isinstance(selector, str) or not selector or len(selector) > 500 or key not in allowed_keys:
+                    raise ToolExecutionError(f"Workflow step {index} has an invalid key target.")
+                item.update({"selector": selector, "key": key})
+            elif action in {"select_tab", "close_tab"}:
+                tab_index = step.get("index")
+                if type(tab_index) is not int or not 0 <= tab_index < self.max_tabs:
+                    raise ToolExecutionError(f"Workflow step {index} has an invalid tab index.")
+                item["index"] = tab_index
+            elif action == "wait":
+                milliseconds = step.get("milliseconds", 0)
+                if type(milliseconds) is not int or not 100 <= milliseconds <= 5000:
+                    raise ToolExecutionError(f"Workflow step {index} wait must be 100-5000 ms.")
+                item["milliseconds"] = milliseconds
+            elif action == "expect_text":
+                expected = step.get("text")
+                if not isinstance(expected, str) or not expected or len(expected) > 1000:
+                    raise ToolExecutionError(f"Workflow step {index} has invalid expected text.")
+                item["text"] = expected
+            elif action == "expect_url":
+                expected = step.get("contains")
+                if not isinstance(expected, str) or not expected or len(expected) > 500:
+                    raise ToolExecutionError(f"Workflow step {index} has an invalid URL assertion.")
+                item["contains"] = expected
+            elif action != "snapshot":
+                raise ToolExecutionError(f"Workflow step {index} uses an unsupported action.")
+            prepared.append(item)
+
+        def run(ctx, pages, active):
+            active_index = active
+            results = []
+            for index, step in enumerate(prepared):
+                action = step["action"]
+                if action == "new_tab":
+                    if len(ctx.pages) >= self.max_tabs:
+                        raise ToolExecutionError("Browser tab limit reached during workflow.")
+                    page = ctx.new_page()
+                    page.goto(step["url"], wait_until="domcontentloaded", timeout=25000)
+                    _url(page.url)
+                    active_index = ctx.pages.index(page)
+                    result = {"url": page.url, "tab_index": active_index}
+                elif action == "select_tab":
+                    if step["index"] >= len(ctx.pages):
+                        raise ToolExecutionError("Workflow selected a tab that does not exist.")
+                    active_index = step["index"]
+                    result = {"tab_index": active_index}
+                elif action == "close_tab":
+                    if len(ctx.pages) == 1:
+                        raise ToolExecutionError("Cannot close the only browser tab.")
+                    if step["index"] >= len(ctx.pages):
+                        raise ToolExecutionError("Workflow closed a tab that does not exist.")
+                    ctx.pages[step["index"]].close()
+                    if step["index"] < active_index:
+                        active_index -= 1
+                    elif step["index"] == active_index:
+                        active_index = min(step["index"], len(ctx.pages) - 1)
+                    result = {"closed_tab": step["index"], "active_tab": active_index}
+                else:
+                    page = ctx.pages[active_index]
+                    if action == "navigate":
+                        page.goto(step["url"], wait_until="domcontentloaded", timeout=25000)
+                        _url(page.url)
+                        result = {"url": page.url}
+                    elif action == "click":
+                        page.locator(step["selector"]).first.click(timeout=10000)
+                        result = {"url": page.url}
+                    elif action == "fill":
+                        page.locator(step["selector"]).first.fill(step["value"], timeout=10000)
+                        result = {"url": page.url}
+                    elif action == "type":
+                        page.locator(step["selector"]).first.press_sequentially(step["value"], timeout=10000)
+                        result = {"url": page.url}
+                    elif action == "press":
+                        page.locator(step["selector"]).first.press(step["key"], timeout=10000)
+                        result = {"url": page.url}
+                    elif action == "wait":
+                        page.wait_for_timeout(step["milliseconds"])
+                        result = {"waited_ms": step["milliseconds"]}
+                    elif action == "snapshot":
+                        result = {
+                            "url": page.url,
+                            "title": page.title(),
+                            "text": page.locator("body").inner_text(timeout=5000)[:8000],
+                        }
+                    elif action == "expect_text":
+                        body = page.locator("body").inner_text(timeout=5000)
+                        if step["text"] not in body:
+                            raise ToolExecutionError(f"Workflow step {index} expected text was not present.")
+                        result = {"assertion": "text_present", "passed": True}
+                    elif action == "expect_visible":
+                        if not page.locator(step["selector"]).first.is_visible(timeout=5000):
+                            raise ToolExecutionError(f"Workflow step {index} expected element was not visible.")
+                        result = {"assertion": "visible", "passed": True}
+                    else:
+                        if step["contains"] not in page.url:
+                            raise ToolExecutionError(f"Workflow step {index} URL assertion failed.")
+                        result = {"assertion": "url_contains", "passed": True}
+                results.append({"step": index, "action": action, **result})
+            return {
+                "steps_completed": len(results),
+                "results": results,
+                "_active_page": ctx.pages[active_index],
+            }
+
+        return self._with_context(profile, run)
+
     def list_extensions(self):
         return {"extensions":[{"name":path.name,"manifest_present":(path/"manifest.json").is_file()}
                               for path in self.extension_dirs],
@@ -800,6 +937,9 @@ def create_comprehensive_browser_tools(
           "message":{"type":"string","maxLength":4000},"timeout_ms":{"type":"integer","minimum":500,"maximum":10000}},
           ["profile","url","message"]),"browser:websocket:interact",
         lambda profile,url,message,timeout_ms=5000:b.websocket_probe(profile,url,message,timeout_ms),timeout=20),
+      FunctionTool("browser.profile_workflow","Run a prevalidated bounded multi-tab workflow using navigation, interaction, waits and assertions.",
+        object_schema({"profile":p,"steps":{"type":"array","minItems":1,"maxItems":30,"items":{"type":"object"}}},
+          ["profile","steps"]),"browser:workflow",lambda profile,steps:b.workflow(profile,steps),timeout=90),
       FunctionTool("browser.test_run","Run a bounded browser application test with navigation, interaction and assertions.",
         object_schema({"profile":p,"steps":{"type":"array","minItems":1,"maxItems":30,"items":{"type":"object"}}},
           ["profile","steps"]),"browser:test:run",lambda profile,steps:b.run_test(profile,steps),timeout=90),
