@@ -237,3 +237,17 @@ This complements OCR and semantic browser locators; it is template matching, not
 object detection. Install with `pip install -e '.[computer-vision]'` and enable through
 `ToolEngine.install_computer_vision_tools(template_root=...)`. See
 [Image-Template Computer Vision](docs/COMPUTER_VISION_AUTOMATION.md).
+
+
+## AI visual grounding
+
+The desktop automation packs can also use an injected vision-model adapter to locate controls from
+natural-language descriptions, without a saved template image. The host adapter receives bounded
+PNG screenshot bytes and a target description, then returns candidate bounding boxes and
+backend-reported confidence values. ULTK validates the candidates and clicks only when exactly one
+candidate exceeds the configured threshold. No model provider or model weights are bundled.
+Install desktop dependencies with `pip install -e '.[computer]'`, provide a trusted
+`grounder` callable, and enable it through
+`ToolEngine.install_computer_grounding_tools(grounder=...)`. See
+[AI Visual Grounding](docs/AI_VISUAL_GROUNDING.md) for the adapter contract, privacy boundary and
+safety limits.
