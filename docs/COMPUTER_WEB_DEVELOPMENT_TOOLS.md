@@ -49,8 +49,12 @@ Requests are restricted to HTTP(S), reject credentials in URLs, block resolved n
 addresses, limit response sizes, and validate redirect destinations. This is defense in depth,
 not a complete SSRF boundary: DNS rebinding, unusual proxy/network configurations, browser
 subresources, and future implementation changes require additional network-level egress controls.
-The current browser tool is a read-oriented page-open operation, not a general click/type/form
-automation engine. Website monitoring and persistent change alerts are not yet implemented.
+The advanced browser pack supports persistent storage-backed sessions, navigation, selector-based
+click/fill/type/press/submit, page snapshots and bounded workflows. The semantic browser pack adds
+accessible-role/label/text/placeholder/alt/test-id targeting, interactive-control inspection and
+bounded waits; see [Semantic Browser Automation](SEMANTIC_BROWSER_AUTOMATION.md). The DOM-derived
+name inspection is not a full accessibility tree. Website monitoring and persistent change alerts
+are implemented separately by the advanced browser pack.
 Search results depend on the public search endpoint and may change format.
 
 ## Development

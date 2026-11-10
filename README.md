@@ -212,3 +212,17 @@ boundaries, and validation status.
 ## Visual computer automation
 
 The computer tool packs now include an optional OCR-backed visual interaction layer. It can inspect visible text and bounding boxes, find exact text lines, click only unique matches, wait for text, scroll, drag, and execute bounded prevalidated visual workflows. Install it with `ToolEngine.install_computer_visual_tools()`; the host must separately install the Tesseract binary and required language data. See [Visual Computer Automation](docs/COMPUTER_VISUAL_AUTOMATION.md).
+
+
+## Semantic browser automation
+
+The optional semantic browser pack builds on the persistent Playwright browser sessions. It can inspect
+visible page text and interactive controls, then target controls by accessible role/name, label,
+visible text, placeholder, alt text or test ID. Actions require exactly one matching element and
+are bounded to a fixed action/key allowlist. It also supports bounded waits for semantic targets.
+
+Install Playwright with `pip install -e '.[browser]'` and run `playwright install chromium`.
+Enable it with `ToolEngine.install_semantic_browser_tools()`. The existing
+`install_advanced_browser_tools()` remains available for selector-based interactions and bounded
+browser workflows. See [Semantic Browser Automation](docs/SEMANTIC_BROWSER_AUTOMATION.md).
+

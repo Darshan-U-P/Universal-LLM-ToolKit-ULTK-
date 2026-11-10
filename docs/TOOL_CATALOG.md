@@ -6,7 +6,7 @@ This is a planned taxonomy, not an implementation inventory. Each tool must be i
 |---|---|
 | Core | provider/model discovery, registry, schemas, dispatch, retries, telemetry |
 | Computer/OS | filesystem, process management, terminal, clipboard, persistent desktop sessions, multi-monitor/window/virtual desktop control, keyboard and accessibility automation, OCR text recognition and targeting, scrolling, dragging, bounded visual GUI workflows |
-| Web | search, URL fetch, browser, scraper, downloads, monitoring |
+| Web | search, URL fetch, headless browser sessions, accessible DOM inspection and interaction, bounded browser workflows, scraper, downloads, monitoring |
 | Development | editor, isolated code runner, compiler, debugger, tests, Git, API testing |
 | Data | SQL/NoSQL, CSV/XLSX, JSON/XML, ETL, vector DB, visualization |
 | Documents | PDF, DOCX, PPTX, XLSX, OCR, conversion, document search |

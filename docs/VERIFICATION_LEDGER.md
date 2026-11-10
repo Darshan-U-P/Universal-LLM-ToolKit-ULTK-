@@ -282,3 +282,23 @@ The provider and plugin branches extend the REST integration branch; media exten
   Ruff passed. The only failures in earlier runs were corrected: the configured OCR line cap now
   supplies the default, the aggregate-wait test exceeds the limit it asserts, and two unused-code
   lint findings were removed. Platform-specific GUI/Tesseract integration tests remain pending.
+
+
+## Semantic browser automation increment
+
+- Branch: feat/semantic-browser-automation
+- Base: feat/visual-computer-automation (PR #11 head).
+- Added src/ultk/builtins/browser_semantic.py with bounded interactive-control inspection,
+  accessible-role/label/text/placeholder/alt/test-id targeting, unique-match interaction, and
+  bounded semantic target waits.
+- Added ToolEngine.install_semantic_browser_tools, the public factory export, focused unit tests,
+  and docs/SEMANTIC_BROWSER_AUTOMATION.md. Reuses the existing Playwright session and network guard.
+- Authored tests cover registration, engine integration, exact semantic locators, ambiguity/missing
+  target fail-closed behavior, action/key validation and wait bounds. CI must be run after PR creation.
+- The inspection name is a DOM-derived approximation rather than a complete browser accessibility
+  tree. Platform/browser behavior and live-site workflows still require integration testing.
+- Browser session calls reopen Chromium per invocation and restore storage plus the last URL; live
+  browser-process state and multiple tabs are not persisted.
+- This increment does not add CAPTCHA solving, anti-bot evasion, frame targeting, upload/download
+  flows, browser extensions or network egress isolation. URL validation is not a complete SSRF
+  boundary; enforce host/network-level egress controls.
