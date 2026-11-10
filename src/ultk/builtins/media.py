@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 import subprocess
 import tempfile
-import uuid
-from pathlib import Path
 from typing import Any
+import uuid
 
 from ultk.builtins._common import FunctionTool, object_schema
 from ultk.exceptions import ToolExecutionError
@@ -55,7 +55,7 @@ def _image_open(root: Path, relative_path: str, max_bytes: int, max_pixels: int)
         image.load()
     except ToolExecutionError:
         raise
-    except Exception as exc:  # noqa: BLE001 - normalize malformed image parser failures
+    except Exception as exc:
         raise ToolExecutionError(
             f"Image could not be decoded ({type(exc).__name__})."
         ) from exc
