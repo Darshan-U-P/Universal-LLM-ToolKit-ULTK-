@@ -90,7 +90,7 @@ def test_plugin_api_version_mismatch_fails_before_registration() -> None:
 def test_plugin_tools_must_use_plugin_namespace() -> None:
     wrong_tool = FunctionTool(
         "other.current", "Wrong namespace", object_schema({}),
-        "other:read", lambda: {},
+        "other:read", dict,
     )
     definition = PluginDefinition(
         PluginManifest("weather", "1.0.0", "Weather tools"),
