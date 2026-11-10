@@ -226,3 +226,28 @@ The provider and plugin branches extend the REST integration branch; media exten
 - Known limitations: macOS accessibility element invocation and virtual-desktop control are
   not implemented; Linux Wayland global input/window control depends on compositor support;
   Windows safe USB eject and some OS-administration operations remain outside this increment.
+
+
+## Durable workflow orchestration increment
+
+- Branch: feat/durable-workflow-orchestration
+- Base: feat/multi-monitor-cross-platform-desktop-automation (PR #9 head).
+- Added a persistent SQLite workflow DAG engine in src/ultk/orchestration.py.
+- Supports explicit dependency edges, ancestor-only JSON Pointer output references, bounded parallel
+  execution, bounded exponential retries, dependency-failure skips, fail-fast, cooperative
+  cancellation, step/run checkpoints, event history, recovery of orphaned in-flight steps, and
+  re-execution from a saved definition.
+- Integrated through ToolEngine.create_workflow_engine and public WorkflowStep/WorkflowEngine exports.
+- Added tests/test_orchestration.py and docs/WORKFLOW_ORCHESTRATION.md.
+- Tests, Ruff, mypy, packaging, and CI intentionally not executed; all implementation remains
+  unverified until the consolidated validation campaign.
+- Recovery is at-least-once. A crash after an external side effect but before checkpoint persistence
+  can cause a repeated tool call. Exactly-once side effects and distributed worker leasing are not
+  implemented. Recovery must only be run after the prior worker is stopped.
+- Cancellation is cooperative between workflow scheduling batches; in-flight tools finish under
+  their own dispatcher timeout. Replay creates a fresh run and re-executes tools; it is not
+  deterministic playback or rollback.
+- Verify DAG cycle and unknown-reference validation, JSON Pointer escaping/indexes, step and
+  concurrency bounds, dependency skip/fail-fast semantics, retry persistence/backoff, concurrent
+  cancellation, crash recovery, replay definition fidelity, SQLite locking/corruption/disk-full,
+  secret-bearing argument/output storage, and multiple simultaneous workflow runners.
