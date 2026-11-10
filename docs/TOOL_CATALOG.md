@@ -49,3 +49,16 @@ vector search remain separate capabilities.
 Implemented as an optional pack through \`ToolEngine.install_database_tools(profiles=...)\`.
 See [Database Integrations](DATABASE_INTEGRATIONS.md) for profile configuration, tool
 names, optional drivers, capabilities and security boundaries.
+
+## Persistent memory
+
+Implemented as an optional pack through `ToolEngine.install_memory_tools(...)`. Provides bounded
+session context, episodic/semantic/procedural memory, namespace isolation, hybrid vector/lexical
+recall, updates, deletion and duplicate consolidation. See [Persistent Memory](PERSISTENT_MEMORY.md).
+
+
+The memory pack additionally exposes `memory.extract_context`,
+`memory.summarize_context`, `memory.consolidate_related` and `memory.diagnostics` when
+installed through `ToolEngine.install_memory_tools(...)`. Extraction and summarization require
+trusted host adapters; outputs are bounded, validated and provenance-tagged. See
+[Persistent Memory](PERSISTENT_MEMORY.md).

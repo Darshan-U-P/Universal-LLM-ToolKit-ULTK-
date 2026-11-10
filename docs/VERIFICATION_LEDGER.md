@@ -461,3 +461,60 @@ The provider and plugin branches extend the REST integration branch; media exten
   TLS/authentication variants, driver/version matrix, transaction isolation and rollback
   behavior on remote engines, and Windows/macOS integration. Use least-privilege service
   accounts and network egress controls; the Python pack is not an OS/network sandbox.
+
+
+## Persistent memory — branch feat/persistent-memory-system
+
+- Base: feat/database-integrations (PR #19 head ead3c3f9fc12d92e001a3ad538c1fb91e4f715bb).
+- Added src/ultk/builtins/memory.py with SQLite persistence, host-fixed namespace isolation,
+  dispatcher-injected session identity, role-tagged bounded working context, episodic/semantic/
+  procedural records, hybrid lexical/vector retrieval, update, hard-delete and exact duplicate
+  consolidation.
+- Added ToolEngine.install_memory_tools(...) and exported create_memory_tools.
+- Added tests/test_memory_tools.py and docs/PERSISTENT_MEMORY.md; README and tool catalog updated.
+- Built-in offline feature-hash vectors provide cosine similarity without model downloads. A trusted
+  host-injected embedder callable enables semantic vectors. The default vectors are lexical features,
+  not semantic model embeddings.
+- Memory capabilities are separated into context read/write/delete, memory read/write/delete and
+  maintenance. User namespace is fixed by host configuration; session IDs come only from ToolContext.
+- Tests and CI for this increment are pending. Do not infer a passing result from PR #19 CI.
+- Deferred verification: full suite/Ruff, multi-process SQLite contention, database corruption and
+  disk-full behavior, backup/restore, concurrent context appends, embedding dimension mismatch,
+  external embedder failures, recall ranking quality, namespace routing in a multi-user host,
+  retention/deletion across WAL and backups, and Windows/macOS filesystem behavior.
+- Boundaries: no automatic LLM-turn ingestion, autonomous memory extraction, summarization-based
+  consolidation, automatic forgetting/decay deletion, distributed vector index or managed backup.
+  The host agent must decide what to append and remember; use an authenticated namespace router.
+
+
+### Persistent memory intelligence extension — branch feat/persistent-memory-system
+
+- Added `src/ultk/builtins/memory_intelligence.py` with host-adapted extraction, conversation
+  summarization, fact/decision capture, conservative similarity-based consolidation and SQLite
+  integrity diagnostics.
+- Added tools `memory.extract_context`, `memory.summarize_context`,
+  `memory.consolidate_related` and `memory.diagnostics`; wired trusted extractor and summarizer
+  callables into `ToolEngine.install_memory_tools(...)`. Host owns model selection, consent and
+  scheduling.
+- Extraction rejects low-confidence/invalid candidates, filters likely credential strings, skips
+  exact duplicates and stores provenance. Summaries preserve session/message provenance. Related
+  consolidation requires same kind/scope and high vector similarity; it writes the replacement
+  before attempting source deletion.
+- SQLite now uses a 30-second busy timeout and immediate transactions for concurrent context
+  sequence allocation and capacity-checked memory writes.
+- Added `tests/test_memory_intelligence.py` for extraction, duplicate rejection, provenance,
+  summarization, consolidation, diagnostics and concurrent writers. CI status remains pending
+  until the workflow associated with the latest head commit completes.
+- Remaining production qualification: real embedding quality/recall benchmarks, multiprocess
+  load tests, backup/restore, disk-full/corruption recovery, WAL/backup erasure, Windows/macOS
+  behavior, and host multi-tenant identity routing. SQLite is not multi-host storage.
+
+
+- Added conservative conflict handling: the summarizer may return a bounded `conflicts` list; when
+  non-empty, ULTK retains source memories and reports the conflict instead of deleting records.
+- Added `benchmarks/benchmark_memory.py`, a repeatable temporary-database benchmark for up to one
+  million records, concurrent writers, query throughput and latency percentiles, database size and
+  SQLite integrity. Production deployment thresholds still require testing on target hardware,
+  storage and the selected embedding adapter.
+- Current test and Ruff status is tracked by the latest GitHub Actions run; do not treat earlier
+  failing runs as current validation after subsequent fixes.

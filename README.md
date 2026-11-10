@@ -2,7 +2,7 @@
 
 A provider-independent, extensible tool execution framework for compatible large language models.
 
-**Status:** Architecture and foundation stage. This repository describes the target architecture and roadmap; it does not yet contain a production agent runtime or the complete tool catalog.
+**Status:** Active implementation. The repository contains the provider-independent runtime and incrementally delivered, capability-gated tool packs; the full target catalog and production deployment hardening are still in progress.
 
 ## Vision
 
@@ -310,3 +310,23 @@ MongoDB executable operators are rejected, and Redis keys are confined to a host
 prefix. Mutating capabilities remain separate from reads. These controls are not a network or
 database sandbox: configure least-privilege database users, TLS, firewall rules, and human
 approval for sensitive writes. See [Database Integrations](docs/DATABASE_INTEGRATIONS.md).
+
+
+
+## Persistent memory
+
+ULTK now includes an optional SQLite-backed memory pack with session-scoped working context,
+long-term episodic/semantic/procedural records, namespace isolation, hybrid vector/lexical recall,
+update/forget operations and duplicate consolidation. The host binds a memory namespace to the
+authenticated user and can inject trusted embedding, extraction and summarization callables. See
+[Persistent Memory](docs/PERSISTENT_MEMORY.md) for installation, capabilities and privacy boundaries.
+
+
+### Automatic and intelligent memory
+
+`ToolEngine.install_memory_tools(...)` also accepts trusted host `extractor` and
+`summarizer` callables. These enable context-to-memory extraction, conversation summaries,
+fact/decision capture, conservative high-similarity consolidation and SQLite integrity
+diagnostics. The host controls consent, model selection and scheduling; ULTK validates outputs
+and records provenance. See [Persistent Memory](docs/PERSISTENT_MEMORY.md) for adapter
+contracts and production-validation requirements.
