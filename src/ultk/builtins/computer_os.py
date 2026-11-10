@@ -963,7 +963,31 @@ def create_computer_os_tools(
     add("computer_os.list_windows", "List visible windows and geometry.", {}, [], "computer:window:read", pack.windows)
     add("computer_os.window_action", "Move, resize, maximize, minimize, restore, activate or close one uniquely selected window.", {"title_contains": selector, "action": {"type": "string", "enum": ["move", "resize", "maximize", "minimize", "restore", "activate", "close"]}, "x": {"type": "integer"}, "y": {"type": "integer"}, "width": {"type": "integer", "minimum": 100}, "height": {"type": "integer", "minimum": 100}}, ["title_contains", "action"], "computer:window:control", pack.window_action)
     add("computer_os.snap_window", "Snap one uniquely selected window to a half, quadrant or full monitor.", {"title_contains": selector, "monitor_index": {"type": "integer", "minimum": 0, "maximum": 15}, "position": {"type": "string", "enum": ["left", "right", "top", "bottom", "top_left", "top_right", "bottom_left", "bottom_right", "maximize"]}}, ["title_contains", "monitor_index", "position"], "computer:window:control", pack.snap_window)
-    add("computer_os.arrange_windows", "Arrange up to 16 uniquely selected windows within one monitor.", {"monitor_index": {"type": "integer", "minimum": 0, "maximum": 15}, "placements": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "object", "properties": {"title_contains": selector, "x": {"type": "integer", "minimum": 0}, "y": {"type": "integer", "minimum": 0}, "width": {"type": "integer", "minimum": 100}, "height": {"type": "integer", "minimum": 100}}, "required": ["title_contains", "x", "y", "width", "height"], "additionalProperties": False}}, ["monitor_index", "placements"], "computer:window:control", pack.arrange_windows)
+    add(
+        "computer_os.arrange_windows",
+        "Arrange up to 16 uniquely selected windows within one monitor.",
+        {
+            "monitor_index": {"type": "integer", "minimum": 0, "maximum": 15},
+            "placements": {
+                "type": "array", "minItems": 1, "maxItems": 16,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title_contains": selector,
+                        "x": {"type": "integer", "minimum": 0},
+                        "y": {"type": "integer", "minimum": 0},
+                        "width": {"type": "integer", "minimum": 100},
+                        "height": {"type": "integer", "minimum": 100},
+                    },
+                    "required": ["title_contains", "x", "y", "width", "height"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        ["monitor_index", "placements"],
+        "computer:window:control",
+        pack.arrange_windows,
+    )
     add("computer_os.virtual_desktops", "List or switch Linux virtual desktops, or inspect/create/switch Windows virtual desktops where pyvda is installed.", {"action": {"type": "string", "enum": ["list", "current", "create", "switch"]}, "desktop_number": {"type": "integer", "minimum": 0}}, ["action"], "computer:desktop:control", pack.virtual_desktops)
     add("computer_os.keyboard_shortcut", "Send a bounded allowlisted keyboard shortcut.", {"keys": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "string"}}}, ["keys"], "computer:keyboard:shortcut", pack.keyboard_shortcut)
     add("computer_os.keyboard_sequence", "Execute a prevalidated bounded keyboard sequence of typing, keypresses, shortcuts and waits.", {"steps": {"type": "array", "minItems": 1, "maxItems": 30, "items": {"type": "object"}}}, ["steps"], "computer:keyboard:sequence", pack.keyboard_sequence, 45)
