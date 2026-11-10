@@ -357,3 +357,16 @@ The provider and plugin branches extend the REST integration branch; media exten
   incorrect; high-impact actions require host approval bound to the exact arguments and fresh
   screenshot context. Screenshots may contain sensitive content, and hosted adapters may transmit
   it externally.
+
+
+### Platform-specific desktop automation completion — branch feat/platform-desktop-automation-completion
+
+- Base: PR #14 visual-grounding head (commit 7add4ed8b92a6656449357db1a43abbc40ba6640).
+- Added macOS Accessibility API inspection and exact identifier/title AXPress invocation using PyObjC. The host process must be granted macOS Accessibility permission; calls fail closed when AX trust is not granted.
+- Added Linux AT-SPI exact accessible-name action invocation; ambiguous element names fail closed.
+- Added a Sway IPC backend for Linux Wayland window enumeration, unique-title activate/close/move/resize/fullscreen/restore actions, and workspace list/current/create/switch. Sway IPC socket and swaymsg must be available. This does not claim generic support for all Wayland compositors or global pointer/keyboard input.
+- Added Windows safe USB device ejection through Configuration Manager CM_Locate_DevNodeW and CM_Request_Device_EjectW, gated by exact host-configured device instance ID allowlist. Busy-device vetoes are returned; force removal is not attempted.
+- Added focused backend tests in tests/test_computer_os_platform_backends.py; tests and CI remain deferred under the current implementation-phase validation policy.
+- Added macOS PyObjC framework dependencies to the computer-os extra and updated the platform coverage documentation.
+- Still outside this desktop-automation increment: native macOS Spaces management (private APIs intentionally avoided), non-Sway Wayland compositor adapters and global Wayland input, recursive/inherited Windows ACL and owner changes, USB driver installation/configuration, isolated OS desktop sessions, and background event-monitor daemons. These require separate OS-specific design/privilege boundaries and are not represented as implemented.
+- Cross-platform native integration is not verified merely by unit tests. Validate on Windows 10/11, macOS with Accessibility permission, Linux X11, and Sway/Wayland before production use.
