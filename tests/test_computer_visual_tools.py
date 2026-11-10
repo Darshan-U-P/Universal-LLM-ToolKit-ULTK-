@@ -156,6 +156,7 @@ def test_desktop_workflow_enforces_combined_wait_budget(pack):
             {"action": "wait_text", "text": "Ready", "timeout_seconds": 10},
             {"action": "wait_text", "text": "Done", "timeout_seconds": 10},
             {"action": "wait", "seconds": 5},
+            {"action": "wait", "seconds": 1},
         ])
 
 
