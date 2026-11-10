@@ -1,12 +1,14 @@
 from __future__ import annotations
-# ruff: noqa: E401, E701, E702
-import asyncio, json
+import asyncio
+import json
 from pathlib import Path
+
 import pytest
+
 from ultk.builtins.memory import PersistentMemory, create_memory_tools
 from ultk.engine import ToolEngine
-from ultk.permissions import AllowListPolicy
 from ultk.exceptions import ToolExecutionError
+from ultk.permissions import AllowListPolicy
 
 def test_context_is_session_scoped_and_restart_safe(tmp_path:Path):
     db=tmp_path/"memory.sqlite3"; store=PersistentMemory(db,namespace="tenant-a")
