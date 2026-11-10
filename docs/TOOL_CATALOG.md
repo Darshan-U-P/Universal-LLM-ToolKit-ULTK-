@@ -8,8 +8,8 @@ This is a planned taxonomy, not an implementation inventory. Each tool must be i
 | Computer/OS | filesystem, process management, terminal, clipboard, persistent desktop sessions, multi-monitor/window/virtual desktop control, keyboard and accessibility automation, OCR text recognition and targeting, multi-scale image-template recognition, icon/control matching, unique-match clicking, scrolling, dragging, bounded visual GUI workflows, natural-language AI visual grounding, candidate-box inspection and unique-candidate clicking, native macOS/Linux accessibility actions, Sway Wayland window/workspace control, allowlisted Windows safe USB ejection |
 | Web | search, URL fetch, headless browser sessions, accessible DOM inspection and interaction, persistent Chromium profiles, tabs/popups/iframes, cookie management, structured scraping, authenticated downloads, bounded network/WebSocket inspection, CAPTCHA detection and human auth handoff, preview-fingerprinted approval-gated form submission, browser test assertions, persistent website monitoring |
 | Development | editor, isolated code runner, compiler, debugger, tests, Git status/log/diff, rebase/cherry-pick/revert, stash, linked worktrees, allowlisted submodules, conflict inspection/resolution, host-adapted pull-request review and merge |
-| Data | SQL/NoSQL, CSV/XLSX, JSON/XML, ETL, vector DB, visualization |
-| Documents | PDF, DOCX, PPTX, XLSX, OCR, conversion, document search |
+| Data | CSV/JSON/XML/XLSX table I/O, schema validation, filtering, selection, rename, sort, deduplication, joins, grouping/aggregation, safe derived columns and file-to-file ETL |
+| Documents | TXT/Markdown/PDF/DOCX/PPTX/XLSX/XLS/ODT/ODS discovery, metadata and text extraction; PDF merge and page extraction |
 | Communication | email, calendar, contacts, notifications, SMS, messaging |
 | Media | image, audio, speech, video, subtitles, media conversion |
 | AI/ML | embeddings, RAG, inference, datasets, evaluation, training, GPU inspection |
@@ -33,3 +33,12 @@ This is a planned taxonomy, not an implementation inventory. Each tool must be i
 Implemented as an optional pack via ToolEngine.install_advanced_git_tools. See
 [Advanced Git Operations](ADVANCED_GIT_OPERATIONS.md) for tool names, capability requirements,
 host adapter contract and safety boundaries. Tests are authored but validation is deferred.
+
+
+## Documents and structured-data packs
+
+Implemented as optional packs through `ToolEngine.install_document_tools(...)` and
+`ToolEngine.install_structured_data_tools(...)`. See
+[Documents and Structured Data](DOCUMENTS_AND_STRUCTURED_DATA.md). OCR, scanned-PDF recognition,
+layout-faithful conversion, document editing, database engines, streaming/distributed ETL and
+vector search remain separate capabilities.
