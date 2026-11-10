@@ -34,6 +34,9 @@ def _environment() -> dict[str, str]:
         env.pop(key, None)
     env["GIT_TERMINAL_PROMPT"] = "0"
     env["GIT_OPTIONAL_LOCKS"] = "0"
+    env["GIT_EDITOR"] = "true"
+    env["GIT_SEQUENCE_EDITOR"] = "true"
+    env["GIT_MERGE_AUTOEDIT"] = "no"
     return env
 
 
@@ -190,7 +193,7 @@ def _stash(root: str, action: str, *, message: str | None = None,
         if not _STASH_PATTERN.fullmatch(ref):
             raise ToolExecutionError("Stash reference must be stash or stash@{N}.")
         if action == "show":
-            args = ["stash", "show", "--stat", "--", ref]
+            args = ["stash", "show", "--stat", ref]
         elif action == "apply":
             args = ["stash", "apply", ref]
         elif action == "pop":
@@ -235,9 +238,9 @@ def _worktree(root: str, worktree_root: str, action: str, *,
         args = ["worktree", "add"]
         if branch:
             args.extend(["-b", _validate_branch(root, branch)])
+        args.append(str(target))
         if reference:
             args.append(_validate_ref(root, reference))
-        args.append(str(target))
     elif action in {"remove", "lock", "unlock", "move"}:
         if not path:
             raise ToolExecutionError(f"Worktree {action} requires a relative path.")
@@ -297,7 +300,18 @@ def _submodule(root: str, action: str, *, path: str | None = None,
     if action == "status":
         args = ["submodule", "status", "--recursive"]
     elif action == "update":
-        args = ["submodule", "update", "--init", "--recursive", "--checkout"]
+        configured = _git(root, ["config", "--file", ".gitmodules", "--get-regexp",
+                                 r"^submodule\..*\.url$"], timeout=10)
+        if configured["return_code"] not in {0, 1}:
+            raise ToolExecutionError("Unable to inspect configured submodule URLs.")
+        for line in configured["stdout"].splitlines():
+            _, configured_url = line.split(None, 1)
+            if not _allowed_submodule_url(configured_url, allowed_hosts):
+                raise ToolExecutionError("A configured submodule URL is not on a host allowlisted by the application.")
+        args = ["submodule", "update", "--init", "--checkout"]
+        if path:
+            _project_path(root, path)
+            args.extend(["--", path])
     elif action == "sync":
         args = ["submodule", "sync", "--recursive"]
     elif action == "add":
@@ -434,7 +448,7 @@ def create_advanced_git_tools(
             "git.worktree",
             "List, add, move, lock, unlock, prune or remove worktrees under the host-configured worktree root.",
             object_schema({
-                "action": {"type": "string", "enum": ["list", "add", "move", "lock", "unlock", "prune", "remove"]},
+                "action": {"type": "string", "enum": ["list", "add", "move", "lock", "unlock", "prune"]},
                 "path": {"type": "string", "maxLength": 500},
                 "branch": {"type": "string", "maxLength": 120},
                 "reference": {"type": "string", "maxLength": 500},
@@ -474,17 +488,26 @@ def create_advanced_git_tools(
             timeout=90,
         ),
         FunctionTool(
-            "git.conflicts",
-            "List unmerged files, inspect index stages, or stage an explicit ours/theirs/working resolution.",
+            "git.conflict_inspect",
+            "List unmerged files and inspect the index stages for one conflicted path.",
             object_schema({
-                "action": {"type": "string", "enum": ["list", "stages", "resolve"]},
+                "action": {"type": "string", "enum": ["list", "stages"]},
                 "path": {"type": "string", "maxLength": 500},
-                "resolution": {"type": "string", "enum": ["ours", "theirs", "working"]},
             }, ["action"]),
+            "git:conflict:read",
+            lambda action, path=None: _conflicts(root, action, path=path),
+            timeout=30,
+        ),
+        FunctionTool(
+            "git.conflict_resolve",
+            "Stage an explicit ours/theirs/working resolution for one conflicted path.",
+            object_schema({
+                "path": {"type": "string", "minLength": 1, "maxLength": 500},
+                "resolution": {"type": "string", "enum": ["ours", "theirs", "working"]},
+            }, ["path", "resolution"]),
             "git:conflict:resolve",
-            lambda action, path=None, resolution=None:
-                _conflicts(root, action, path=path, resolution=resolution),
-            timeout=40,
+            lambda path, resolution: _conflicts(root, "resolve", path=path, resolution=resolution),
+            timeout=30,
         ),
         FunctionTool(
             "git.pull_request_read",
