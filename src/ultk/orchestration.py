@@ -14,7 +14,7 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from ultk.exceptions import WorkflowError
 from ultk.execution import ToolDispatcher
@@ -224,7 +224,7 @@ class WorkflowStore:
 class WorkflowEngine:
     """Execute bounded DAGs with SQLite checkpoints, retry and cooperative cancellation."""
 
-    TERMINAL = {"succeeded", "failed", "skipped", "cancelled"}
+    TERMINAL: ClassVar[frozenset[str]] = frozenset(\n        {"succeeded", "failed", "skipped", "cancelled"}\n    )
 
     def __init__(self, dispatcher: ToolDispatcher, database: str | Path = "./ultk_workflows.sqlite3",
                  *, max_steps: int = 100, max_concurrency: int = 4) -> None:
