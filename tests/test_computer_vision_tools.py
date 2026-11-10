@@ -123,3 +123,89 @@ def test_wait_for_template_is_bounded_before_matching(tmp_path: Path) -> None:
 def test_region_bounds_are_enforced(tmp_path: Path) -> None:
     with pytest.raises(ToolExecutionError, match="16 megapixels"):
         ComputerVisionPack(template_root=tmp_path)._region([0, 0, 5000, 5000])
+
+
+def test_match_pipeline_runs_multiscale_matching_and_suppresses_duplicates(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "templates"
+    root.mkdir()
+    (root / "icon.png").write_bytes(b"image")
+    pack = ComputerVisionPack(template_root=root)
+
+    class FakeScreenshot:
+        width = 100
+        height = 100
+
+        def convert(self, mode):
+            assert mode == "RGB"
+            return self
+
+    class FakeArray:
+        shape = (100, 100, 3)
+
+    class FakeResponse:
+        shape = (90, 90)
+
+        def __setitem__(self, key, value):
+            pass
+
+    class FakePyAutoGUI:
+        @staticmethod
+        def screenshot(region=None):
+            return FakeScreenshot()
+
+    class FakeCV2:
+        COLOR_RGB2GRAY = 1
+        IMREAD_GRAYSCALE = 2
+        INTER_AREA = 3
+        INTER_CUBIC = 4
+        TM_CCOEFF_NORMED = 5
+
+        def __init__(self):
+            self.responses = []
+
+        @staticmethod
+        def cvtColor(image, conversion):
+            return type("Gray", (), {"shape": (100, 100)})()
+
+        @staticmethod
+        def imread(path, mode):
+            return type("Template", (), {"shape": (10, 10)})()
+
+        @staticmethod
+        def resize(image, size, interpolation):
+            return image
+
+        def matchTemplate(self, image, template, method):
+            response = FakeResponse()
+            self.responses.append(response)
+            return response
+
+        def minMaxLoc(self, response):
+            if not hasattr(response, "queried"):
+                response.queried = True
+                return 0.0, 0.93, (0, 0), (5, 6)
+            return 0.0, 0.1, (0, 0), (0, 0)
+
+    fake_cv2 = FakeCV2()
+
+    def fake_optional(module):
+        if module == "pyautogui":
+            return FakePyAutoGUI
+        if module == "cv2":
+            return fake_cv2
+        if module == "numpy":
+            return type("FakeNumpy", (), {"asarray": staticmethod(lambda image: FakeArray())})
+        raise AssertionError(module)
+
+    monkeypatch.setattr("ultk.builtins.computer_vision._optional", fake_optional)
+    matches = pack._match(
+        root / "icon.png", region=[100, 200, 100, 100],
+        min_score=0.85, max_matches=5,
+    )
+    assert len(fake_cv2.responses) == 5
+    assert len(matches) == 1
+    assert matches[0]["x"] == 105
+    assert matches[0]["y"] == 206
+    assert matches[0]["score"] == 0.93

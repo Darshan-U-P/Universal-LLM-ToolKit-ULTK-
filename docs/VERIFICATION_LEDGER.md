@@ -326,3 +326,9 @@ The provider and plugin branches extend the REST integration branch; media exten
 - Desktop clicks remain externally visible host actions. Grant computer:screen:read and
   computer:screen:control separately, and require human approval for high-impact actions.
 - PR #12 semantic browser automation CI run #535 completed successfully after its import-order fix.
+
+- GitHub Actions run #540 on commit 263a40b completed successfully: 107 tests passed and Ruff passed.
+  The preceding run #537 passed all tests but exposed two Ruff sorting findings in built-in exports;
+  the export order was corrected in commit 263a40b. A further test now exercises the matching
+  pipeline with stubbed OpenCV/PyAutoGUI boundaries; real OpenCV and live-desktop integration
+  remain separate validation requirements.
