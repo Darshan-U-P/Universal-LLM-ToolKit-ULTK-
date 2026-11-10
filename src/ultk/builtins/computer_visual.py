@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import re
 import time
-from pathlib import Path
 from typing import Any
 
 from ultk.builtins._common import FunctionTool, object_schema
@@ -100,7 +99,7 @@ class ComputerVisualPack:
             data = pytesseract.image_to_data(
                 image, lang=language, output_type=pytesseract.Output.DICT
             )
-        except Exception as exc:  # noqa: BLE001 - normalize OCR engine/backend errors
+        except Exception as exc:
             raise ToolExecutionError(
                 f"OCR failed ({type(exc).__name__}); verify the Tesseract binary and language data."
             ) from exc
