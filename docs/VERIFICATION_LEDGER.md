@@ -387,3 +387,34 @@ The provider and plugin branches extend the REST integration branch; media exten
 - CAPTCHA/anti-bot behavior is detect-and-handoff only; no solving or bypass. Visible login/MFA handoff is heuristic and not identity proof. Form submission uses a dedicated consequential capability, but host policy must enforce explicit human approval for exact arguments.
 - Website monitors are host-polled; no background daemon or scheduler is launched by this pack. Browser sessions do not preserve in-memory page state between calls; saved tab URLs are recreated.
 - Live Playwright/Chromium, authenticated download, real-site SSRF, DNS rebinding, popup/frame, multi-process profile contention, extension loading and cross-platform integration remain unverified.
+
+### Advanced Git operations — branch feat/advanced-git-operations
+
+- Base: feat/browser-automation-completion (PR #16 head).
+- Added src/ultk/builtins/git_operations.py and ToolEngine.install_advanced_git_tools.
+- History operations: non-interactive rebase (optional --rebase-merges), continue/abort/skip,
+  bounded multi-commit cherry-pick and revert. History starts require a clean worktree/index,
+  validated commit revisions and no conflicting operation in progress. Interactive rebase todo
+  editing and force push are intentionally excluded.
+- Added stash push/list/show/apply/pop and a separately capability-gated stash drop.
+- Added linked worktree list/add/move/lock/unlock/prune and a separate non-force remove tool.
+  Worktree paths are confined to a host-configured root; the default is a sibling directory
+  outside the repository.
+- Added submodule status/add/update/sync/deinit. Add and direct update URLs must match exact
+  host allowlists; update uses checkout strategy and does not recursively fetch nested modules.
+- Added conflict listing/index-stage inspection and explicit ours/theirs/working path staging.
+  Conflict selection does not assert semantic correctness or automatically continue the operation.
+- Added optional host-injected pull-request adapter for inspect/reviews/comments/checks,
+  create/update/comment/review/close and a separate merge operation with expected-head SHA.
+  ULTK does not bundle provider credentials or a network client.
+- Capabilities are split across history, stash, destructive, worktree, submodule, conflict read/
+  resolve, PR read/write and PR merge. The host policy must bind approval to exact arguments
+  for destructive operations and merges.
+- Added tests/test_git_operations.py and docs/ADVANCED_GIT_OPERATIONS.md; README and tool catalog
+  updated. Git is a host executable dependency; no GitPython dependency was added.
+- Tests and CI are deferred under the current implementation-phase validation policy. No passing
+  result is claimed. Live Git-version, OS path, conflict, submodule allowlist and PR adapter tests
+  remain pending.
+- Security boundary: Git hooks, filters, credential helpers, external merge/diff drivers and
+  repository configuration can execute with host-user privileges. This pack is not a sandbox;
+  untrusted repositories require a disposable container/VM and restricted network egress.
