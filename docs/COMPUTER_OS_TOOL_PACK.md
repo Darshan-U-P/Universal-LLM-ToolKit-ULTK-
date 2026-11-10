@@ -27,13 +27,13 @@ The filesystem root confines metadata and POSIX permission operations. Service m
 | Persistent desktop contexts | Create, update, inspect, list and close SQLite-backed logical desktop sessions |
 | Displays | Enumerate monitor geometry with screeninfo; primary-display fallback |
 | Windows | Enumerate, move, resize, maximize, minimize, restore, activate, close, snap and arrange windows |
-| Virtual desktops | Windows current/create/switch through optional pyvda; Linux X11 list/switch through wmctrl |
+| Virtual desktops | Windows current/create/switch through optional pyvda; Linux X11 list/switch through wmctrl; Sway workspace list/current/create/switch through compositor IPC |
 | Keyboard | Allowlisted shortcuts and prevalidated bounded key/type/wait sequences |
-| Accessibility | Windows UI Automation inspection and element click; Linux AT-SPI inspection |
+| Accessibility | Windows UI Automation inspection and click; Linux AT-SPI inspection and exact accessible-name action invocation; macOS Accessibility API inspection and AXPress invocation |
 | Services | Read service inventory on Windows/Linux/macOS; allowlisted start/stop/restart on Windows/Linux |
 | Filesystem permissions | Metadata, POSIX chmod, optional host-enabled chown; paths confined to filesystem_root |
 | Windows ACL | Inspect ACLs and optionally grant R/RX/M to a host-allowlisted numeric SID on one object |
-| USB ejection | Allowlisted safe power-off/eject on Linux and macOS; Windows eject is not implemented |
+| USB ejection | Allowlisted safe power-off/eject on Linux (udisksctl), macOS (diskutil) and Windows (Configuration Manager CM_Request_Device_EjectW) |
 | Hardware | CPU, memory, disks, thermal sensors and battery where supported |
 | Devices | USB inventory through pyudev (Linux), pnputil (Windows) or system_profiler (macOS) |
 | Networking | Interface addresses, state, MTU and link speed |
@@ -56,8 +56,8 @@ Event watches are durable watch definitions. They do not start background daemon
 ## Platform coverage and limitations
 
 - Windows: PyWinCtl window operations, pywinauto UI Automation, optional pyvda virtual desktops, Service Control Manager, Event Log, pnputil USB inventory. Use the PowerShell pack for deeper Windows administration.
-- Linux: PyWinCtl where supported, AT-SPI, systemd service/journal tools, pyudev USB inventory, and wmctrl virtual desktops on X11. Wayland compositors restrict global input/window automation and wmctrl generally does not control Wayland sessions.
-- macOS: PyWinCtl where supported, launchd service listing, unified log snapshots and system_profiler USB inventory. macOS virtual-desktop switching and native accessibility element invocation are not implemented in this increment.
+- Linux X11: PyWinCtl, AT-SPI, systemd/journal, pyudev and wmctrl virtual desktops. Linux Wayland: Sway sessions now have a dedicated compositor-IPC backend for window enumeration, exact-title unique window actions and workspace list/current/create/switch. Global pointer/keyboard input still depends on compositor/portal permissions and is not claimed as universal Wayland support. Other Wayland compositors require their own adapters.
+- macOS: PyWinCtl where supported, native Accessibility API inspection and AXPress invocation through PyObjC, launchd service listing, unified log snapshots and system_profiler USB inventory. Native macOS Spaces enumeration/creation/switching is not exposed by this pack; private APIs are intentionally avoided.
 
 ## Security boundaries
 
@@ -67,13 +67,13 @@ Event watches are durable watch definitions. They do not start background daemon
 - Service mutations require an exact host-configured allowlist. The host must require approval for stop/restart/start operations.
 - Filesystem metadata and permission changes are confined to a host-configured root. Symlinks are rejected for chmod/chown. Path checks do not eliminate filesystem TOCTOU races; this is not an OS sandbox.
 - POSIX ownership changes are disabled by default. Windows ACL grants are disabled by default, require host opt-in and an exact SID allowlist, and are limited to R/RX/M on a single object. Windows ACL inheritance and recursive grants are not changed.
-- Hardware inventory may reveal device identifiers. USB serial numbers are returned only by the Linux pyudev backend; restrict access appropriately. Linux/macOS safe eject requires an exact host allowlist of device paths. Eject can interrupt I/O and must require human approval. Windows device ejection is not implemented.
+- Hardware inventory may reveal device identifiers. USB serial numbers are returned only by the Linux pyudev backend; restrict access appropriately. Safe eject requires an exact host allowlist of platform-specific device identifiers. Windows Configuration Manager may refuse ejection when a device is busy or another driver vetoes it; ULTK reports the veto and does not force removal. Eject can interrupt I/O and must require human approval.
 - Event log access may require elevated privileges and can expose sensitive operational data. Output and event counts are bounded.
 - The pack does not elevate privileges and cannot bypass OS permissions.
 
 ## Not implemented in this increment
 
-Full macOS AX accessibility actions, native macOS virtual desktop switching, Wayland compositor integration, Windows ACL editing, USB eject/eject-safe removal, device driver installation, service creation/deletion, user/account administration, background event-monitor daemons, and remote OS management remain outside this pack.
+Native macOS Spaces management, Wayland support outside the Sway compositor adapter, Windows recursive/inherited ACL and ownership changes, USB driver installation/configuration, service creation/deletion, user/account administration, background event-monitor daemons, isolated OS desktop sessions and remote OS management remain outside this pack.
 
 
 ## Multi-monitor GUI workflows
