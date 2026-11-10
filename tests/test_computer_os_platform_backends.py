@@ -228,3 +228,21 @@ def test_generic_window_action_routes_through_sway_proxy(pack, monkeypatch) -> N
     result = pack.window_action("Editor", "maximize")
     assert result["action"] == "maximize"
     assert calls == [("[con_id=12] fullscreen enable",)]
+
+
+def test_platform_specific_tools_are_registered_with_control_capabilities(tmp_path: Path) -> None:
+    from ultk.builtins.computer_os import create_computer_os_tools
+
+    tools = {
+        tool.spec.name: tool
+        for tool in create_computer_os_tools(
+            filesystem_root=tmp_path / "files",
+            state_database=tmp_path / "state.sqlite3",
+        )
+    }
+    assert "computer_os.sway_window_action" in tools
+    assert tools["computer_os.sway_window_action"].spec.capability == "computer:window:control"
+    assert "computer_os.accessibility_click" in tools
+    assert tools["computer_os.accessibility_click"].spec.capability == "computer:accessibility:control"
+    assert "computer_os.eject_usb_device" in tools
+    assert tools["computer_os.eject_usb_device"].spec.capability == "system:devices:eject"
