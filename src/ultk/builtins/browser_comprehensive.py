@@ -66,9 +66,14 @@ class BrowserControlPlane:
         download_root: str | Path | None = None,
         max_download_bytes: int = 25_000_000,
     ) -> None:
-        if not 1 <= max_profiles <= 100 or not 1 <= max_tabs <= _MAX_TABS:
+        if (
+            type(max_profiles) is not int
+            or not 1 <= max_profiles <= 100
+            or type(max_tabs) is not int
+            or not 1 <= max_tabs <= _MAX_TABS
+        ):
             raise ValueError("max_profiles must be 1-100 and max_tabs must be 1-12.")
-        if not 1 <= max_download_bytes <= 100_000_000:
+        if type(max_download_bytes) is not int or not 1 <= max_download_bytes <= 100_000_000:
             raise ValueError("max_download_bytes must be between 1 byte and 100 MB.")
         self.root = Path(root).expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
@@ -579,7 +584,9 @@ class BrowserControlPlane:
 
     def monitor_add(self,url:str,selector:str|None=None):
         _url(url)
-        if selector is not None and (not selector or len(selector) > 500):
+        if selector is not None and (
+            not isinstance(selector, str) or not selector or len(selector) > 500
+        ):
             raise ToolExecutionError("Monitor selector is invalid.")
         mid=uuid.uuid4().hex
         with sqlite3.connect(self.db_path) as db:
