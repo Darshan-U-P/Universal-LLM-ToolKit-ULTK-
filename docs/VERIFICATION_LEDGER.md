@@ -508,3 +508,13 @@ The provider and plugin branches extend the REST integration branch; media exten
 - Remaining production qualification: real embedding quality/recall benchmarks, multiprocess
   load tests, backup/restore, disk-full/corruption recovery, WAL/backup erasure, Windows/macOS
   behavior, and host multi-tenant identity routing. SQLite is not multi-host storage.
+
+
+- Added conservative conflict handling: the summarizer may return a bounded `conflicts` list; when
+  non-empty, ULTK retains source memories and reports the conflict instead of deleting records.
+- Added `benchmarks/benchmark_memory.py`, a repeatable temporary-database benchmark for up to one
+  million records, concurrent writers, query throughput and latency percentiles, database size and
+  SQLite integrity. Production deployment thresholds still require testing on target hardware,
+  storage and the selected embedding adapter.
+- Current test and Ruff status is tracked by the latest GitHub Actions run; do not treat earlier
+  failing runs as current validation after subsequent fixes.
