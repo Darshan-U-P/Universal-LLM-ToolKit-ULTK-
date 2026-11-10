@@ -55,6 +55,9 @@ class PersistentMemory:
             CREATE TABLE IF NOT EXISTS memory_context(
               ns TEXT NOT NULL,sid TEXT NOT NULL,seq INTEGER NOT NULL,role TEXT NOT NULL,
               content TEXT NOT NULL,created REAL NOT NULL,PRIMARY KEY(ns,sid,seq));
+            CREATE TABLE IF NOT EXISTS memory_session_stats(
+              ns TEXT NOT NULL,sid TEXT NOT NULL,user_messages INTEGER NOT NULL DEFAULT 0,
+              PRIMARY KEY(ns,sid));
             """)
     @contextmanager
     def db(self):
@@ -86,6 +89,10 @@ class PersistentMemory:
                           (self.namespace,session_id)).fetchone()["n"]
             c.execute("INSERT INTO memory_context VALUES(?,?,?,?,?,?)",
                       (self.namespace,session_id,seq,role,content,time.time()))
+            if role == "user":
+                c.execute("""INSERT INTO memory_session_stats(ns,sid,user_messages) VALUES(?,?,1)
+                  ON CONFLICT(ns,sid) DO UPDATE SET user_messages=user_messages+1""",
+                  (self.namespace,session_id))
             c.execute("""DELETE FROM memory_context WHERE ns=? AND sid=? AND seq NOT IN
               (SELECT seq FROM memory_context WHERE ns=? AND sid=? ORDER BY seq DESC LIMIT 200)""",
               (self.namespace,session_id,self.namespace,session_id))
@@ -103,6 +110,7 @@ class PersistentMemory:
     def context_clear(self,session_id:str)->dict:
         with self.db() as c:
             cur=c.execute("DELETE FROM memory_context WHERE ns=? AND sid=?",(self.namespace,session_id))
+            c.execute("DELETE FROM memory_session_stats WHERE ns=? AND sid=?",(self.namespace,session_id))
         return {"deleted_entries":cur.rowcount}
     def remember(self,session_id:str,content:str,kind:str="episodic",scope:str="user",
                  tags:list[str]|None=None,metadata:dict|None=None,confidence:float=0.8)->dict:
