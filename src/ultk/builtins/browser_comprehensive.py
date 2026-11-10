@@ -252,8 +252,14 @@ class BrowserControlPlane:
             page=ctx.pages[index]
             if operation=="select": return {"selected":index,"url":page.url,"_active_page":page}
             if operation=="close":
-                if len(ctx.pages)==1: raise ToolExecutionError("Cannot close the only browser tab.")
-                page.close(); return {"closed":index}
+                if len(ctx.pages)==1:
+                    raise ToolExecutionError("Cannot close the only browser tab.")
+                page.close()
+                next_active = active - 1 if index < active else active
+                if index == active:
+                    next_active = min(index, len(ctx.pages) - 1)
+                next_active = max(0, min(next_active, len(ctx.pages) - 1))
+                return {"closed": index, "_active_page": ctx.pages[next_active]}
             raise ToolExecutionError("Unknown tab operation.")
         return self._with_context(profile,run)
 
@@ -319,19 +325,51 @@ class BrowserControlPlane:
             }
         return self._with_context(profile,run)
 
-    def network(self, profile: str, url: str|None=None):
-        if url: url=_url(url)
-        def run(ctx,pages,active):
-            page=pages[active]; req=[]; resp=[]; fail=[]; sockets=[]
-            page.on("request",lambda r:req.append({"method":r.method,"url":r.url[:2000],"resource_type":r.resource_type}))
-            page.on("response",lambda r:resp.append({"status":r.status,"url":r.url[:2000],"method":r.request.method}))
-            page.on("requestfailed",lambda r:fail.append({"url":r.url[:2000],"error":(r.failure or "")[:300]}))
-            page.on("websocket",lambda ws:sockets.append({"url":ws.url[:2000]}))
-            if url: page.goto(url,wait_until="domcontentloaded",timeout=25000)
-            return {"url":page.url,"requests":req[:_MAX_EVENTS],"responses":resp[:_MAX_EVENTS],
-                    "failures":fail[:_MAX_EVENTS],"websockets":sockets[:_MAX_EVENTS],
-                    "truncated":any(len(x)>_MAX_EVENTS for x in (req,resp,fail,sockets))}
-        return self._with_context(profile,run)
+    def network(self, profile: str, url: str | None = None, capture_ms: int = 1000):
+        if url:
+            url = _url(url)
+        if type(capture_ms) is not int or not 100 <= capture_ms <= 10000:
+            raise ToolExecutionError("Network capture window must be between 100 and 10000 ms.")
+
+        def run(ctx, pages, active):
+            page = pages[active]
+            events: dict[str, list[dict[str, Any]]] = {
+                "requests": [], "responses": [], "failures": [], "websockets": [],
+            }
+            counts = {key: 0 for key in events}
+
+            def record(kind: str, event: dict[str, Any]) -> None:
+                counts[kind] += 1
+                if len(events[kind]) < _MAX_EVENTS:
+                    events[kind].append(event)
+
+            page.on("request", lambda request: record("requests", {
+                "method": request.method, "url": request.url[:2000],
+                "resource_type": request.resource_type,
+            }))
+            page.on("response", lambda response: record("responses", {
+                "status": response.status, "url": response.url[:2000],
+                "method": response.request.method,
+            }))
+            page.on("requestfailed", lambda request: record("failures", {
+                "url": request.url[:2000], "error": (request.failure or "")[:300],
+            }))
+            page.on("websocket", lambda socket: record("websockets", {
+                "url": socket.url[:2000],
+            }))
+            if url:
+                page.goto(url, wait_until="domcontentloaded", timeout=25000)
+            page.wait_for_timeout(capture_ms)
+            return {
+                "url": page.url,
+                **events,
+                "event_counts": counts,
+                "capture_ms": capture_ms,
+                "truncated": any(count > _MAX_EVENTS for count in counts.values()),
+                "websocket_frames_captured": False,
+            }
+
+        return self._with_context(profile, run)
 
     def challenge(self, profile: str):
         def run(ctx,pages,active):
@@ -398,9 +436,15 @@ class BrowserControlPlane:
             raise ToolExecutionError("A bounded form selector and SHA-256 preview fingerprint are required.")
         def run(ctx,pages,active):
             page=pages[active]; form=page.locator(selector).first
-            snapshot=_form_snapshot(page, selector)
-            snapshot["action"] = page.evaluate("(action) => new URL(action, location.href).href", snapshot["action"])
-            fingerprint=hashlib.sha256(json.dumps(snapshot,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
+            snapshot = _form_snapshot(page, selector)
+            if snapshot["method"] not in {"GET", "POST"}:
+                raise ToolExecutionError("Only GET and POST form submissions are supported.")
+            snapshot["action"] = page.evaluate(
+                "(action) => new URL(action, location.href).href", snapshot["action"]
+            )
+            fingerprint = hashlib.sha256(
+                json.dumps(snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+            ).hexdigest()
             if fingerprint.casefold()!=expected_form_sha256.casefold():
                 raise ToolExecutionError("Form changed after preview; obtain a fresh preview and approval.")
             _url(snapshot["action"])
