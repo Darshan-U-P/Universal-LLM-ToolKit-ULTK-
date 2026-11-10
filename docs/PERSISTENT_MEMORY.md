@@ -69,9 +69,10 @@ retention, do not store secrets, and provide access/export/deletion workflows. H
 not erase copies retained in WAL files, backups, filesystem snapshots or external embedding logs;
 apply backup expiry and retention policies.
 
-ULTK does not automatically ingest every LLM turn, infer consent, summarize history, or start a
-background consolidation process. The host agent decides what context to append and what durable
-facts to remember.
+ULTK does not silently ingest every LLM turn or infer consent. When trusted extraction and
+summarization adapters are configured, the host agent may invoke the explicit intelligence tools
+or schedule them at session boundaries. The host remains responsible for deciding what context is
+eligible for processing.
 
 ## Limits and boundaries
 
@@ -79,7 +80,59 @@ Default capacity is 100,000 memories per namespace. Context is bounded to 200 en
 characters; memory content is limited to 20,000 characters. Recall scans at most the newest 5,000
 visible records and returns at most 50. Large corpora should use a dedicated indexed vector store.
 
-Consolidation merges exact normalized-text duplicates; it is not an LLM summarizer or ontology
-resolver. No automatic deletion/decay is performed; confidence and recency affect ranking.
+The base maintenance tool merges exact normalized-text duplicates. The optional intelligence
+consolidator can summarize only strongly similar same-kind/scope records through a trusted host
+summarizer; it is deliberately conservative and is not a contradiction solver. No automatic
+deletion/decay is performed; confidence and recency affect ranking.
 This subsystem is not a secret manager, secure enclave, backup service, identity provider or
 distributed consistency protocol.
+
+
+## Automatic extraction and intelligent consolidation
+
+The memory pack can run extraction and summarization through trusted host adapters. Configure
+them when installing the tools:
+
+    engine.install_memory_tools(
+        database="./data/user-memory.sqlite3",
+        namespace=authenticated_user_id,
+        embedder=embedding_callable,
+        extractor=extractor_callable,
+        summarizer=summarizer_callable,
+    )
+
+The extractor contract is `extractor(messages) -> list[dict]`, where each item contains
+`content` and may include `kind`, `scope`, `tags`, `metadata` and `confidence`. It receives
+bounded role-tagged session context, not credentials or provider configuration. Candidates are
+size/type checked, low-confidence items are rejected, likely credential strings are filtered,
+exact duplicates are skipped, and provenance records the source session and extraction time.
+The host remains responsible for obtaining consent and selecting which context is eligible.
+
+The summarizer contract is `summarizer(payload) -> dict`. For
+`task=summarize_conversation`, return `summary` plus optional bounded `facts`, `decisions`
+and `open_loops` arrays. For `task=consolidate_memories`, return a faithful `summary` of
+the supplied source records. ULTK stores summaries and extracted facts with provenance.
+Related-memory consolidation is conservative: it requires same-kind/scope records and a high
+vector-similarity threshold, records source IDs, writes the replacement before deleting source
+records, and retains sources if cleanup fails. It is not a contradiction solver.
+
+New tools: `memory.extract_context`, `memory.summarize_context`,
+`memory.consolidate_related` and `memory.diagnostics`. Grant `memory:write` for extraction
+and `memory:maintenance` for summarization, consolidation and diagnostics. These are explicit
+tool calls; hosts may schedule them after a turn or at session boundaries. ULTK does not silently
+ingest every message or run an implicit background model.
+
+## Operational validation
+
+`memory.diagnostics` runs SQLite `PRAGMA integrity_check` and reports namespace-scoped record
+counts, context count, journal mode, database size and diagnostic duration. SQLite writes use an
+explicit busy timeout and `BEGIN IMMEDIATE` for sequence allocation and capacity-checked inserts
+to serialize concurrent writers. CI tests exercise concurrent context appends and memory writes,
+restart persistence, namespace isolation, extraction filtering, provenance, summarization,
+consolidation and integrity reporting.
+
+A passing test suite is not a substitute for production qualification. Before deployment, run
+workload-specific load tests, multi-process tests for the chosen storage layer, backup/restore
+drills, disk-full and corruption recovery tests, real embedder retrieval evaluation, retention/
+deletion verification for WAL and backups, and platform-specific Windows/macOS testing. SQLite
+remains a single-host store; use a suitable shared database/vector service for multi-host scale.
