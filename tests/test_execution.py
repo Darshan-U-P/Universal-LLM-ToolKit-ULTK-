@@ -67,3 +67,28 @@ async def test_unknown_tool_returns_structured_error():
     )
     assert result.is_error
     assert "not registered" in result.content
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_passes_server_owned_metadata_to_tool_context():
+    class ContextTool:
+        spec = ToolSpec(
+            name="context.read",
+            description="Read a trusted host context value",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+        )
+
+        async def invoke(self, arguments: dict, context: ToolContext) -> str:
+            return str(context.metadata["profile_id"])
+
+    registry = ToolRegistry()
+    registry.register(ContextTool())
+    dispatcher = ToolDispatcher(registry, AllowListPolicy({"context.read"}))
+
+    result = await dispatcher.execute(
+        ToolCallRequest("context-1", "context.read", {}),
+        metadata={"profile_id": "profile-123"},
+    )
+
+    assert result.is_error is False
+    assert result.content == "profile-123"
