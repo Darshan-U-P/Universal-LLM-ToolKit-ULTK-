@@ -80,7 +80,7 @@ insert/update/delete operation arrays and roll back as a unit on failure.
 
 ## MongoDB behavior
 
-Find supports structured MongoDB filters, optional projection and bounded results. Filter
+Find supports structured MongoDB filters, optional projection and bounded results. Bounded multi-document insert/update/delete transactions use PyMongo sessions and require a replica set or sharded cluster. Filter
 operators are restricted to logical and comparison operators; executable operators such as
 \`$where\`, \`$function\`, \`$expr\` and unknown operators are rejected. Update uses \`$set\`
 with model-supplied field names and requires a non-empty filter. Delete also requires a
@@ -105,7 +105,7 @@ transactions use MULTI/EXEC and support set, delete, increment and expire operat
 - SQLite paths are host configuration, not model-selected. Protect the database file and parent
   directory with OS permissions.
 - This pack is not a network sandbox, secret manager, SQL policy engine or distributed transaction
-  coordinator. MongoDB multi-document transactions are not exposed by this increment.
+  coordinator. MongoDB transactions use driver sessions and require a deployment that supports transactions (normally a replica set or sharded cluster); standalone MongoDB deployments reject them.
 - Remote service integration, failover, pool lifecycle, advanced schema migrations, arbitrary SQL,
   stored procedures, Mongo aggregation pipelines, Redis scripting/streams/pub-sub and ORM mapping
   are not included.
