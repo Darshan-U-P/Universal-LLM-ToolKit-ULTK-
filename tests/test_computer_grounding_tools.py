@@ -146,7 +146,7 @@ def test_target_and_candidate_limits_are_enforced() -> None:
         pack._validate_target(" ")
     with pytest.raises(ToolExecutionError, match="0.50 and 0.99"):
         pack._validate_threshold(1.0)
-    with pytest.raises(ValueError, match="candidate limit"):
+    with pytest.raises(ValueError, match="max_candidates"):
         ComputerGroundingPack(lambda image, target: [], max_candidates=11)
 
 
