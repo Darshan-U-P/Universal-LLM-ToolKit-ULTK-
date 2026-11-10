@@ -161,6 +161,13 @@ class ToolEngine:
         self.register_tools(create_advanced_browser_tools(
             session_root=session_root, monitor_database=monitor_database, notifier=notifier))
 
+    def install_semantic_browser_tools(
+        self, *, session_root: str | Path = "./browser_sessions"
+    ) -> None:
+        """Install accessibility-oriented browser inspection and interaction tools."""
+        from ultk.builtins.browser_semantic import create_semantic_browser_tools
+        self.register_tools(create_semantic_browser_tools(session_root=session_root))
+
     def install_development_tools(self, *, project_root: str | Path,
                                   allowed_executables: dict[str, str] | None = None) -> None:
         from ultk.builtins.development import create_development_tools
