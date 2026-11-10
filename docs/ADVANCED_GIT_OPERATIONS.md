@@ -26,11 +26,14 @@ sibling of the repository, named <repo>.ultk-worktrees.
 | Tool | Operations |
 |---|---|
 | git.history | Rebase, rebase continue/abort/skip, cherry-pick one or more commits, cherry-pick continue/abort/skip, revert one or more commits, revert continue/abort/skip |
-| git.stash | Push, list, show, apply and pop |
+| git.stash | Push, apply and pop |
+| git.stash_inspect | List and show stash entries |
 | git.stash_drop | Drop one explicitly selected stash |
-| git.worktree | List, add, move, lock, unlock and prune |
+| git.worktree_inspect | List and inspect worktrees |
+| git.worktree | Add, move, lock, unlock and prune |
 | git.worktree_remove | Remove one explicitly selected worktree; no force removal |
-| git.submodule | Status, add from an allowlisted host, update using checkout strategy, sync |
+| git.submodule_inspect | Inspect submodule status |
+| git.submodule | Add from an allowlisted host, update using checkout strategy, sync |
 | git.submodule_deinit | Deinitialize one explicitly selected submodule |
 | git.conflict_inspect | List unmerged paths and inspect index stages |
 | git.conflict_resolve | Select ours/theirs/current working-file content and stage that path |
@@ -67,9 +70,12 @@ the provider's compare-and-swap/expected-head mechanism where available.
 ## Capabilities
 
 - git:history:mutate
+- git:stash:read
 - git:stash:mutate
 - git:destructive — stash drop, worktree removal and submodule deinitialization
+- git:worktree:read
 - git:worktree:mutate
+- git:submodule:read
 - git:submodule:mutate
 - git:conflict:read
 - git:conflict:resolve
