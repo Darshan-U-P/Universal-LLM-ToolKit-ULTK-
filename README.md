@@ -20,6 +20,12 @@ Connect an LLM to a governed, discoverable ecosystem of tools through one consis
 - Structured telemetry with secret redaction.
 - Honest provider capability negotiation; not all models support native tool calling.
 
+## Computer automation implementation
+
+The advanced desktop branch adds a dedicated cross-platform computer/OS pack for persistent logical desktop contexts, monitor discovery, window placement and snapping, virtual desktops where supported, keyboard shortcuts/sequences, accessibility inspection, and bounded desktop workflows combining pointer, keyboard, window and screenshot actions.
+
+Platform support is backend-dependent. PyAutoGUI/PyWinCtl provide GUI input and window operations where supported; Windows UI Automation and Linux AT-SPI provide accessibility support. Linux Wayland, macOS accessibility actions and some virtual-desktop operations remain platform-specific limitations. See [Computer/OS Tool Pack](docs/COMPUTER_OS_TOOL_PACK.md).
+
 ## Architecture
 
 ```text
@@ -62,7 +68,7 @@ This taxonomy is a roadmap, not an implementation inventory.
 | Domain | Planned capabilities |
 |---|---|
 | Core | provider/model discovery, tool registry, schema validation, dispatch, retries, telemetry |
-| Computer/OS | filesystem, process management, terminal, clipboard, desktop automation |
+| Computer/OS | filesystem, process management, terminal, clipboard, persistent desktop contexts, multi-monitor/window/virtual desktop control, keyboard automation, accessibility and bounded GUI workflows |
 | Web | search, URL fetch, browser automation, scraping, downloads, page monitoring |
 | Development | code editing, isolated execution, compilers, debugging, tests, Git, API testing |
 | Data | SQL/NoSQL, CSV/Excel, JSON/XML, ETL, vector databases, visualization |
