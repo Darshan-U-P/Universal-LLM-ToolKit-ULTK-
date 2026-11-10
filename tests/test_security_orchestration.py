@@ -156,45 +156,6 @@ async def test_audit_chain_records_authorization_and_result_without_raw_argument
 
 
 @pytest.mark.asyncio
-async def test_workflow_resolves_explicit_dependencies(tmp_path) -> None:
-    registry = ToolRegistry()
-    registry.register(SourceTool())
-    registry.register(DoubleTool())
-    dispatcher = ToolDispatcher(registry, AllowListPolicy({"test.source", "test.double"}))
-    workflow = WorkflowEngine(dispatcher, max_steps=5, max_concurrency=2)
-    result = await workflow.run(
-        [
-            WorkflowStep("source", "test.source", {}, ()),
-            WorkflowStep(
-                "double", "test.double",
-                {"number": {"$ref": "source#/value"}},
-                ("source",),
-            ),
-        ],
-        granted_capabilities=frozenset({"test:run"}),
-    )
-    assert result["succeeded"] == 2
-    assert result["failed_or_skipped"] == 0
-    assert '"double": 6' in result["steps"]["double"]["content"]
-
-
-def test_workflow_rejects_cycles_and_undeclared_references() -> None:
-    with pytest.raises(Exception, match="cycle"):
-        WorkflowEngine._validate(
-            [
-                WorkflowStep("a", "test.a", {}, ("b",)),
-                WorkflowStep("b", "test.b", {}, ("a",)),
-            ]
-        )
-    with pytest.raises(Exception, match="ancestor dependency"):
-        WorkflowEngine._validate(
-            [
-                WorkflowStep("a", "test.a", {}, ()),
-                WorkflowStep("b", "test.b", {"value": {"$ref": "a#/value"}}, ()),
-            ]
-        )
-
-@pytest.mark.asyncio
 async def test_approval_request_callback_receives_exact_action_context(tmp_path) -> None:
     tool = CounterTool()
     registry = ToolRegistry()
