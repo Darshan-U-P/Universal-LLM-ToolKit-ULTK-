@@ -423,3 +423,17 @@ The provider and plugin branches extend the REST integration branch; media exten
   status are separate tools/capabilities from mutations. Conflict inspection is also separate
   from conflict staging. Conflict staging permits deleted paths so an explicit working-tree
   deletion can be staged as a resolution. Default worktree storage is outside the repository.
+
+
+## Documents and structured-data ETL — branch feat/documents-structured-data-etl
+
+- Added `src/ultk/builtins/documents.py`: bounded discovery and metadata; extraction from UTF-8 TXT/Markdown, PDF, DOCX, PPTX, XLSX, legacy XLS, ODT and ODS; PDF merge and inclusive page-range extraction.
+- Added `src/ultk/builtins/structured_data.py`: bounded CSV/JSON/XML/XLSX table readers and writers, primitive schema validation, and declarative ETL with select, rename, filter, sort, deduplicate, derive, group/aggregate and inner/left join.
+- ETL never evaluates model-supplied Python, SQL, XPath, regular expressions or arbitrary expressions. Joins load the second dataset through the same root/byte/row/column limits.
+- CSV/XLSX export escapes formula-leading strings. XML DTD/entity declarations are rejected; defusedxml is used when installed.
+- Separate read, write, transform and ETL capabilities are declared. Output overwrite requires an explicit argument. Files are written atomically and path-resolved under host-configured roots.
+- Added optional dependency groups: documents, documents-xls, documents-odf and structured-data.
+- Added focused tests in tests/test_documents_structured_data.py and user/developer documentation in docs/DOCUMENTS_AND_STRUCTURED_DATA.md.
+- GitHub Actions run #42779245676 on commit `813852d3016a831cedd8be7e213c9c32d1bc6945` passed: **178 tests passed and Ruff passed**. The run installed the document, legacy XLS, OpenDocument and structured-data extras. This validates the Linux/Python 3.12 CI environment, not all target platforms or real-world parser interoperability.
+- Deferred verification: parser behavior on malformed/encrypted/large files; actual optional dependency installs; PDF merge/extract; XLS/XLSX/ODF interoperability; XML hostile-input cases; ETL type edge cases, joins and output limits; Windows path and atomic-write behavior; full integrated pytest/Ruff.
+- Boundaries: scanned-PDF OCR, handwriting, layout-faithful format conversion, document editing/signing/redaction, XLSB, arbitrary XML schema mapping, database adapters, streaming/distributed ETL and dataframe acceleration are not included. Parser processes should run in a restricted worker for hostile files; path/size bounds are not a sandbox.

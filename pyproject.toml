@@ -35,6 +35,10 @@ computer-os = [
 ]
 browser = ["playwright>=1.48"]
 devtools = ["pytest>=8.0", "ruff>=0.5", "mypy>=1.10"]
+documents = ["pypdf>=5.0", "python-docx>=1.1", "python-pptx>=1.0", "openpyxl>=3.1"]
+documents-xls = ["xlrd>=2.0"]
+documents-odf = ["odfpy>=1.4"]
+structured-data = ["openpyxl>=3.1", "defusedxml>=0.7"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ultk"]

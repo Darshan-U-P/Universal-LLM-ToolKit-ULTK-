@@ -262,3 +262,43 @@ class ToolEngine:
             allowed_submodule_hosts=allowed_submodule_hosts,
             pull_request_adapter=pull_request_adapter,
         ))
+
+
+    def install_document_tools(
+        self,
+        *,
+        root_dir: str | Path,
+        max_file_bytes: int = 25_000_000,
+        max_output_chars: int = 50_000,
+        max_pdf_pages: int = 500,
+    ) -> None:
+        """Install bounded document discovery, extraction and PDF operations.
+
+        The root directory is trusted host configuration. Parser dependencies are optional.
+        """
+        from ultk.builtins.documents import create_document_tools
+        self.register_tools(create_document_tools(
+            root_dir=root_dir,
+            max_file_bytes=max_file_bytes,
+            max_output_chars=max_output_chars,
+            max_pdf_pages=max_pdf_pages,
+        ))
+
+    def install_structured_data_tools(
+        self,
+        *,
+        root_dir: str | Path,
+        max_file_bytes: int = 25_000_000,
+        max_rows: int = 50_000,
+        max_columns: int = 500,
+        max_operations: int = 30,
+    ) -> None:
+        """Install bounded CSV/JSON/XML/XLSX I/O, validation and declarative ETL."""
+        from ultk.builtins.structured_data import create_structured_data_tools
+        self.register_tools(create_structured_data_tools(
+            root_dir=root_dir,
+            max_file_bytes=max_file_bytes,
+            max_rows=max_rows,
+            max_columns=max_columns,
+            max_operations=max_operations,
+        ))

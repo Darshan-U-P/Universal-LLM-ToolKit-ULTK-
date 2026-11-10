@@ -282,3 +282,10 @@ capabilities. Interactive rebase todo editing, force push and automatic semantic
 resolution are intentionally not exposed. Git hooks and external helpers execute with host-user
 privileges, so this is not an OS sandbox. See
 [Advanced Git Operations](docs/ADVANCED_GIT_OPERATIONS.md).
+
+
+## Documents and structured data
+
+The optional document pack provides bounded discovery, metadata, text extraction for PDF and common Office/OpenDocument formats, and guarded PDF merge/page extraction. The structured-data pack reads and writes CSV, JSON, XML and XLSX and provides declarative, bounded ETL operations without evaluating model-supplied code.
+
+Install with `pip install -e ".[documents,structured-data]"`. Legacy XLS and OpenDocument parsers have separate optional extras. See [Documents and Structured Data](docs/DOCUMENTS_AND_STRUCTURED_DATA.md) for capabilities, installation and security boundaries.
