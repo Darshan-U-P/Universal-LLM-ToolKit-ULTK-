@@ -227,6 +227,23 @@ Enable it with `ToolEngine.install_semantic_browser_tools()`. The existing
 browser workflows. See [Semantic Browser Automation](docs/SEMANTIC_BROWSER_AUTOMATION.md).
 
 
+## Comprehensive browser automation
+
+The comprehensive Playwright pack adds persistent Chromium profiles, tabs and popup capture, iframe
+interaction, cookie metadata/clearing, structured scraping, browser-triggered downloads, bounded
+network inspection, a one-message WebSocket probe, browser test assertions, CAPTCHA-aware detection,
+visible human login/MFA handoff, form preview with fingerprint-checked submission, and persistent
+website change monitors. Form submission uses the separately gated
+`browser:submit:consequential` capability; the host policy must enforce explicit human approval.
+
+Install with `pip install -e '.[browser]'` and `playwright install chromium`. Enable with
+`ToolEngine.install_comprehensive_browser_tools(profile_root=..., download_root=...)`. Protect
+persistent profile directories as credential stores. Downloads are confined to a host-configured
+directory and checked against a post-download byte limit. CAPTCHA is detected, never solved or
+bypassed. Website monitors are host-polled, not background daemons. See
+[Comprehensive Browser Automation](docs/COMPREHENSIVE_BROWSER_AUTOMATION.md).
+
+
 
 ## Image-template computer vision
 
