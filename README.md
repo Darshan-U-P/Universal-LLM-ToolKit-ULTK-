@@ -207,3 +207,8 @@ idempotent. Distributed worker coordination and exactly-once side effects are no
 
 See [Workflow Orchestration](docs/WORKFLOW_ORCHESTRATION.md) for the API, semantics, security
 boundaries, and validation status.
+
+
+## Visual computer automation
+
+The computer tool packs now include an optional OCR-backed visual interaction layer. It can inspect visible text and bounding boxes, find exact text lines, click only unique matches, wait for text, scroll, drag, and execute bounded prevalidated visual workflows. Install it with `ToolEngine.install_computer_visual_tools()`; the host must separately install the Tesseract binary and required language data. See [Visual Computer Automation](docs/COMPUTER_VISUAL_AUTOMATION.md).
