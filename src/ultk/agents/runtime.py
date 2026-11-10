@@ -67,7 +67,7 @@ class AgentRuntime:
             conversation = []
             for message in messages:
                 if not isinstance(message, Mapping):
-                    raise ValueError("each conversation message must be an object")
+                    raise TypeError("each conversation message must be an object")
                 role = message.get("role")
                 if role not in {"system", "user", "assistant", "tool"}:
                     raise ValueError("conversation contains an unsupported message role")
