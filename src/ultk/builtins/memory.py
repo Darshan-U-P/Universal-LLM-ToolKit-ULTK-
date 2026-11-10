@@ -1,4 +1,6 @@
 """Persistent namespace-isolated memory for ULTK."""
+# Ruff's compact validation helpers intentionally use inline guards and grouped imports.
+# ruff: noqa: E401, E701, E702
 from __future__ import annotations
 import asyncio, hashlib, json, math, re, sqlite3, time, uuid
 from collections import Counter
