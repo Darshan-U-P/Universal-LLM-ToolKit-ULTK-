@@ -354,7 +354,7 @@ class ToolEngine:
             ("auto_extract_every", auto_extract_every),
             ("auto_summarize_every", auto_summarize_every),
         ):
-            if interval is not None and (isinstance(interval, bool) or interval < 1):
+            if interval is not None and (isinstance(interval, bool) or not isinstance(interval, int) or interval < 1):
                 raise ValueError(f"{name} must be a positive integer or None.")
 
         store = PersistentMemory(
@@ -371,8 +371,12 @@ class ToolEngine:
         def after_context_append(*, session_id: str, role: str, content: str) -> dict[str, Any]:
             if role != "user":
                 return {}
-            entries = store.context_get(session_id, limit=200)["entries"]
-            user_messages = sum(1 for entry in entries if entry["role"] == "user")
+            with store.db() as connection:
+                row = connection.execute(
+                    "SELECT user_messages FROM memory_session_stats WHERE ns=? AND sid=?",
+                    (store.namespace, session_id),
+                ).fetchone()
+            user_messages = int(row["user_messages"]) if row is not None else 0
             outcome: dict[str, Any] = {}
             if extractor is not None and auto_extract_every and user_messages % auto_extract_every == 0:
                 try:
