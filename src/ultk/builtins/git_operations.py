@@ -107,9 +107,10 @@ def _require_clean(root: str) -> None:
 
 def _operation_state(root: str) -> dict[str, bool]:
     git_dir_result = _git(root, ["rev-parse", "--git-path", "."], timeout=10)
-    git_dir = Path(git_dir_result["stdout"].strip()).resolve()
+    git_dir = Path(git_dir_result["stdout"].strip())
     if not git_dir.is_absolute():
-        git_dir = (Path(root) / git_dir).resolve()
+        git_dir = Path(root) / git_dir
+    git_dir = git_dir.resolve()
     return {
         "rebase": (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists(),
         "cherry_pick": (git_dir / "CHERRY_PICK_HEAD").exists(),
@@ -228,6 +229,14 @@ def _worktree(root: str, worktree_root: str, action: str, *,
     base.mkdir(parents=True, exist_ok=True)
     if action == "list":
         args = ["worktree", "list", "--porcelain"]
+    elif action == "inspect":
+        if not path:
+            raise ToolExecutionError("Worktree inspection requires a relative path.")
+        target = _worktree_path(str(base), path, must_exist=True)
+        result = _git(root, ["-C", str(target), "status", "--short", "--branch"], timeout=15)
+        result["path"] = str(target)
+        result["action"] = action
+        return result
     elif action == "add":
         if not path:
             raise ToolExecutionError("Worktree add requires a relative path.")
@@ -349,7 +358,7 @@ def _conflicts(root: str, action: str, *, path: str | None = None,
     if action == "stages":
         if not path:
             raise ToolExecutionError("Conflict stage inspection requires a path.")
-        _project_path(root, path, must_exist=True)
+        _project_path(root, path)
         raw = _git(root, ["ls-files", "-u", "--", path], timeout=10)
         if raw["return_code"] != 0:
             return raw
@@ -357,7 +366,7 @@ def _conflicts(root: str, action: str, *, path: str | None = None,
     if action == "resolve":
         if not path or resolution not in {"ours", "theirs", "working"}:
             raise ToolExecutionError("Conflict resolution requires a path and ours, theirs or working.")
-        _project_path(root, path, must_exist=True)
+        _project_path(root, path)
         if resolution in {"ours", "theirs"}:
             selected = _git(root, ["checkout", f"--{resolution}", "--", path], timeout=20)
             if selected["return_code"] != 0:
@@ -437,6 +446,17 @@ def create_advanced_git_tools(
             timeout=100,
         ),
         FunctionTool(
+            "git.stash_inspect",
+            "List stash entries or inspect the diff summary of one selected stash.",
+            object_schema({
+                "action": {"type": "string", "enum": ["list", "show"]},
+                "reference": {"type": "string", "maxLength": 32},
+            }, ["action"]),
+            "git:stash:read",
+            lambda action, reference=None: _stash(root, action, reference=reference),
+            timeout=30,
+        ),
+        FunctionTool(
             "git.stash_drop",
             "Permanently drop one explicitly selected Git stash entry.",
             object_schema({"reference": {"type": "string", "maxLength": 32}}, ["reference"]),
@@ -446,9 +466,9 @@ def create_advanced_git_tools(
         ),
         FunctionTool(
             "git.worktree",
-            "List, add, move, lock, unlock, prune or remove worktrees under the host-configured worktree root.",
+            "Add, move, lock, unlock or prune worktrees under the host-configured worktree root.",
             object_schema({
-                "action": {"type": "string", "enum": ["list", "add", "move", "lock", "unlock", "prune"]},
+                "action": {"type": "string", "enum": ["add", "move", "lock", "unlock", "prune"]},
                 "path": {"type": "string", "maxLength": 500},
                 "branch": {"type": "string", "maxLength": 120},
                 "reference": {"type": "string", "maxLength": 500},
@@ -457,6 +477,17 @@ def create_advanced_git_tools(
             lambda action, path=None, branch=None, reference=None:
                 _worktree(root, worktrees, action, path=path, branch=branch, reference=reference),
             timeout=100,
+        ),
+        FunctionTool(
+            "git.worktree_inspect",
+            "List linked worktrees or inspect the status of one configured worktree.",
+            object_schema({
+                "action": {"type": "string", "enum": ["list", "inspect"]},
+                "path": {"type": "string", "maxLength": 500},
+            }, ["action"]),
+            "git:worktree:read",
+            lambda action, path=None: _worktree(root, worktrees, action, path=path),
+            timeout=30,
         ),
         FunctionTool(
             "git.worktree_remove",
@@ -468,9 +499,9 @@ def create_advanced_git_tools(
         ),
         FunctionTool(
             "git.submodule",
-            "Inspect, add from an allowlisted host, initialize/update with checkout strategy, or synchronize submodules.",
+            "Add from an allowlisted host, initialize/update with checkout strategy, or synchronize submodules.",
             object_schema({
-                "action": {"type": "string", "enum": ["status", "add", "update", "sync"]},
+                "action": {"type": "string", "enum": ["add", "update", "sync"]},
                 "path": {"type": "string", "maxLength": 500},
                 "url": {"type": "string", "maxLength": 2000},
             }, ["action"]),
@@ -478,6 +509,14 @@ def create_advanced_git_tools(
             lambda action, path=None, url=None:
                 _submodule(root, action, path=path, url=url, allowed_hosts=hosts),
             timeout=160,
+        ),
+        FunctionTool(
+            "git.submodule_inspect",
+            "Inspect recursive submodule status without changing repository state.",
+            object_schema({"action": {"type": "string", "enum": ["status"]}}, ["action"]),
+            "git:submodule:read",
+            lambda action: _submodule(root, action, allowed_hosts=hosts),
+            timeout=30,
         ),
         FunctionTool(
             "git.submodule_deinit",
