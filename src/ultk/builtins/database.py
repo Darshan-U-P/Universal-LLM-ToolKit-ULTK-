@@ -392,33 +392,32 @@ class DatabasePack:
         client = MongoClient(cfg["uri"], serverSelectionTimeoutMS=int(cfg.get("server_selection_timeout_ms", 5000)))
         results = []
         try:
-            with client.start_session() as session:
-                with session.start_transaction():
-                    for op in operations:
-                        kind, collection = op.get("operation"), _ident(op.get("collection"))
-                        coll = client[cfg["database"]][collection]
-                        if kind == "insert":
-                            document = op.get("document")
-                            if not isinstance(document, dict) or not document:
-                                raise ToolExecutionError("MongoDB transaction insert requires a document.")
-                            result = coll.insert_one(document, session=session)
-                            results.append({"operation": kind, "inserted_id": str(result.inserted_id)})
-                        elif kind in {"update", "delete"}:
-                            filter_doc = self._mongo_filter(op.get("filter", {}))
-                            if not filter_doc:
-                                raise ToolExecutionError("MongoDB transaction update/delete requires a filter.")
-                            many = bool(op.get("many", False))
-                            if kind == "update":
-                                values = op.get("values")
-                                if not isinstance(values, dict) or not values or any(k.startswith("$") for k in values):
-                                    raise ToolExecutionError("MongoDB transaction update requires safe values.")
-                                result = coll.update_many(filter_doc, {"$set": values}, session=session) if many else coll.update_one(filter_doc, {"$set": values}, session=session)
-                                results.append({"operation": kind, "matched": result.matched_count, "modified": result.modified_count})
-                            else:
-                                result = coll.delete_many(filter_doc, session=session) if many else coll.delete_one(filter_doc, session=session)
-                                results.append({"operation": kind, "deleted_count": result.deleted_count})
+            with client.start_session() as session, session.start_transaction():
+            for op in operations:
+                    kind, collection = op.get("operation"), _ident(op.get("collection"))
+                    coll = client[cfg["database"]][collection]
+                    if kind == "insert":
+                        document = op.get("document")
+                        if not isinstance(document, dict) or not document:
+                            raise ToolExecutionError("MongoDB transaction insert requires a document.")
+                        result = coll.insert_one(document, session=session)
+                        results.append({"operation": kind, "inserted_id": str(result.inserted_id)})
+                    elif kind in {"update", "delete"}:
+                        filter_doc = self._mongo_filter(op.get("filter", {}))
+                        if not filter_doc:
+                            raise ToolExecutionError("MongoDB transaction update/delete requires a filter.")
+                        many = bool(op.get("many", False))
+                        if kind == "update":
+                            values = op.get("values")
+                            if not isinstance(values, dict) or not values or any(k.startswith("$") for k in values):
+                                raise ToolExecutionError("MongoDB transaction update requires safe values.")
+                            result = coll.update_many(filter_doc, {"$set": values}, session=session) if many else coll.update_one(filter_doc, {"$set": values}, session=session)
+                            results.append({"operation": kind, "matched": result.matched_count, "modified": result.modified_count})
                         else:
-                            raise ToolExecutionError("Unsupported MongoDB transaction operation.")
+                            result = coll.delete_many(filter_doc, session=session) if many else coll.delete_one(filter_doc, session=session)
+                            results.append({"operation": kind, "deleted_count": result.deleted_count})
+                    else:
+                        raise ToolExecutionError("Unsupported MongoDB transaction operation.")
             return {"committed": True, "operations": results}
         finally:
             client.close()
