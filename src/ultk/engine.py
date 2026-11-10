@@ -331,14 +331,31 @@ class ToolEngine:
         database: str | Path = "./ultk_memory.sqlite3",
         namespace: str,
         embedder: Any = None,
+        extractor: Any = None,
+        summarizer: Any = None,
         max_items: int = 100_000,
+        max_context_entries: int = 100,
+        max_candidates: int = 30,
     ) -> None:
-        """Install persistent, namespace-isolated memory tools.
+        """Install persistent memory plus optional host-adapted intelligence.
 
         The namespace must come from authenticated host identity, never model input.
-        An optional trusted embedder callable may provide semantic vector embeddings.
+        Embedding, extraction and summarization adapters are trusted host callables;
+        provider credentials and model configuration are not exposed to tools.
         """
-        from ultk.builtins.memory import create_memory_tools
+        from ultk.builtins.memory import PersistentMemory, create_memory_tools
+        from ultk.builtins.memory_intelligence import create_memory_intelligence_tools
+
         self.register_tools(create_memory_tools(
             database, namespace=namespace, embedder=embedder, max_items=max_items,
+        ))
+        store = PersistentMemory(
+            database, namespace=namespace, embedder=embedder, max_items=max_items,
+        )
+        self.register_tools(create_memory_intelligence_tools(
+            store,
+            extractor=extractor,
+            summarizer=summarizer,
+            max_context_entries=max_context_entries,
+            max_candidates=max_candidates,
         ))
