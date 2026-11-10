@@ -144,7 +144,7 @@ class PluginManager:
                     self.registry.register(tool)
             except (ConfigurationError, DuplicateToolError, ToolPermissionError):
                 raise
-            except Exception as exc:  # noqa: BLE001 - isolate plugin import/factory errors
+            except Exception as exc:
                 raise ConfigurationError(
                     f"Plugin loading failed ({type(exc).__name__})."
                 ) from exc
