@@ -2,6 +2,7 @@
 from __future__ import annotations
 import asyncio, hashlib, json, math, re, sqlite3, time, uuid
 from collections import Counter
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable
 from ultk.exceptions import ToolExecutionError
@@ -53,8 +54,18 @@ class PersistentMemory:
               ns TEXT NOT NULL,sid TEXT NOT NULL,seq INTEGER NOT NULL,role TEXT NOT NULL,
               content TEXT NOT NULL,created REAL NOT NULL,PRIMARY KEY(ns,sid,seq));
             """)
+    @contextmanager
     def db(self):
-        c=sqlite3.connect(self.database,timeout=10); c.row_factory=sqlite3.Row; return c
+        c = sqlite3.connect(self.database, timeout=10)
+        c.row_factory = sqlite3.Row
+        try:
+            yield c
+            c.commit()
+        except Exception:
+            c.rollback()
+            raise
+        finally:
+            c.close()
     def embedding(self,text:str)->list[float]:
         try: v=self.embedder(text) if self.embedder else _vector(text)
         except Exception as exc: raise ToolExecutionError("Embedding generation failed.") from exc
