@@ -81,6 +81,8 @@ def test_tool_factory_registers_browser_surface(tmp_path: Path) -> None:
         "browser.download",
         "browser.network_inspect",
         "browser.websocket_probe",
+        "browser.test_run",
+        "browser.profile_workflow",
         "browser.challenge_detect",
         "browser.auth_handoff",
         "browser.auth_status",
