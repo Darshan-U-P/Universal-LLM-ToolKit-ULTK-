@@ -259,3 +259,6 @@ The provider and plugin branches extend the REST integration branch; media exten
   import-style findings in the inherited desktop test file. Those final findings were corrected
   on the base branch and synchronized into this branch. A fresh run against the latest head is
   required before marking CI clean.
+- Follow-up run #500: pytest passed; Ruff reported one remaining blank-line separation issue between
+  standard-library and project imports in the inherited desktop test module. That import block has
+  now been corrected and synchronized. The next CI run must confirm the final state.
