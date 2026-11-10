@@ -278,3 +278,7 @@ The provider and plugin branches extend the REST integration branch; media exten
   OCR and OS failures can occur after earlier steps have executed. No rollback/transaction is claimed.
 - This increment does not add image-template matching, semantic object recognition, screenshot
   streaming, or unattended background desktop sessions.
+- GitHub Actions run #527 completed successfully on commit 36e204d: pytest passed (84 tests) and
+  Ruff passed. The only failures in earlier runs were corrected: the configured OCR line cap now
+  supplies the default, the aggregate-wait test exceeds the limit it asserts, and two unused-code
+  lint findings were removed. Platform-specific GUI/Tesseract integration tests remain pending.
