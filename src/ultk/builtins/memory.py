@@ -204,13 +204,19 @@ class MemoryTool:
         except Exception as exc: raise ToolExecutionError(f"Memory operation failed ({type(exc).__name__}).") from exc
 
 def create_memory_tools(database:str|Path,*,namespace:str,embedder:Callable[[str],list[float]]|None=None,
-                        max_items:int=100000)->tuple[MemoryTool,...]:
-    store=PersistentMemory(database,namespace=namespace,embedder=embedder,max_items=max_items)
+                        max_items:int=100000,store:PersistentMemory|None=None,
+                        after_context_append:Callable[...,dict]|None=None)->tuple[MemoryTool,...]:
+    store=store or PersistentMemory(database,namespace=namespace,embedder=embedder,max_items=max_items)
+    def append_context(session_id:str,role:str,content:str)->dict:
+        result=store.context_append(session_id,role,content)
+        if after_context_append is not None:
+            result["automatic_memory"]=after_context_append(session_id=session_id,role=role,content=content)
+        return result
     txt={"type":"string","minLength":1,"maxLength":20000}
     tags={"type":"array","items":{"type":"string","minLength":1,"maxLength":64},"maxItems":30,"uniqueItems":True}
     meta={"type":"object","maxProperties":50}
     return (
-      MemoryTool("memory.context_append","Append a role-tagged entry to active session context.",object_schema({"role":{"type":"string","enum":["system","user","assistant","tool"]},"content":txt},["role","content"]),"memory:context:write",store.context_append),
+      MemoryTool("memory.context_append","Append a role-tagged entry to active session context and run configured automatic memory hooks.",object_schema({"role":{"type":"string","enum":["system","user","assistant","tool"]},"content":txt},["role","content"]),"memory:context:write",append_context),
       MemoryTool("memory.context_get","Read recent context from active session.",object_schema({"limit":{"type":"integer","minimum":1,"maximum":200}}),"memory:context:read",store.context_get),
       MemoryTool("memory.context_clear","Delete active session context.",object_schema({}),"memory:context:delete",store.context_clear),
       MemoryTool("memory.remember","Persist episodic, semantic or procedural memory.",object_schema({"content":txt,"kind":{"type":"string","enum":sorted(_KINDS)},"scope":{"type":"string","enum":["user","session"]},"tags":tags,"metadata":meta,"confidence":{"type":"number","minimum":0,"maximum":1}},["content"]),"memory:write",store.remember),
