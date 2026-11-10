@@ -18,10 +18,49 @@ class ToolEngine:
     """Register, govern and execute tools without requiring an LLM provider."""
 
     def __init__(self, *, registry: ToolRegistry | None = None,
-                 policy: PermissionPolicy | None = None) -> None:
+                 policy: PermissionPolicy | None = None,
+                 audit_logger: Any = None) -> None:
         self.registry = registry or ToolRegistry()
         self.policy = policy or DenyAllPolicy()
-        self.dispatcher = ToolDispatcher(self.registry, self.policy)
+        self.audit_logger = audit_logger
+        self.dispatcher = ToolDispatcher(self.registry, self.policy, self.audit_logger)
+        self.plugin_manager = None
+
+    def configure_plugins(
+        self,
+        *,
+        trusted_plugins: set[str] | frozenset[str] = frozenset(),
+    ) -> Any:
+        from ultk.plugins import PluginManager
+        self.plugin_manager = PluginManager(
+            self.registry, trusted_plugins=trusted_plugins
+        )
+        return self.plugin_manager
+
+    def enable_audit(self, database: str | Path) -> Any:
+        from ultk.audit import SQLiteAuditLogger
+        self.audit_logger = SQLiteAuditLogger(database)
+        self.dispatcher.audit_logger = self.audit_logger
+        return self.audit_logger
+
+    def require_approval(
+        self,
+        database: str | Path,
+        *,
+        approval_capabilities: set[str] | frozenset[str],
+        ttl_seconds: int = 600,
+        on_request: Any = None,
+    ) -> Any:
+        from ultk.approvals import ApprovalPolicy, SQLiteApprovalStore
+        store = SQLiteApprovalStore(database, ttl_seconds=ttl_seconds)
+        self.policy = ApprovalPolicy(
+            self.policy,
+            store,
+            approval_capabilities=approval_capabilities,
+            on_request=on_request,
+        )
+        self.dispatcher.policy = self.policy
+        return store
 
     def create_workflow_engine(
         self,
@@ -413,3 +452,61 @@ class ToolEngine:
             max_context_entries=max_context_entries,
             max_candidates=max_candidates,
         ))
+
+    def install_data_tools(
+        self,
+        *,
+        root_dir: str | Path,
+        sqlite_database: str | Path | None = None,
+        allow_database_writes: bool = False,
+        max_file_bytes: int = 5_000_000,
+        max_rows: int = 1000,
+    ) -> None:
+        from ultk.builtins.data import create_data_tools
+        self.register_tools(create_data_tools(
+            root_dir=root_dir,
+            sqlite_database=sqlite_database,
+            allow_database_writes=allow_database_writes,
+            max_file_bytes=max_file_bytes,
+            max_rows=max_rows,
+        ))
+
+    def install_rest_tools(
+        self,
+        endpoints: Mapping[str, Mapping[str, Any]],
+        *,
+        allow_writes: bool = False,
+        max_response_bytes: int = 1_000_000,
+        timeout_seconds: int = 20,
+    ) -> None:
+        from ultk.builtins.integrations import create_rest_tools
+        self.register_tools(create_rest_tools(
+            endpoints,
+            allow_writes=allow_writes,
+            max_response_bytes=max_response_bytes,
+            timeout_seconds=timeout_seconds,
+        ))
+
+    def install_media_tools(
+        self,
+        *,
+        root_dir: str | Path,
+        ffmpeg_binary: str | None = None,
+        ffprobe_binary: str | None = None,
+        max_input_bytes: int = 1_000_000_000,
+        max_output_bytes: int = 1_000_000_000,
+        max_pixels: int = 40_000_000,
+    ) -> None:
+        from ultk.builtins.media import create_media_tools
+        self.register_tools(create_media_tools(
+            root_dir=root_dir,
+            ffmpeg_binary=ffmpeg_binary,
+            ffprobe_binary=ffprobe_binary,
+            max_input_bytes=max_input_bytes,
+            max_output_bytes=max_output_bytes,
+            max_pixels=max_pixels,
+        ))
+
+    def install_email_tools(self, **configuration: Any) -> None:
+        from ultk.builtins.communications import create_email_tools
+        self.register_tools(create_email_tools(**configuration))
