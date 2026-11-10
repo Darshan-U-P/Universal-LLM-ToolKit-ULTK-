@@ -12,6 +12,7 @@ from ultk.builtins.data import (
     _write_json,
 )
 from ultk.engine import ToolEngine
+from ultk.exceptions import ToolExecutionError
 from ultk.permissions import AllowListPolicy
 
 
@@ -30,7 +31,7 @@ def test_json_and_csv_files_round_trip_within_root(tmp_path) -> None:
 
 
 def test_data_files_reject_path_traversal(tmp_path) -> None:
-    with pytest.raises(Exception, match="Absolute paths|escapes"):
+    with pytest.raises(ToolExecutionError, match="Absolute paths|escapes"):
         _write_json(tmp_path, "../outside.json", {"unsafe": True}, 10000)
 
 
@@ -42,7 +43,7 @@ def test_sqlite_query_is_read_only_and_parameterized(tmp_path) -> None:
     store = SQLiteDataStore(database)
     result = store._query("SELECT id, label FROM items WHERE id = ?", [1])
     assert result["rows"] == [{"id": 1, "label": "alpha"}]
-    with pytest.raises(Exception):
+    with pytest.raises(ToolExecutionError):
         store._query("DELETE FROM items WHERE id = ?", [1])
     with sqlite3.connect(database) as connection:
         assert connection.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 1
