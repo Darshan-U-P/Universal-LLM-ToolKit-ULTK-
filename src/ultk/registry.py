@@ -32,6 +32,13 @@ class ToolRegistry:
         except KeyError as exc:
             raise ToolNotFoundError(f"Tool is not registered: {name}") from exc
 
+    def unregister(self, name: str) -> Tool:
+        """Remove a registered tool and return its implementation."""
+        try:
+            return self._tools.pop(name)
+        except KeyError as exc:
+            raise ToolNotFoundError(f"Tool is not registered: {name}") from exc
+
     def list(self, names: Iterable[str] | None = None) -> tuple[Tool, ...]:
         if names is None:
             return tuple(self._tools[name] for name in sorted(self._tools))
