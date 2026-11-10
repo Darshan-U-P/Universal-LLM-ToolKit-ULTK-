@@ -102,7 +102,9 @@ def _pptx(path: Path, max_units: int, max_chars: int) -> dict[str, Any]:
         presentation = Presentation(str(path))
         total = len(presentation.slides)
         parts: list[str] = []
-        for index, slide in enumerate(presentation.slides[:max_units], start=1):
+        for index, slide in enumerate(presentation.slides, start=1):
+            if index > max_units:
+                break
             _append(parts, f"\n[Slide {index}]\n", max_chars)
             for shape in slide.shapes:
                 if getattr(shape, "has_text_frame", False):
