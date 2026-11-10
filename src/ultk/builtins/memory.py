@@ -1,16 +1,23 @@
 """Persistent namespace-isolated memory for ULTK."""
-# Ruff's compact validation helpers intentionally use inline guards and grouped imports.
-# ruff: noqa: E401, E701, E702
 from __future__ import annotations
-import asyncio, hashlib, json, math, re, sqlite3, time, uuid
+
+import asyncio
+import hashlib
+import json
+import math
+import re
+import sqlite3
+import time
+import uuid
 from collections import Counter
 from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+
+from ultk.builtins._common import object_schema
 from ultk.exceptions import ToolExecutionError
 from ultk.models import ToolContext, ToolSpec
-from ultk.builtins._common import object_schema
 
 _WORD=re.compile(r"[^\W_]+",re.UNICODE)
 _KINDS={"episodic","semantic","procedural"}
