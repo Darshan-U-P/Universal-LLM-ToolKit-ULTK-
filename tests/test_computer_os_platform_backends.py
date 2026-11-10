@@ -241,8 +241,8 @@ def test_platform_specific_tools_are_registered_with_control_capabilities(tmp_pa
         )
     }
     assert "computer_os.sway_window_action" in tools
-    assert tools["computer_os.sway_window_action"].spec.capability == "computer:window:control"
+    assert tools["computer_os.sway_window_action"].spec.capabilities == frozenset({"computer:window:control"})
     assert "computer_os.accessibility_click" in tools
-    assert tools["computer_os.accessibility_click"].spec.capability == "computer:accessibility:control"
+    assert tools["computer_os.accessibility_click"].spec.capabilities == frozenset({"computer:accessibility:control"})
     assert "computer_os.eject_usb_device" in tools
-    assert tools["computer_os.eject_usb_device"].spec.capability == "system:devices:eject"
+    assert tools["computer_os.eject_usb_device"].spec.capabilities == frozenset({"system:devices:eject"})
