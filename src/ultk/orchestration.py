@@ -224,7 +224,9 @@ class WorkflowStore:
 class WorkflowEngine:
     """Execute bounded DAGs with SQLite checkpoints, retry and cooperative cancellation."""
 
-    TERMINAL: ClassVar[frozenset[str]] = frozenset(\n        {"succeeded", "failed", "skipped", "cancelled"}\n    )
+    TERMINAL: ClassVar[frozenset[str]] = frozenset(
+        {"succeeded", "failed", "skipped", "cancelled"}
+    )
 
     def __init__(self, dispatcher: ToolDispatcher, database: str | Path = "./ultk_workflows.sqlite3",
                  *, max_steps: int = 100, max_concurrency: int = 4) -> None:
@@ -331,10 +333,12 @@ class WorkflowEngine:
                 raise WorkflowError("Workflow cannot progress; inspect its dependency checkpoints.")
             ready = ready[:self.max_concurrency]
 
-            async def execute(sid: str) -> tuple[str, ToolResult]:
-                item = states[sid]
+            async def execute(
+                sid: str, state_snapshot: dict[str, Any] = states
+            ) -> tuple[str, ToolResult]:
+                item = state_snapshot[sid]
                 args = _resolve(json.loads(self._step_arguments(run_id, sid)), {
-                    key: value["output"] for key, value in states.items()
+                    key: value["output"] for key, value in state_snapshot.items()
                     if value["status"] == "succeeded"
                 })
                 attempts = item["attempts"] + 1
