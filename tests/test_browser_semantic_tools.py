@@ -11,8 +11,8 @@ from ultk.builtins.browser_semantic import (
     _wait_for,
     create_semantic_browser_tools,
 )
-from ultk.exceptions import ToolExecutionError
 from ultk.engine import ToolEngine
+from ultk.exceptions import ToolExecutionError
 from ultk.permissions import AllowListPolicy
 
 
