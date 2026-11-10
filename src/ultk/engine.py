@@ -55,6 +55,33 @@ class ToolEngine:
         from ultk.builtins.process_management import create_process_management_tools
         self.register_tools(create_process_management_tools())
 
+    def install_computer_os_tools(
+        self,
+        *,
+        filesystem_root: str | Path = ".",
+        state_database: str | Path = "./ultk_computer_os.sqlite3",
+        allowed_services: frozenset[str] = frozenset(),
+        allowed_acl_sids: frozenset[str] = frozenset(),
+        allowed_eject_devices: frozenset[str] = frozenset(),
+        allow_windows_acl_changes: bool = False,
+        allow_posix_chmod: bool = True,
+        allow_posix_chown: bool = False,
+        max_output_bytes: int = 200_000,
+    ) -> None:
+        """Install multi-display desktop automation and cross-platform computer/OS tools."""
+        from ultk.builtins.computer_os import create_computer_os_tools
+        self.register_tools(create_computer_os_tools(
+            filesystem_root=filesystem_root,
+            state_database=state_database,
+            allowed_services=allowed_services,
+            allowed_acl_sids=allowed_acl_sids,
+            allowed_eject_devices=allowed_eject_devices,
+            allow_windows_acl_changes=allow_windows_acl_changes,
+            allow_posix_chmod=allow_posix_chmod,
+            allow_posix_chown=allow_posix_chown,
+            max_output_bytes=max_output_bytes,
+        ))
+
     def install_computer_tools(self, *, image_root: str | Path = "./screenshots",
                                allowed_apps: dict[str, str] | None = None,
                                allowed_environment_names: tuple[str, ...] = ()) -> None:
