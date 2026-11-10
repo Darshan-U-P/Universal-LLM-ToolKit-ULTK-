@@ -1,6 +1,6 @@
 """Expanded browser control plane: profiles, tabs, frames, network, scraping and guarded submissions."""
 from __future__ import annotations
-import hashlib, json, re, shutil, sqlite3, time, uuid
+import hashlib, json, os, re, shutil, sqlite3, threading, time, uuid
 from pathlib import Path
 from typing import Any
 from ultk.builtins._common import FunctionTool, object_schema
@@ -46,14 +46,32 @@ def _form_snapshot(page, selector: str) -> dict[str, Any]:
 
 
 class BrowserControlPlane:
-    def __init__(self, root: str | Path, *, headless: bool = True,
-                 max_profiles: int = 20, max_tabs: int = _MAX_TABS,
-                 extension_dirs: tuple[str | Path, ...] = (), notifier=None) -> None:
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        headless: bool = True,
+        max_profiles: int = 20,
+        max_tabs: int = _MAX_TABS,
+        extension_dirs: tuple[str | Path, ...] = (),
+        notifier=None,
+        download_root: str | Path | None = None,
+        max_download_bytes: int = 25_000_000,
+    ) -> None:
+        if not 1 <= max_profiles <= 100 or not 1 <= max_tabs <= _MAX_TABS:
+            raise ValueError("max_profiles must be 1-100 and max_tabs must be 1-12.")
+        if not 1 <= max_download_bytes <= 100_000_000:
+            raise ValueError("max_download_bytes must be between 1 byte and 100 MB.")
         self.root = Path(root).expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
+        self.download_root = Path(download_root or (self.root / "downloads")).expanduser().resolve()
+        self.download_root.mkdir(parents=True, exist_ok=True)
+        self.max_download_bytes = max_download_bytes
         self.headless, self.max_profiles, self.max_tabs = bool(headless), max_profiles, max_tabs
         self.extension_dirs = tuple(Path(x).expanduser().resolve() for x in extension_dirs)
         self.notifier = notifier
+        self._profile_locks: dict[str, threading.Lock] = {}
+        self._profile_locks_guard = threading.Lock()
         for extension in self.extension_dirs:
             if not extension.is_dir() or not (extension / "manifest.json").is_file():
                 raise ValueError(f"Trusted browser extension directory is invalid: {extension}")
@@ -110,10 +128,13 @@ class BrowserControlPlane:
 
     def delete_profile(self, name: str):
         name = _name(name)
-        with sqlite3.connect(self.db_path) as db: cur = db.execute("DELETE FROM profiles WHERE name=?", (name,))
-        path = self._profile_path(name)
-        if path.exists(): shutil.rmtree(path)
-        return {"profile": name, "deleted": cur.rowcount == 1}
+        with self._profile_lock(name):
+            with sqlite3.connect(self.db_path) as db:
+                cur = db.execute("DELETE FROM profiles WHERE name=?", (name,))
+            path = self._profile_path(name)
+            if path.exists():
+                shutil.rmtree(path)
+            return {"profile": name, "deleted": cur.rowcount == 1}
 
     @staticmethod
     def _guard_context(context):
@@ -136,7 +157,16 @@ class BrowserControlPlane:
                 route.abort()
         page.route("**/*", guard)
 
+    def _profile_lock(self, profile: str) -> threading.Lock:
+        with self._profile_locks_guard:
+            return self._profile_locks.setdefault(profile, threading.Lock())
+
     def _with_context(self, profile: str, action):
+        profile = _name(profile)
+        with self._profile_lock(profile):
+            return self._with_context_locked(profile, action)
+
+    def _with_context_locked(self, profile: str, action):
         profile = _name(profile)
         with sqlite3.connect(self.db_path) as db:
             if not db.execute("SELECT 1 FROM profiles WHERE name=?", (profile,)).fetchone():
@@ -159,7 +189,7 @@ class BrowserControlPlane:
                                "--load-extension=" + ",".join(paths)]
             context = p.chromium.launch_persistent_context(
                 user_data_dir=str(user_data_dir), headless=self.headless, args=launch_args,
-                service_workers="block", accept_downloads=False)
+                service_workers="block", accept_downloads=True)
             self._guard_context(context)
             try:
                 initial_pages = list(context.pages)
@@ -270,13 +300,23 @@ class BrowserControlPlane:
         attrs=attributes or ["href"]
         if len(attrs)>8 or any(not re.fullmatch(r"[A-Za-z_:][-A-Za-z0-9_:.]{0,63}",a) for a in attrs):
             raise ToolExecutionError("Invalid attribute list.")
-        def run(ctx,pages,active):
-            items=pages[active].locator(selector).all()[:limit]; records=[]
-            for item in items:
-                rec={"text":item.inner_text(timeout=5000)[:2000]}
-                for attr in attrs: rec[attr]=item.get_attribute(attr,timeout=5000)
-                records.append(rec)
-            return {"url":pages[active].url,"selector":selector,"count":len(records),"records":records}
+        def run(ctx, pages, active):
+            locator = pages[active].locator(selector)
+            count = min(locator.count(), limit)
+            records = []
+            for index in range(count):
+                item = locator.nth(index)
+                record = {"text": item.inner_text(timeout=5000)[:2000]}
+                for attribute in attrs:
+                    record[attribute] = item.get_attribute(attribute, timeout=5000)
+                records.append(record)
+            return {
+                "url": pages[active].url,
+                "selector": selector,
+                "count": len(records),
+                "records": records,
+                "truncated": locator.count() > limit,
+            }
         return self._with_context(profile,run)
 
     def network(self, profile: str, url: str|None=None):
@@ -333,7 +373,8 @@ class BrowserControlPlane:
         return self._with_context(profile, run)
 
     def auth_status(self, profile: str, selectors: list[str]):
-        if len(selectors)>10 or any(not isinstance(s,str) or len(s)>300 for s in selectors): raise ToolExecutionError("Authentication selectors are invalid.")
+        if not 1 <= len(selectors) <= 10 or any(not isinstance(s, str) or not s or len(s) > 300 for s in selectors):
+            raise ToolExecutionError("Provide 1-10 non-empty authentication selectors of at most 300 characters.")
         def run(ctx,pages,active):
             page=pages[active]; found=[]
             for selector in selectors:
@@ -412,6 +453,8 @@ class BrowserControlPlane:
     def run_test(self, profile: str, steps: list[dict[str, Any]]):
         if not 1 <= len(steps) <= 30:
             raise ToolExecutionError("Browser test must contain 1–30 steps.")
+        if any(not isinstance(step, dict) for step in steps):
+            raise ToolExecutionError("Every browser test step must be an object.")
         def run(ctx, pages, active):
             page = pages[active]
             results = []
