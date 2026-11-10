@@ -447,8 +447,9 @@ The provider and plugin branches extend the REST integration branch; media exten
 - SQL: table/column discovery, bounded SELECT, parameterized INSERT/UPDATE/DELETE and
   bounded atomic mutation transactions. Identifiers are allowlisted; values use driver
   parameters; unfiltered UPDATE/DELETE is refused.
-- MongoDB: collection discovery, bounded find, insert, update and delete. Filters reject
-  executable and unknown operators; update/delete require non-empty filters.
+- MongoDB: collection discovery, bounded find, insert, update, delete and bounded session-backed
+  transactions. Filters reject executable and unknown operators; update/delete require filters.
+  Transactions require a replica set or sharded cluster.
 - Redis: prefixed key get/set/delete, bounded SCAN, JSON value encoding, TTLs and atomic
   MULTI/EXEC transactions.
 - Added separate read, schema-read, write, delete and transaction capabilities and
