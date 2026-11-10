@@ -118,6 +118,9 @@ class BrowserControlPlane:
             if not source_exists:
                 raise ToolExecutionError("Source browser profile does not exist.")
             source = self._profile_path(source_name)
+        target = self._profile_path(name)
+        if target.exists():
+            raise ToolExecutionError("Browser profile data directory already exists; refusing to reuse stale state.")
         with sqlite3.connect(self.db_path) as db:
             if db.execute("SELECT COUNT(*) FROM profiles").fetchone()[0] >= self.max_profiles:
                 raise ToolExecutionError("Browser profile limit reached.")
@@ -126,7 +129,6 @@ class BrowserControlPlane:
             now = time.time()
             db.execute("INSERT INTO profiles(name,created,last_used,tabs,active_tab) VALUES (?,?,?,?,0)",
                        (name, now, now, "[]"))
-        target = self._profile_path(name)
         try:
             if source is not None:
                 if not source.is_dir():
