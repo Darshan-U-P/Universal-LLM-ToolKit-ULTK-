@@ -74,6 +74,10 @@ class DatabasePack:
                 "sqlite", "mysql", "postgresql", "mongodb", "redis"
             }:
                 raise ValueError(f"Unsupported database profile: {name}")
+            if cfg["backend"] == "redis" and (not isinstance(cfg.get("key_prefix"), str) or not cfg.get("key_prefix")):
+                raise ValueError(f"Redis profile {name!r} requires a non-empty key_prefix.")
+            if cfg["backend"] == "mongodb" and (not cfg.get("uri") or not cfg.get("database")):
+                raise ValueError(f"MongoDB profile {name!r} requires host-configured uri and database.")
             self.profiles[name] = dict(cfg)
         self.max_rows, self.max_bytes, self.max_batch = max_rows, max_result_bytes, max_batch
 
@@ -376,6 +380,48 @@ class DatabasePack:
         finally:
             client.close()
 
+    def mongo_transaction(self, profile: str, operations: list[dict[str, Any]]) -> dict[str, Any]:
+        cfg = self._cfg(profile, "mongodb")
+        if not 1 <= len(operations) <= self.max_batch:
+            raise ToolExecutionError("MongoDB transaction size outside configured bounds.")
+        try:
+            from pymongo import MongoClient
+        except ImportError as exc:
+            raise ToolExecutionError("Install the database-mongodb extra.") from exc
+        client = MongoClient(cfg["uri"], serverSelectionTimeoutMS=int(cfg.get("server_selection_timeout_ms", 5000)))
+        results = []
+        try:
+            with client.start_session() as session:
+                with session.start_transaction():
+                    for op in operations:
+                        kind, collection = op.get("operation"), _ident(op.get("collection"))
+                        coll = client[cfg["database"]][collection]
+                        if kind == "insert":
+                            document = op.get("document")
+                            if not isinstance(document, dict) or not document:
+                                raise ToolExecutionError("MongoDB transaction insert requires a document.")
+                            result = coll.insert_one(document, session=session)
+                            results.append({"operation": kind, "inserted_id": str(result.inserted_id)})
+                        elif kind in {"update", "delete"}:
+                            filter_doc = self._mongo_filter(op.get("filter", {}))
+                            if not filter_doc:
+                                raise ToolExecutionError("MongoDB transaction update/delete requires a filter.")
+                            many = bool(op.get("many", False))
+                            if kind == "update":
+                                values = op.get("values")
+                                if not isinstance(values, dict) or not values or any(k.startswith("$") for k in values):
+                                    raise ToolExecutionError("MongoDB transaction update requires safe values.")
+                                result = coll.update_many(filter_doc, {"$set": values}, session=session) if many else coll.update_one(filter_doc, {"$set": values}, session=session)
+                                results.append({"operation": kind, "matched": result.matched_count, "modified": result.modified_count})
+                            else:
+                                result = coll.delete_many(filter_doc, session=session) if many else coll.delete_one(filter_doc, session=session)
+                                results.append({"operation": kind, "deleted_count": result.deleted_count})
+                        else:
+                            raise ToolExecutionError("Unsupported MongoDB transaction operation.")
+            return {"committed": True, "operations": results}
+        finally:
+            client.close()
+
     def _redis(self, profile: str):
         cfg = self._cfg(profile, "redis")
         try:
@@ -517,6 +563,7 @@ def create_database_tools(profiles: dict[str, dict[str, Any]], *, max_rows: int 
         add("database.mongo_insert", "Insert one MongoDB document.", {"profile": p, "collection": {"type": "string"}, "document": {"type": "object", "minProperties": 1}}, ["profile", "collection", "document"], "database:write", pack.mongo_insert)
         add("database.mongo_update", "Set fields on matching MongoDB documents; filter is mandatory.", {"profile": p, "collection": {"type": "string"}, "filter": {"type": "object", "minProperties": 1}, "values": {"type": "object", "minProperties": 1}, "many": {"type": "boolean"}}, ["profile", "collection", "filter", "values"], "database:write", pack.mongo_update)
         add("database.mongo_delete", "Delete matching MongoDB documents; filter is mandatory.", {"profile": p, "collection": {"type": "string"}, "filter": {"type": "object", "minProperties": 1}, "many": {"type": "boolean"}}, ["profile", "collection", "filter"], "database:delete", pack.mongo_delete)
+        add("database.mongo_transaction", "Run a bounded MongoDB transaction on a transaction-capable deployment.", {"profile": p, "operations": {"type": "array", "items": {"type": "object"}, "minItems": 1, "maxItems": max_batch}}, ["profile", "operations"], "database:transaction", pack.mongo_transaction, 30)
 
     if redis_profiles:
         p = profile_schema(redis_profiles)
