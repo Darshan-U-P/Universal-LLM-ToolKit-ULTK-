@@ -24,6 +24,14 @@ class ToolPermissionError(ULTKError):
     """The current policy does not authorize a tool call."""
 
 
+class ApprovalRequiredError(ToolPermissionError):
+    """A valid approval is required before this invocation can execute."""
+
+    def __init__(self, approval_id: str) -> None:
+        self.approval_id = approval_id
+        super().__init__(f"Human approval required: {approval_id}")
+
+
 class ToolExecutionError(ULTKError):
     """A tool failed during execution."""
 
