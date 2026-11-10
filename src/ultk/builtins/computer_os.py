@@ -824,6 +824,12 @@ class ComputerOSPack:
             if action in {"create", "switch"}:
                 if type(desktop_number) is not int or not 0 <= desktop_number <= 999:
                     raise ToolExecutionError("desktop_number must be an integer from 0 to 999.")
+                workspaces = self._sway_request("-t", "get_workspaces", "-r")
+                exists = any(item.get("num") == desktop_number for item in workspaces)
+                if action == "create" and exists:
+                    raise ToolExecutionError("Sway workspace number already exists.")
+                if action == "switch" and not exists:
+                    raise ToolExecutionError("Sway workspace number does not exist.")
                 result = self._sway_request("workspace", "number", str(desktop_number))
                 return {"backend": "sway-ipc", "action": action, "workspace_number": desktop_number,
                         "result": result}
