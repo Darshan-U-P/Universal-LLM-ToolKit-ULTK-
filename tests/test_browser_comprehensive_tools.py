@@ -298,7 +298,10 @@ def test_profile_workflow_prevalidates_all_steps_before_opening_browser(tmp_path
         ])
 
 
-def test_profile_workflow_executes_prevalidated_steps_and_returns_active_page(tmp_path: Path) -> None:
+def test_profile_workflow_executes_prevalidated_steps_and_returns_active_page(tmp_path: Path, monkeypatch) -> None:
+    import ultk.builtins.browser_comprehensive as module
+
+    monkeypatch.setattr(module, "_url", lambda value: value)
     pack = BrowserControlPlane(tmp_path / "profiles")
 
     class Locator:
