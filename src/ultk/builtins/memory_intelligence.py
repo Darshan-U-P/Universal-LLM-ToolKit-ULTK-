@@ -229,7 +229,7 @@ class MemoryIntelligence:
         source_ids = [item["memory_id"] for item in compatible]
         payload = {
             "task": "consolidate_memories",
-            "instruction": "Produce one faithful summary. Preserve distinctions and uncertainty; do not infer facts.",
+            "instruction": "Produce one faithful summary. Preserve distinctions and uncertainty; do not infer facts. If claims conflict, return them in a conflicts array and do not merge them.",
             "memories": [{key: value for key, value in item.items() if key != "_vector"} for item in compatible],
         }
         try:
@@ -238,6 +238,16 @@ class MemoryIntelligence:
             raise ToolExecutionError(f"Consolidation summarizer failed ({type(exc).__name__}).") from exc
         if not isinstance(result, dict):
             raise ToolExecutionError("Consolidation summarizer must return an object.")
+        conflicts = result.get("conflicts", [])
+        if not isinstance(conflicts, list) or len(conflicts) > 20:
+            raise ToolExecutionError("Consolidation conflicts must be a bounded list.")
+        if conflicts:
+            return {
+                "consolidated": False,
+                "reason": "conflicting_information",
+                "conflicts": [_safe_text(item, limit=2000) for item in conflicts],
+                "source_records_retained": len(source_ids),
+            }
         merged = _safe_text(result.get("summary"), limit=12000)
         first = compatible[0]
         tags = sorted({tag for item in compatible for tag in item["tags"]} | {"consolidated"})
