@@ -239,11 +239,12 @@ The provider and plugin branches extend the REST integration branch; media exten
   re-execution from a saved definition.
 - Integrated through ToolEngine.create_workflow_engine and public WorkflowStep/WorkflowEngine exports.
 - Added tests/test_orchestration.py and docs/WORKFLOW_ORCHESTRATION.md.
-- GitHub Actions run #476 executed against the first integrated head: pytest passed (69 tests),
-  while Ruff reported 13 findings. The workflow-module findings (ClassVar and closure binding) and
-  inherited desktop-pack findings (import ordering, exception-handler annotations, subprocess
-  capture style and test imports) have been corrected in the current branch. A new check against
-  the fully synchronized head is still required; mypy and platform integration checks remain pending.
+- GitHub Actions run #505 completed successfully against the synchronized workflow and desktop
+  code: pytest passed (69 tests) and Ruff passed. The earlier workflow-module and inherited desktop
+  lint findings have been corrected. The verification commit after this run changes only this
+  ledger entry; no runtime code changed after the successful run.
+- Mypy, Windows/macOS/Linux desktop integration, SQLite crash/disk-full, multi-process execution,
+  and external-side-effect idempotency checks remain pending.
 - Recovery is at-least-once. A crash after an external side effect but before checkpoint persistence
   can cause a repeated tool call. Exactly-once side effects and distributed worker leasing are not
   implemented. Recovery must only be run after the prior worker is stopped.
@@ -254,11 +255,3 @@ The provider and plugin branches extend the REST integration branch; media exten
   concurrency bounds, dependency skip/fail-fast semantics, retry persistence/backoff, concurrent
   cancellation, crash recovery, replay definition fidelity, SQLite locking/corruption/disk-full,
   secret-bearing argument/output storage, and multiple simultaneous workflow runners.
-
-- Follow-up GitHub Actions run #495: pytest passed; Ruff found only two remaining import-order /
-  import-style findings in the inherited desktop test file. Those final findings were corrected
-  on the base branch and synchronized into this branch. A fresh run against the latest head is
-  required before marking CI clean.
-- Follow-up run #500: pytest passed; Ruff reported one remaining blank-line separation issue between
-  standard-library and project imports in the inherited desktop test module. That import block has
-  now been corrected and synchronized. The next CI run must confirm the final state.
