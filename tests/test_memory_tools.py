@@ -53,8 +53,7 @@ def test_host_embedder_used_and_persisted(tmp_path:Path):
 def test_tools_take_session_from_dispatch_context(tmp_path:Path):
     tools=create_memory_tools(tmp_path/"m.sqlite3",namespace="tenant")
     engine=ToolEngine(policy=AllowListPolicy(
-      allowed_tools=frozenset({"memory.context_append","memory.context_get"}),
-      granted_capabilities=frozenset({"memory:context:write","memory:context:read"})))
+      {"memory.context_append","memory.context_get"}))
     engine.register_tools(tools)
     async def run():
         w=await engine.execute("memory.context_append",{"role":"user","content":"hi"},
