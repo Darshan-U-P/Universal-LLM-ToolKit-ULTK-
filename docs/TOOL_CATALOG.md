@@ -8,7 +8,7 @@ This is a planned taxonomy, not an implementation inventory. Each tool must be i
 | Computer/OS | filesystem, process management, terminal, clipboard, persistent desktop sessions, multi-monitor/window/virtual desktop control, keyboard and accessibility automation, OCR text recognition and targeting, multi-scale image-template recognition, icon/control matching, unique-match clicking, scrolling, dragging, bounded visual GUI workflows, natural-language AI visual grounding, candidate-box inspection and unique-candidate clicking, native macOS/Linux accessibility actions, Sway Wayland window/workspace control, allowlisted Windows safe USB ejection |
 | Web | search, URL fetch, headless browser sessions, accessible DOM inspection and interaction, persistent Chromium profiles, tabs/popups/iframes, cookie management, structured scraping, authenticated downloads, bounded network/WebSocket inspection, CAPTCHA detection and human auth handoff, preview-fingerprinted approval-gated form submission, browser test assertions, persistent website monitoring |
 | Development | editor, isolated code runner, compiler, debugger, tests, Git status/log/diff, rebase/cherry-pick/revert, stash, linked worktrees, allowlisted submodules, conflict inspection/resolution, host-adapted pull-request review and merge |
-| Data | CSV/JSON/XML/XLSX table I/O, schema validation, filtering, selection, rename, sort, deduplication, joins, grouping/aggregation, safe derived columns and file-to-file ETL |
+| Data | CSV/JSON/XML/XLSX table I/O, schema validation, filtering, selection, rename, sort, deduplication, joins, grouping/aggregation, safe derived columns and file-to-file ETL; MySQL/PostgreSQL/SQLite, MongoDB and Redis integrations |
 | Documents | TXT/Markdown/PDF/DOCX/PPTX/XLSX/XLS/ODT/ODS discovery, metadata and text extraction; PDF merge and page extraction |
 | Communication | email, calendar, contacts, notifications, SMS, messaging |
 | Media | image, audio, speech, video, subtitles, media conversion |
@@ -42,3 +42,10 @@ Implemented as optional packs through `ToolEngine.install_document_tools(...)` a
 [Documents and Structured Data](DOCUMENTS_AND_STRUCTURED_DATA.md). OCR, scanned-PDF recognition,
 layout-faithful conversion, document editing, database engines, streaming/distributed ETL and
 vector search remain separate capabilities.
+
+
+## Database integrations
+
+Implemented as an optional pack through \`ToolEngine.install_database_tools(profiles=...)\`.
+See [Database Integrations](DATABASE_INTEGRATIONS.md) for profile configuration, tool
+names, optional drivers, capabilities and security boundaries.
