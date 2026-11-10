@@ -1,6 +1,14 @@
 """Expanded browser control plane: profiles, tabs, frames, network, scraping and guarded submissions."""
 from __future__ import annotations
-import hashlib, json, os, re, shutil, sqlite3, threading, time, uuid
+import hashlib
+import json
+import os
+import re
+import shutil
+import sqlite3
+import threading
+import time
+import uuid
 from pathlib import Path
 from typing import Any
 from ultk.builtins._common import FunctionTool, object_schema
@@ -92,8 +100,10 @@ class BrowserControlPlane:
             row = db.execute("SELECT tabs,active_tab FROM profiles WHERE name=?", (profile,)).fetchone()
         if row is None:
             raise ToolExecutionError("Browser profile does not exist.")
-        try: tabs = json.loads(row[0])
-        except (ValueError, TypeError): tabs = []
+        try:
+            tabs = json.loads(row[0])
+        except (ValueError, TypeError):
+            tabs = []
         return [str(x) for x in tabs if isinstance(x, str)][:self.max_tabs], int(row[1])
 
     def create_profile(self, name: str, clone_from: str | None = None):
@@ -209,12 +219,16 @@ class BrowserControlPlane:
                         page.goto(_url(saved_url), wait_until="domcontentloaded", timeout=20000)
                         pages.append(page)
                     except Exception:
-                        try: page.close()
-                        except Exception: pass
+                        try:
+                            page.close()
+                        except Exception:
+                            pass
                 if pages:
                     for initial in initial_pages:
-                        try: initial.close()
-                        except Exception: pass
+                        try:
+                            initial.close()
+                        except Exception:
+                            pass
                 else:
                     pages = initial_pages or [context.new_page()]
                 active = min(max(active, 0), len(pages)-1)
@@ -235,7 +249,9 @@ class BrowserControlPlane:
         if wait_until not in {"domcontentloaded","load","networkidle","commit"}:
             raise ToolExecutionError("Unsupported navigation wait condition.")
         def run(ctx,pages,active):
-            page=pages[active]; page.goto(url,wait_until=wait_until,timeout=25000); _url(page.url)
+            page = pages[active]
+            page.goto(url, wait_until=wait_until, timeout=25000)
+            _url(page.url)
             return {"url":page.url,"title":page.title(),"tab_index":active}
         return self._with_context(profile,run)
 
@@ -252,14 +268,19 @@ class BrowserControlPlane:
                 return {"tabs":[{"index":i,"url":p.url,"title":p.title(),"is_active":i==active}
                                 for i,p in enumerate(ctx.pages)]}
             if operation=="new":
-                if len(ctx.pages)>=self.max_tabs: raise ToolExecutionError("Browser tab limit reached.")
-                if not url: raise ToolExecutionError("Creating a persistent tab requires a public URL.")
-                page=ctx.new_page(); self._guard(page)
+                if len(ctx.pages) >= self.max_tabs:
+                    raise ToolExecutionError("Browser tab limit reached.")
+                if not url:
+                    raise ToolExecutionError("Creating a persistent tab requires a public URL.")
+                page = ctx.new_page()
+                self._guard(page)
                 page.goto(_url(url),wait_until="domcontentloaded",timeout=25000)
                 return {"created":True,"tab_index":len(ctx.pages)-1,"url":page.url,"_active_page":page}
-            if index is None or not 0<=index<len(ctx.pages): raise ToolExecutionError("A valid tab index is required.")
+            if index is None or not 0 <= index < len(ctx.pages):
+                raise ToolExecutionError("A valid tab index is required.")
             page=ctx.pages[index]
-            if operation=="select": return {"selected":index,"url":page.url,"_active_page":page}
+            if operation == "select":
+                return {"selected": index, "url": page.url, "_active_page": page}
             if operation=="close":
                 if len(ctx.pages)==1:
                     raise ToolExecutionError("Cannot close the only browser tab.")
@@ -273,24 +294,33 @@ class BrowserControlPlane:
         return self._with_context(profile,run)
 
     def popup(self, profile: str, selector: str, timeout_ms: int = 5000):
-        if not selector or len(selector)>500 or not 500<=timeout_ms<=15000: raise ToolExecutionError("Popup selector or timeout is invalid.")
+        if not selector or len(selector) > 500 or not 500 <= timeout_ms <= 15000:
+            raise ToolExecutionError("Popup selector or timeout is invalid.")
         def run(ctx,pages,active):
             try:
-                with ctx.expect_page(timeout=timeout_ms) as info: pages[active].locator(selector).first.click(timeout=timeout_ms)
-                page=info.value; page.wait_for_load_state("domcontentloaded",timeout=timeout_ms); _url(page.url)
+                with ctx.expect_page(timeout=timeout_ms) as info:
+                    pages[active].locator(selector).first.click(timeout=timeout_ms)
+                page = info.value
+                page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+                _url(page.url)
                 self._guard(page)
                 return {"opened":True,"url":page.url,"title":page.title(),"tab_index":ctx.pages.index(page),"_active_page":page}
-            except Exception as exc: raise ToolExecutionError(f"Popup was not captured ({type(exc).__name__}).") from exc
+            except Exception as exc:
+                raise ToolExecutionError(f"Popup was not captured ({type(exc).__name__}).") from exc
         return self._with_context(profile,run)
 
     def frame(self, profile: str, frame_selector: str, action: str, selector: str="body", value: str|None=None):
-        if not frame_selector or len(frame_selector)>500 or not selector or len(selector)>500: raise ToolExecutionError("Frame and element selectors must be bounded.")
+        if not frame_selector or len(frame_selector) > 500 or not selector or len(selector) > 500:
+            raise ToolExecutionError("Frame and element selectors must be bounded.")
         def run(ctx,pages,active):
             loc=pages[active].frame_locator(frame_selector).locator(selector).first
-            if action=="read": return {"text":loc.inner_text(timeout=10000)[:10000],"url":pages[active].url}
-            if action=="click": loc.click(timeout=10000)
+            if action == "read":
+                return {"text": loc.inner_text(timeout=10000)[:10000], "url": pages[active].url}
+            if action == "click":
+                loc.click(timeout=10000)
             elif action=="fill":
-                if value is None or len(value)>5000: raise ToolExecutionError("Frame fill requires a value up to 5000 characters.")
+                if value is None or len(value) > 5000:
+                    raise ToolExecutionError("Frame fill requires a value up to 5000 characters.")
                 loc.fill(value,timeout=10000)
             else: raise ToolExecutionError("Frame action must be read, click or fill.")
             return {"action":action,"url":pages[active].url}
@@ -304,14 +334,17 @@ class BrowserControlPlane:
                     "expires":c.get("expires"),"httpOnly":c.get("httpOnly"),"secure":c.get("secure"),
                     "sameSite":c.get("sameSite")} for c in cs],"count":len(cs)}
             if operation=="clear":
-                if name: ctx.clear_cookies(name=name)
-                else: ctx.clear_cookies()
+                if name:
+                    ctx.clear_cookies(name=name)
+                else:
+                    ctx.clear_cookies()
                 return {"cleared":True,"name":name}
             raise ToolExecutionError("Cookie operation must be list or clear.")
         return self._with_context(profile,run)
 
     def scrape(self, profile: str, selector: str, attributes: list[str]|None=None, limit: int=50):
-        if not selector or len(selector)>500 or not 1<=limit<=200: raise ToolExecutionError("Scrape selector or result limit is invalid.")
+        if not selector or len(selector) > 500 or not 1 <= limit <= 200:
+            raise ToolExecutionError("Scrape selector or result limit is invalid.")
         attrs=attributes or ["href"]
         if len(attrs)>8 or any(not re.fullmatch(r"[A-Za-z_:][-A-Za-z0-9_:.]{0,63}",a) for a in attrs):
             raise ToolExecutionError("Invalid attribute list.")
@@ -382,7 +415,9 @@ class BrowserControlPlane:
 
     def challenge(self, profile: str):
         def run(ctx,pages,active):
-            page=pages[active]; title=page.title(); body=page.locator("body").inner_text(timeout=5000)[:12000].casefold()
+            page = pages[active]
+            title = page.title()
+            body = page.locator("body").inner_text(timeout=5000)[:12000].casefold()
             indicators=[x for x in ("captcha","verify you are human","are you a robot","cloudflare","checking your browser","security challenge") if x in (title+" "+body).casefold()]
             frames=[f.url[:1000] for f in page.frames if any(x in f.url.casefold() for x in ("captcha","recaptcha","hcaptcha","challenges.cloudflare"))]
             return {"challenge_detected":bool(indicators or frames),"indicators":indicators,
@@ -423,17 +458,21 @@ class BrowserControlPlane:
         if not 1 <= len(selectors) <= 10 or any(not isinstance(s, str) or not s or len(s) > 300 for s in selectors):
             raise ToolExecutionError("Provide 1-10 non-empty authentication selectors of at most 300 characters.")
         def run(ctx,pages,active):
-            page=pages[active]; found=[]
+            page = pages[active]
+            found = []
             for selector in selectors:
                 try:
-                    if page.locator(selector).count(): found.append(selector)
-                except Exception: pass
+                    if page.locator(selector).count():
+                        found.append(selector)
+                except Exception:
+                    pass
             return {"url":page.url,"title":page.title(),"authenticated_heuristic":not bool(found),
                     "login_indicators_found":found,"warning":"Selector heuristic only; not authoritative identity verification."}
         return self._with_context(profile,run)
 
     def form_preview(self, profile: str, selector: str):
-        if not selector or len(selector)>500: raise ToolExecutionError("A bounded form selector is required.")
+        if not selector or len(selector) > 500:
+            raise ToolExecutionError("A bounded form selector is required.")
         def run(ctx,pages,active):
             snapshot = _form_snapshot(pages[active], selector)
             fingerprint = hashlib.sha256(json.dumps(snapshot,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
@@ -444,7 +483,8 @@ class BrowserControlPlane:
         if not selector or len(selector)>500 or not re.fullmatch(r"[A-Fa-f0-9]{64}", expected_form_sha256):
             raise ToolExecutionError("A bounded form selector and SHA-256 preview fingerprint are required.")
         def run(ctx,pages,active):
-            page=pages[active]; form=page.locator(selector).first
+            page = pages[active]
+            form = page.locator(selector).first
             snapshot = _form_snapshot(page, selector)
             if snapshot["method"] not in {"GET", "POST"}:
                 raise ToolExecutionError("Only GET and POST form submissions are supported.")
@@ -536,16 +576,23 @@ class BrowserControlPlane:
 
     def monitor_add(self,url:str,selector:str|None=None):
         _url(url)
-        if selector is not None and (not selector or len(selector)>500): raise ToolExecutionError("Monitor selector is invalid.")
+        if selector is not None and (not selector or len(selector) > 500):
+            raise ToolExecutionError("Monitor selector is invalid.")
         mid=uuid.uuid4().hex
-        with sqlite3.connect(self.db_path) as db: db.execute("INSERT INTO site_changes(monitor_id,url,selector) VALUES (?,?,?)",(mid,url,selector))
+        with sqlite3.connect(self.db_path) as db:
+            db.execute(
+                "INSERT INTO site_changes(monitor_id,url,selector) VALUES (?,?,?)",
+                (mid, url, selector),
+            )
         return {"monitor_id":mid,"url":url,"selector":selector}
 
     def monitor_check(self,monitor_id:str):
-        if not isinstance(monitor_id,str) or len(monitor_id)!=32: raise ToolExecutionError("Invalid monitor identifier.")
+        if not isinstance(monitor_id, str) or len(monitor_id) != 32:
+            raise ToolExecutionError("Invalid monitor identifier.")
         with sqlite3.connect(self.db_path) as db:
             row=db.execute("SELECT url,selector,last_hash FROM site_changes WHERE monitor_id=? AND enabled=1",(monitor_id,)).fetchone()
-        if row is None: raise ToolExecutionError("Website monitor not found or disabled.")
+        if row is None:
+            raise ToolExecutionError("Website monitor not found or disabled.")
         result = self._fetch_monitor(row[0], row[1])
         digest = hashlib.sha256((result["title"] + "\\n" + result["text"]).encode()).hexdigest()
         changed = row[2] is not None and row[2] != digest
@@ -625,21 +672,26 @@ class BrowserControlPlane:
                         page.goto(_url(step.get("url","")), wait_until="domcontentloaded", timeout=20000)
                     elif action in {"click","fill"}:
                         selector = step.get("selector","")
-                        if not selector or len(selector)>500: raise ToolExecutionError("Invalid test selector.")
+                        if not selector or len(selector) > 500:
+                            raise ToolExecutionError("Invalid test selector.")
                         loc = page.locator(selector).first
-                        if action == "click": loc.click(timeout=10000)
+                        if action == "click":
+                            loc.click(timeout=10000)
                         else:
                             value = step.get("value","")
-                            if not isinstance(value,str) or len(value)>5000: raise ToolExecutionError("Invalid test value.")
+                            if not isinstance(value, str) or len(value) > 5000:
+                                raise ToolExecutionError("Invalid test value.")
                             loc.fill(value,timeout=10000)
                     elif action == "expect_text":
                         text = step.get("text","")
-                        if not isinstance(text,str) or not text or len(text)>1000: raise ToolExecutionError("Invalid expected text.")
+                        if not isinstance(text, str) or not text or len(text) > 1000:
+                            raise ToolExecutionError("Invalid expected text.")
                         if text not in page.locator("body").inner_text(timeout=5000):
                             raise ToolExecutionError("Expected text was not present.")
                     elif action == "expect_visible":
                         selector = step.get("selector","")
-                        if not selector or len(selector)>500: raise ToolExecutionError("Invalid visibility selector.")
+                        if not selector or len(selector) > 500:
+                            raise ToolExecutionError("Invalid visibility selector.")
                         if not page.locator(selector).first.is_visible(timeout=5000):
                             raise ToolExecutionError("Expected element was not visible.")
                     elif action == "expect_url":
@@ -665,9 +717,12 @@ class BrowserControlPlane:
     def _fetch_monitor(self,url,selector):
         try:
             from playwright.sync_api import sync_playwright
-        except ImportError as exc: raise ToolExecutionError("Install the browser extra and Chromium.") from exc
+        except ImportError as exc:
+            raise ToolExecutionError("Install the browser extra and Chromium.") from exc
         with sync_playwright() as p:
-            browser=p.chromium.launch(headless=True); page=browser.new_page(); self._guard(page)
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            self._guard(page)
             try:
                 page.goto(_url(url),wait_until="domcontentloaded",timeout=25000)
                 loc=page.locator(selector) if selector else page.locator("body")
