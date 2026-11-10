@@ -348,8 +348,11 @@ The provider and plugin branches extend the REST integration branch; media exten
 - Unit tests cover registration, engine installation, screenshot/target handoff, region coordinate
   offsets, confidence filtering, malformed/out-of-bounds candidate rejection, missing/failing
   backends, ambiguity rejection, unique-match click coordinates and candidate bounds.
-- CI validation is pending for this branch. Live model quality, latency, privacy/data-transfer,
-  real screenshot capture and cross-platform coordinate integration remain unverified.
+- GitHub Actions run #562 on commit 59173c1 completed successfully: 124 tests passed and Ruff passed.
+  Earlier CI findings were corrected: a test assertion-message regex, unused import and redundant casts,
+  a loop-variable closure binding, and the public __all__ ordering.
+- Live model quality, latency, privacy/data-transfer, real screenshot capture and cross-platform
+  coordinate integration remain unverified.
 - Backend-reported confidence is not assumed to be calibrated. A unique candidate may still be
   incorrect; high-impact actions require host approval bound to the exact arguments and fresh
   screenshot context. Screenshots may contain sensitive content, and hosted adapters may transmit
