@@ -1,5 +1,6 @@
 """Expanded browser control plane: profiles, tabs, frames, network, scraping and guarded submissions."""
 from __future__ import annotations
+
 import hashlib
 import json
 import os
