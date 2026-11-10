@@ -153,9 +153,11 @@ class DatabasePack:
             conn.close()
 
     def _where(self, filters: list[dict[str, Any]] | None) -> tuple[str, list[Any]]:
+        if filters is not None and len(filters) > 20:
+            raise ToolExecutionError("SQL filters are limited to 20 conditions.")
         clauses, params = [], []
         for item in filters or []:
-            field, op, value = _ident(item.get("field")), item.get("operator", "eq"), item.get("value")
+            field, op, value = _ident(item.get("field")), item.get("operator", "eq"), _bounded(item.get("value"), 50000)
             if op == "is_null":
                 clauses.append(f"{field} IS NULL")
             elif op == "not_null":
@@ -215,6 +217,7 @@ class DatabasePack:
         table = _ident(table)
         if not isinstance(values, dict) or not 1 <= len(values) <= 100:
             raise ToolExecutionError("Insert requires 1–100 values.")
+        values = _bounded(values, 50000)
         keys = [_ident(k) for k in values]
         _, count = self._run_sql(profile, f"INSERT INTO {table} ({','.join(keys)}) VALUES ({','.join('?' for _ in keys)})", tuple(values.values()))
         return {"rows_affected": count}
@@ -224,6 +227,7 @@ class DatabasePack:
         table = _ident(table)
         if not filters or not isinstance(values, dict) or not 1 <= len(values) <= 100:
             raise ToolExecutionError("UPDATE requires values and at least one filter.")
+        values = _bounded(values, 50000)
         keys = [_ident(k) for k in values]
         where, params = self._where(filters)
         _, count = self._run_sql(profile, f"UPDATE {table} SET " + ",".join(f"{k}=?" for k in keys) + where, tuple(values.values()) + tuple(params))
@@ -250,6 +254,7 @@ class DatabasePack:
                     values = op.get("values")
                     if not isinstance(values, dict) or not 1 <= len(values) <= 100:
                         raise ToolExecutionError("Transaction insert requires 1–100 values.")
+                    values = _bounded(values, 50000)
                     keys = [_ident(k) for k in values]
                     sql, params = f"INSERT INTO {table} ({','.join(keys)}) VALUES ({','.join('?' for _ in keys)})", tuple(values.values())
                 elif kind in {"update", "delete"}:
@@ -262,6 +267,7 @@ class DatabasePack:
                         values = op.get("values")
                         if not isinstance(values, dict) or not 1 <= len(values) <= 100:
                             raise ToolExecutionError("Transaction update requires 1–100 values.")
+                        values = _bounded(values, 50000)
                         keys = [_ident(k) for k in values]
                         sql = f"UPDATE {table} SET " + ",".join(f"{k}=?" for k in keys) + where
                         params = tuple(values.values()) + tuple(where_params)
@@ -299,6 +305,7 @@ class DatabasePack:
                     check(child, depth + 1)
         if not isinstance(value, dict):
             raise ToolExecutionError("MongoDB filter must be an object.")
+        value = _bounded(value, 50000)
         check(value)
         return value
 
@@ -334,8 +341,9 @@ class DatabasePack:
 
     def mongo_insert(self, profile: str, collection: str, document: dict[str, Any]) -> dict[str, Any]:
         cfg = self._cfg(profile, "mongodb")
-        if not isinstance(document, dict) or not document or len(json.dumps(document, default=str)) > 50000:
-            raise ToolExecutionError("MongoDB document must be non-empty and under 50 KB.")
+        if not isinstance(document, dict) or not document:
+            raise ToolExecutionError("MongoDB document must be a non-empty object.")
+        document = _bounded(document, 50000)
         try:
             from pymongo import MongoClient
         except ImportError as exc:
@@ -352,6 +360,7 @@ class DatabasePack:
         cfg = self._cfg(profile, "mongodb")
         if not filter or not isinstance(values, dict) or not values or any(k.startswith("$") for k in values):
             raise ToolExecutionError("MongoDB update requires a safe non-empty filter and values.")
+        values = _bounded(values, 50000)
         try:
             from pymongo import MongoClient
         except ImportError as exc:
@@ -400,6 +409,7 @@ class DatabasePack:
                         document = op.get("document")
                         if not isinstance(document, dict) or not document:
                             raise ToolExecutionError("MongoDB transaction insert requires a document.")
+                        document = _bounded(document, 50000)
                         result = coll.insert_one(document, session=session)
                         results.append({"operation": kind, "inserted_id": str(result.inserted_id)})
                     elif kind in {"update", "delete"}:
@@ -411,6 +421,7 @@ class DatabasePack:
                             values = op.get("values")
                             if not isinstance(values, dict) or not values or any(k.startswith("$") for k in values):
                                 raise ToolExecutionError("MongoDB transaction update requires safe values.")
+                            values = _bounded(values, 50000)
                             result = coll.update_many(filter_doc, {"$set": values}, session=session) if many else coll.update_one(filter_doc, {"$set": values}, session=session)
                             results.append({"operation": kind, "matched": result.matched_count, "modified": result.modified_count})
                         else:
