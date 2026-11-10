@@ -131,7 +131,8 @@ def test_conflict_inspection_and_explicit_resolution(tmp_path: Path) -> None:
     assert listed["conflicts"][0]["path"] == "tracked.txt"
     resolved = _conflicts(str(root), "resolve", path="tracked.txt", resolution="ours")
     assert resolved["return_code"] == 0
-    assert _git(root, "status", "--porcelain") == "M  tracked.txt"
+    assert _git(root, "ls-files", "-u") == ""
+    assert _git(root, "status", "--porcelain") == ""
 
 
 def test_submodule_urls_require_exact_host_allowlist() -> None:

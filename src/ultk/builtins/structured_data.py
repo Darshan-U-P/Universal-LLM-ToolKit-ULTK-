@@ -93,12 +93,16 @@ def _read_csv(path: Path, max_rows: int, max_columns: int) -> list[dict[str, Any
             reader = csv.DictReader(handle)
             if not reader.fieldnames:
                 raise ToolExecutionError("CSV requires a header row.")
-            if len(reader.fieldnames) > max_columns or len(set(reader.fieldnames)) != len(reader.fieldnames):
+            if (any(not name for name in reader.fieldnames)
+                    or len(reader.fieldnames) > max_columns
+                    or len(set(reader.fieldnames)) != len(reader.fieldnames)):
                 raise ToolExecutionError("CSV headers must be unique and within the column limit.")
             rows = []
             for row in reader:
                 if len(rows) >= max_rows:
                     raise ToolExecutionError("CSV row count exceeds the configured limit.")
+                if None in row:
+                    raise ToolExecutionError("CSV row contains more fields than the header.")
                 rows.append(dict(row))
             return rows
     except UnicodeDecodeError as exc:
@@ -137,7 +141,7 @@ def _xml_parse(path: Path, max_rows: int) -> list[dict[str, Any]]:
     for record in records:
         row: dict[str, Any] = {"_tag": record.tag}
         for child in list(record):
-            key = child.tag
+            key = child.attrib.get("name", child.tag)
             if key in row:
                 current = row[key]
                 row[key] = current + [child.text or ""] if isinstance(current, list) else [current, child.text or ""]
@@ -281,15 +285,24 @@ def _filter(rows: list[dict[str, Any]], field: str, operator: str, value: Any) -
     def match(row: dict[str, Any]) -> bool:
         actual = row.get(field)
         try:
-            if operator == "eq": return actual == value
-            if operator == "ne": return actual != value
-            if operator == "gt": return actual is not None and actual > value
-            if operator == "gte": return actual is not None and actual >= value
-            if operator == "lt": return actual is not None and actual < value
-            if operator == "lte": return actual is not None and actual <= value
-            if operator == "contains": return value in actual if actual is not None else False
-            if operator == "in": return actual in value
-            if operator == "is_null": return actual is None
+            if operator == "eq":
+                return actual == value
+            if operator == "ne":
+                return actual != value
+            if operator == "gt":
+                return actual is not None and actual > value
+            if operator == "gte":
+                return actual is not None and actual >= value
+            if operator == "lt":
+                return actual is not None and actual < value
+            if operator == "lte":
+                return actual is not None and actual <= value
+            if operator == "contains":
+                return value in actual if actual is not None else False
+            if operator == "in":
+                return actual in value
+            if operator == "is_null":
+                return actual is None
             return actual is not None
         except (TypeError, ValueError):
             return False
@@ -300,10 +313,14 @@ def _derive_value(row: dict[str, Any], operation: dict[str, Any]) -> Any:
     op = operation["operation"]
     field = operation.get("field")
     value = row.get(field) if field else operation.get("value")
-    if op == "constant": return operation.get("value")
-    if op == "lower": return str(value or "").lower()
-    if op == "upper": return str(value or "").upper()
-    if op == "trim": return str(value or "").strip()
+    if op == "constant":
+        return operation.get("value")
+    if op == "lower":
+        return str(value or "").lower()
+    if op == "upper":
+        return str(value or "").upper()
+    if op == "trim":
+        return str(value or "").strip()
     if op == "coalesce":
         return next((row.get(name) for name in operation.get("fields", []) if row.get(name) is not None), None)
     if op == "concat":
@@ -311,13 +328,18 @@ def _derive_value(row: dict[str, Any], operation: dict[str, Any]) -> Any:
     right = operation.get("value", 0)
     try:
         left_num, right_num = float(value), float(right)
-        if op == "add": result = left_num + right_num
-        elif op == "subtract": result = left_num - right_num
-        elif op == "multiply": result = left_num * right_num
+        if op == "add":
+            result = left_num + right_num
+        elif op == "subtract":
+            result = left_num - right_num
+        elif op == "multiply":
+            result = left_num * right_num
         elif op == "divide":
-            if right_num == 0: return None
+            if right_num == 0:
+                return None
             result = left_num / right_num
-        else: raise ToolExecutionError("Unsupported derive operation.")
+        else:
+            raise ToolExecutionError("Unsupported derive operation.")
         return result if math.isfinite(result) else None
     except (TypeError, ValueError):
         return None
@@ -379,13 +401,20 @@ def _transform(root: Path, rows: list[dict[str, Any]], operations: list[dict[str
                     field, name, fn = agg["field"], agg["as"], agg["function"]
                     values = [r.get(field) for r in members if r.get(field) is not None]
                     nums = [float(v) for v in values if isinstance(v, (int, float)) and not isinstance(v, bool)]
-                    if fn == "count": value = len(values)
-                    elif fn == "sum": value = sum(nums)
-                    elif fn == "avg": value = sum(nums) / len(nums) if nums else None
-                    elif fn == "min": value = min(values) if values else None
-                    elif fn == "max": value = max(values) if values else None
-                    elif fn == "first": value = values[0] if values else None
-                    else: raise ToolExecutionError("Unsupported aggregation function.")
+                    if fn == "count":
+                        value = len(values)
+                    elif fn == "sum":
+                        value = sum(nums)
+                    elif fn == "avg":
+                        value = sum(nums) / len(nums) if nums else None
+                    elif fn == "min":
+                        value = min(values) if values else None
+                    elif fn == "max":
+                        value = max(values) if values else None
+                    elif fn == "first":
+                        value = values[0] if values else None
+                    else:
+                        raise ToolExecutionError("Unsupported aggregation function.")
                     item[name] = value
                 grouped.append(item)
             result = grouped

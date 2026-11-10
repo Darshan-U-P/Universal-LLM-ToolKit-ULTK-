@@ -214,7 +214,7 @@ def _worktree_path(worktree_root: str, relative: str, *, must_exist: bool = Fals
     candidate = Path(relative)
     if (candidate.is_absolute() or not relative or "\x00" in relative
             or ".." in candidate.parts or "\\" in relative):
-        raise ToolExecutionError("Worktree paths must be safe relative paths under the configured root.")
+        raise ToolExecutionError("Worktree path is unsafe or escapes the configured root.")
     target = (base / candidate).resolve()
     if not target.is_relative_to(base) or target == base:
         raise ToolExecutionError("Worktree path escapes its configured root.")

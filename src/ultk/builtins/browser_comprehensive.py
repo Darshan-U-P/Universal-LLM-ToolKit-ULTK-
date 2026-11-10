@@ -10,6 +10,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import Any
 from ultk.builtins._common import FunctionTool, object_schema
 from ultk.builtins.web import _validate_public_url
@@ -27,6 +28,14 @@ def _name(value: str) -> str:
 def _url(value: str) -> str:
     if not isinstance(value, str) or len(value) > 4096:
         raise ToolExecutionError("URL must be a string of at most 4096 characters.")
+    try:
+        parsed = urlsplit(value)
+        if (parsed.scheme.casefold() not in {"http", "https"} or not parsed.hostname
+                or parsed.username is not None or parsed.password is not None):
+            raise ToolExecutionError("Only HTTP(S) URLs without embedded credentials are allowed.")
+        _ = parsed.port
+    except ValueError as exc:
+        raise ToolExecutionError("URL is malformed.") from exc
     _validate_public_url(value)
     return value
 
