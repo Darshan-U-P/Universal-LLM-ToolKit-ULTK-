@@ -23,7 +23,7 @@ def pack() -> ComputerVisualPack:
 def ocr_data(words=("Save", "changes"), *, left=(10, 55), top=(20, 20)):
     return {
         "text": list(words),
-        "conf": ["95", "90"][:len(words)],
+        "conf": ["95"] * len(words),
         "left": list(left),
         "top": list(top),
         "width": [40] * len(words),
@@ -171,5 +171,5 @@ def test_factory_registers_visual_tools_with_separate_capabilities():
         "computer_visual.drag",
         "computer_visual.desktop_workflow",
     }
-    assert specs["computer_visual.click_text"].capability == "computer:screen:control"
-    assert specs["computer_visual.find_text"].capability == "computer:screen:read"
+    assert specs["computer_visual.click_text"].capabilities == frozenset({"computer:screen:control"})
+    assert specs["computer_visual.find_text"].capabilities == frozenset({"computer:screen:read"})
