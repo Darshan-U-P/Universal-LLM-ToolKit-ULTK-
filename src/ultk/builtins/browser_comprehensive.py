@@ -457,7 +457,12 @@ class BrowserControlPlane:
             if fingerprint.casefold()!=expected_form_sha256.casefold():
                 raise ToolExecutionError("Form changed after preview; obtain a fresh preview and approval.")
             _url(snapshot["action"])
-            form.evaluate("(el) => el.requestSubmit ? el.requestSubmit() : el.submit()")
+            form.evaluate("""el => {
+              if (typeof el.requestSubmit !== "function") {
+                throw new Error("requestSubmit is not supported");
+              }
+              el.requestSubmit();
+            }""")
             page.wait_for_load_state("domcontentloaded",timeout=15000)
             return {"submitted":True,"url":page.url,"destination":snapshot["action"],"method":snapshot["method"],
                     "form_sha256":fingerprint}
