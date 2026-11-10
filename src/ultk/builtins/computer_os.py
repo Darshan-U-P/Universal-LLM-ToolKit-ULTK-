@@ -293,6 +293,7 @@ class ComputerOSPack:
                     "left": int(rect.get("x", 0)), "top": int(rect.get("y", 0)),
                     "width": int(rect.get("width", 0)), "height": int(rect.get("height", 0)),
                     "active": bool(node.get("focused")), "visible": not bool(node.get("scratchpad_state")),
+                    "scratchpad": bool(node.get("scratchpad_state")),
                     "workspace": workspace, "container_id": int(node.get("id", 0)),
                     "backend": "sway-ipc",
                 })
@@ -322,8 +323,14 @@ class ComputerOSPack:
             command = f"[con_id={container_id}] kill"
         elif action == "maximize":
             command = f"[con_id={container_id}] fullscreen enable"
+        elif action == "minimize":
+            command = f"[con_id={container_id}] move scratchpad"
         elif action == "restore":
-            command = f"[con_id={container_id}] fullscreen disable"
+            command = (
+                f"[con_id={container_id}] scratchpad show"
+                if window.get("scratchpad")
+                else f"[con_id={container_id}] fullscreen disable"
+            )
         elif action == "move":
             if type(x) is not int or type(y) is not int or not -30000 <= x <= 30000 or not -30000 <= y <= 30000:
                 raise ToolExecutionError("Sway move requires bounded integer x and y coordinates.")
@@ -333,7 +340,7 @@ class ComputerOSPack:
                 raise ToolExecutionError("Sway resize requires width and height from 100 to 20000.")
             command = f"[con_id={container_id}] resize set width {width} px height {height} px"
         else:
-            raise ToolExecutionError("Sway supports activate, close, move, resize, maximize and restore.")
+            raise ToolExecutionError("Sway supports activate, close, move, resize, maximize, minimize and restore.")
         result = self._sway_request(command)
         if isinstance(result, list) and any(item.get("success") is False for item in result if isinstance(item, dict)):
             raise ToolExecutionError("Sway did not complete the requested window action.")
@@ -355,6 +362,23 @@ class ComputerOSPack:
         return rows
 
     def _window(self, selector: str) -> Any:
+        if self._sway_enabled():
+            from types import SimpleNamespace
+
+            row = self._sway_window(selector)
+            title = row["title"]
+            return SimpleNamespace(
+                title=title,
+                moveTo=lambda x, y: self.sway_window_action(title, "move", x=x, y=y),
+                resizeTo=lambda width, height: self.sway_window_action(
+                    title, "resize", width=width, height=height
+                ),
+                activate=lambda: self.sway_window_action(title, "activate"),
+                close=lambda: self.sway_window_action(title, "close"),
+                maximize=lambda: self.sway_window_action(title, "maximize"),
+                minimize=lambda: self.sway_window_action(title, "minimize"),
+                restore=lambda: self.sway_window_action(title, "restore"),
+            )
         needle = self._text(selector, "window selector", 180).casefold()
         pywinctl = _optional("pywinctl")
         matches = [window for window in pywinctl.getAllWindows()
@@ -1248,7 +1272,7 @@ def create_computer_os_tools(
         "computer:window:control",
         pack.arrange_windows,
     )
-    add("computer_os.sway_window_action", "Manage one uniquely matched Sway window through compositor IPC on Linux Wayland.", {"title_contains": selector, "action": {"type": "string", "enum": ["activate", "close", "move", "resize", "maximize", "restore"]}, "x": {"type": "integer"}, "y": {"type": "integer"}, "width": {"type": "integer"}, "height": {"type": "integer"}}, ["title_contains", "action"], "computer:window:control", pack.sway_window_action)
+    add("computer_os.sway_window_action", "Manage one uniquely matched Sway window through compositor IPC on Linux Wayland.", {"title_contains": selector, "action": {"type": "string", "enum": ["activate", "close", "move", "resize", "maximize", "minimize", "restore"]}, "x": {"type": "integer"}, "y": {"type": "integer"}, "width": {"type": "integer"}, "height": {"type": "integer"}}, ["title_contains", "action"], "computer:window:control", pack.sway_window_action)
     add("computer_os.virtual_desktops", "List or switch Windows virtual desktops, Linux X11 desktops, or Sway workspaces on supported backends.", {"action": {"type": "string", "enum": ["list", "current", "create", "switch"]}, "desktop_number": {"type": "integer", "minimum": 0}}, ["action"], "computer:desktop:control", pack.virtual_desktops)
     add("computer_os.keyboard_shortcut", "Send a bounded allowlisted keyboard shortcut.", {"keys": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "string"}}}, ["keys"], "computer:keyboard:shortcut", pack.keyboard_shortcut)
     add("computer_os.keyboard_sequence", "Execute a prevalidated bounded keyboard sequence of typing, keypresses, shortcuts and waits.", {"steps": {"type": "array", "minItems": 1, "maxItems": 30, "items": {"type": "object"}}}, ["steps"], "computer:keyboard:sequence", pack.keyboard_sequence, 45)
