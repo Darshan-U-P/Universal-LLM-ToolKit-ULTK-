@@ -11,6 +11,7 @@ from ultk.engine import ToolEngine
 from ultk.exceptions import ToolExecutionError
 from ultk.permissions import AllowListPolicy
 
+
 def test_context_is_session_scoped_and_restart_safe(tmp_path:Path):
     db=tmp_path/"memory.sqlite3"; store=PersistentMemory(db,namespace="tenant-a")
     store.context_append("s1","user","hello from session one")
