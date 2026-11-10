@@ -4,9 +4,10 @@
 from __future__ import annotations
 import asyncio, hashlib, json, math, re, sqlite3, time, uuid
 from collections import Counter
+from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from ultk.exceptions import ToolExecutionError
 from ultk.models import ToolContext, ToolSpec
 from ultk.builtins._common import object_schema
