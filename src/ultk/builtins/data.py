@@ -8,7 +8,7 @@ import os
 import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import quote
 
 from ultk.builtins._common import FunctionTool, object_schema
@@ -116,18 +116,18 @@ def _write_csv(root: Path, relative_path: str, columns: list[str],
 class SQLiteDataStore:
     """Read-only SQLite queries by default; optional DML is explicitly enabled."""
 
-    _READ_ACTIONS = {
+    _READ_ACTIONS: ClassVar[frozenset[int]] = frozenset({
         sqlite3.SQLITE_SELECT,
         sqlite3.SQLITE_READ,
         sqlite3.SQLITE_FUNCTION,
         getattr(sqlite3, "SQLITE_RECURSIVE", -1),
-    }
-    _WRITE_ACTIONS = _READ_ACTIONS | {
+    })
+    _WRITE_ACTIONS: ClassVar[frozenset[int]] = _READ_ACTIONS | frozenset({
         sqlite3.SQLITE_INSERT,
         sqlite3.SQLITE_UPDATE,
         sqlite3.SQLITE_DELETE,
         sqlite3.SQLITE_TRANSACTION,
-    }
+    })
 
     def __init__(self, database: str | Path, *, allow_writes: bool = False,
                  max_rows: int = 1000, max_vm_steps: int = 1_000_000) -> None:
