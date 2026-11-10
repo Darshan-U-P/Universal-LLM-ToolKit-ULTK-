@@ -152,6 +152,6 @@ class ApprovalPolicy:
                 ))
                 if inspect.isawaitable(notification):
                     await notification
-            except Exception as exc:  # noqa: BLE001 - surface host approval UI failures
+            except Exception as exc:
                 raise ToolExecutionError("Host approval notification callback failed.") from exc
         raise ApprovalRequiredError(approval_id)
