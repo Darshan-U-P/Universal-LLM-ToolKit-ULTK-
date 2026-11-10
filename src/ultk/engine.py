@@ -197,6 +197,26 @@ class ToolEngine:
         self.register_tools(create_advanced_browser_tools(
             session_root=session_root, monitor_database=monitor_database, notifier=notifier))
 
+    def install_comprehensive_browser_tools(
+        self,
+        *,
+        profile_root: str | Path = "./browser_profiles",
+        headless: bool = True,
+        extension_dirs: tuple[str | Path, ...] = (),
+        notifier: Any = None,
+    ) -> None:
+        """Install persistent-profile browser automation, monitoring and guarded form submission.
+
+        Extension directories are trusted host configuration and are never model-selected.
+        """
+        from ultk.builtins.browser_comprehensive import create_comprehensive_browser_tools
+        self.register_tools(create_comprehensive_browser_tools(
+            profile_root=profile_root,
+            headless=headless,
+            extension_dirs=extension_dirs,
+            notifier=notifier,
+        ))
+
     def install_semantic_browser_tools(
         self, *, session_root: str | Path = "./browser_sessions"
     ) -> None:
