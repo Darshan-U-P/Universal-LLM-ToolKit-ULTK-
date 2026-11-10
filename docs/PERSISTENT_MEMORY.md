@@ -114,7 +114,7 @@ and `open_loops` arrays. For `task=consolidate_memories`, return a faithful `sum
 the supplied source records. ULTK stores summaries and extracted facts with provenance.
 Related-memory consolidation is conservative: it requires same-kind/scope records and a high
 vector-similarity threshold, records source IDs, writes the replacement before deleting source
-records, and retains sources if cleanup fails. It is not a contradiction solver.
+records, and retains sources if cleanup fails. If the summarizer returns a non-empty `conflicts` list, ULTK retains every source record and reports the conflict rather than merging. This is adapter-assisted conflict preservation, not an independent truth-verification system.
 
 New tools: `memory.extract_context`, `memory.summarize_context`,
 `memory.consolidate_related` and `memory.diagnostics`. Grant `memory:write` for extraction
