@@ -41,7 +41,7 @@ def test_sway_tree_is_converted_to_bounded_window_rows(pack, monkeypatch) -> Non
     assert rows == [{
         "title": "Browser", "app_id": "firefox", "left": 10, "top": 20,
         "width": 900, "height": 700, "active": True, "visible": True,
-        "workspace": "2:web", "container_id": 77, "backend": "sway-ipc",
+        "scratchpad": False, "workspace": "2:web", "container_id": 77, "backend": "sway-ipc",
     }]
 
 
