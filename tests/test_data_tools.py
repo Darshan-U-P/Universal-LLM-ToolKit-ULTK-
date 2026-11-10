@@ -54,7 +54,7 @@ def test_sqlite_write_requires_host_opt_in_and_allows_only_dml(tmp_path) -> None
     with sqlite3.connect(database) as connection:
         connection.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, label TEXT)")
     readonly = SQLiteDataStore(database, allow_writes=False)
-    with pytest.raises(Exception, match="not enabled"):
+    with pytest.raises(ToolExecutionError, match="not enabled"):
         readonly._write("INSERT INTO items(label) VALUES (?)", ["alpha"])
 
     writable = SQLiteDataStore(database, allow_writes=True)
