@@ -638,6 +638,34 @@ class ComputerOSPack:
             if not rows:
                 raise ToolExecutionError("No matching accessible application was found.")
             return {"backend": "AT-SPI", "elements": rows}
+        if platform.system() == "Darwin":
+            quartz, root, app_name = self._mac_accessibility_app(title_contains)
+            rows: list[dict[str, Any]] = []
+
+            def walk(node: Any, depth: int = 0) -> None:
+                if len(rows) >= max_elements or depth > 12:
+                    return
+                role = self._mac_ax_value(quartz, node, "AXRole")
+                name = self._mac_ax_value(quartz, node, "AXTitle")
+                description = self._mac_ax_value(quartz, node, "AXDescription")
+                identifier = self._mac_ax_value(quartz, node, "AXIdentifier")
+                enabled = self._mac_ax_value(quartz, node, "AXEnabled")
+                if role or name or description or identifier:
+                    rows.append({
+                        "name": str(name or description or "")[:300],
+                        "role": str(role or "")[:100],
+                        "automation_id": str(identifier or "")[:256],
+                        "enabled": enabled if isinstance(enabled, bool) else None,
+                    })
+                children = self._mac_ax_value(quartz, node, "AXChildren") or []
+                for child in list(children)[:300]:
+                    walk(child, depth + 1)
+                    if len(rows) >= max_elements:
+                        break
+
+            walk(root)
+            return {"backend": "macOS Accessibility API", "application": app_name,
+                    "elements": rows}
         raise ToolExecutionError("Accessibility inspection backend is not implemented for this OS.")
 
     def accessibility_click(self, title_contains: str, automation_id: str) -> dict[str, Any]:
