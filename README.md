@@ -226,3 +226,14 @@ Enable it with `ToolEngine.install_semantic_browser_tools()`. The existing
 `install_advanced_browser_tools()` remains available for selector-based interactions and bounded
 browser workflows. See [Semantic Browser Automation](docs/SEMANTIC_BROWSER_AUTOMATION.md).
 
+
+
+## Image-template computer vision
+
+The computer automation packs also include an optional OpenCV-backed image-template layer. Supply
+trusted reference images in a host-configured template directory to detect known icons and controls
+at multiple scales, inspect candidate coordinates and click only a unique non-overlapping match.
+This complements OCR and semantic browser locators; it is template matching, not general semantic
+object detection. Install with `pip install -e '.[computer-vision]'` and enable through
+`ToolEngine.install_computer_vision_tools(template_root=...)`. See
+[Image-Template Computer Vision](docs/COMPUTER_VISION_AUTOMATION.md).

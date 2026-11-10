@@ -5,6 +5,7 @@ from ultk.builtins.computer import create_computer_tools
 from ultk.builtins.computer_advanced import create_advanced_computer_tools
 from ultk.builtins.computer_os import create_computer_os_tools
 from ultk.builtins.computer_visual import create_computer_visual_tools
+from ultk.builtins.computer_vision import create_computer_vision_tools
 from ultk.builtins.development import create_development_tools
 from ultk.builtins.development_advanced import create_advanced_development_tools
 from ultk.builtins.filesystem import create_filesystem_tools
@@ -21,6 +22,7 @@ __all__ = [
     "create_computer_os_tools",
     "create_computer_tools",
     "create_computer_visual_tools",
+    "create_computer_vision_tools",
     "create_development_tools",
     "create_filesystem_tools",
     "create_process_management_tools",

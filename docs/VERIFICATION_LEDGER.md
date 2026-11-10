@@ -302,3 +302,27 @@ The provider and plugin branches extend the REST integration branch; media exten
 - This increment does not add CAPTCHA solving, anti-bot evasion, frame targeting, upload/download
   flows, browser extensions or network egress isolation. URL validation is not a complete SSRF
   boundary; enforce host/network-level egress controls.
+
+
+## Image-template computer vision increment
+
+- Branch: feat/image-template-computer-vision
+- Base: feat/semantic-browser-automation (PR #12 head).
+- Added src/ultk/builtins/computer_vision.py with multi-scale grayscale OpenCV template matching,
+  non-maximum overlap suppression, bounded candidate inspection, unique-match clicking and
+  bounded wait-for-template polling.
+- Templates are host-supplied image files confined to a configured directory; extension, file
+  size, image pixel count, capture area, threshold, candidate count and wait bounds are restricted.
+- Added ToolEngine.install_computer_vision_tools, public factory export, optional
+  computer-vision dependency extra, focused unit tests and dedicated documentation.
+- This is deterministic image-template matching for known reference images, not general semantic
+  object detection or a learned visual grounding model. Appearance changes, animation, DPI scaling,
+  theme changes and anti-aliasing can reduce match scores.
+- Unit tests cover registration, engine integration, path confinement, image extension/size limits,
+  match bounds, overlap calculations, unique-match click safety, and wait bounds. CI result pending.
+- Validate OpenCV behavior and false-positive rates against real screenshots on Windows, macOS and
+  Linux; test high-DPI/multi-monitor scaling, theme/zoom changes, animated controls, image formats,
+  template quality, CPU/memory load and capture backend behavior.
+- Desktop clicks remain externally visible host actions. Grant computer:screen:read and
+  computer:screen:control separately, and require human approval for high-impact actions.
+- PR #12 semantic browser automation CI run #535 completed successfully after its import-order fix.

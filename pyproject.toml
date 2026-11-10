@@ -22,6 +22,7 @@ dependencies = ["jsonschema>=4.22", "psutil>=6.0"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5", "mypy>=1.10"]
 computer = ["pyautogui>=0.9.54", "pyperclip>=1.9", "PyWinCtl>=0.4.01"]
 computer-visual = ["pyautogui>=0.9.54", "Pillow>=10.0", "pytesseract>=0.3.13"]
+computer-vision = ["pyautogui>=0.9.54", "Pillow>=10.0", "numpy>=1.26", "opencv-python-headless>=4.10"]
 computer-os = [
   "PyWinCtl>=0.4.01",
   "pyautogui>=0.9.54",

@@ -91,9 +91,9 @@ amount, text length, step count, OCR output and waits are bounded.
   ambiguity but does not guarantee the target's meaning or safety.
 - The pack interacts with the currently active desktop session under the host user's OS privileges.
   It is not an OS sandbox and does not isolate applications.
-- OCR requires a compatible Tesseract binary and language data. This increment does not provide
-  image-template matching, semantic object recognition, screenshot streaming, or unattended
-  background desktop sessions.
+- OCR requires a compatible Tesseract binary and language data. Image-template matching is provided
+  separately by the OpenCV-backed `computer_vision` pack; it is template matching, not semantic object
+  recognition. Screenshot streaming and unattended background desktop sessions are not provided.
 - Wayland, macOS permissions, remote desktops, display scaling, and multi-monitor capture require
   platform-specific integration testing. OCR region coordinates follow the host's screenshot
   backend, not an assumed universal display coordinate convention.
