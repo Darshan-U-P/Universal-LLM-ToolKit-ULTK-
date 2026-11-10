@@ -8,8 +8,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ultk.exceptions import ToolExecutionError
 from ultk.builtins._common import FunctionTool, object_schema
+from ultk.exceptions import ToolExecutionError
 
 
 def _rooted(root_dir: str, relative_path: str) -> Path:
@@ -74,7 +74,7 @@ def _run_command(args: list[str], root_dir: str, timeout_seconds: int = 20,
         raise ToolExecutionError("Invalid project root or timeout.")
     try:
         completed = subprocess.run(args, cwd=root, shell=False, stdin=subprocess.DEVNULL,
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   capture_output=True,
                                    timeout=timeout_seconds, check=False,
                                    env={"PATH": os.environ.get("PATH", ""),
                                         "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
