@@ -310,3 +310,13 @@ MongoDB executable operators are rejected, and Redis keys are confined to a host
 prefix. Mutating capabilities remain separate from reads. These controls are not a network or
 database sandbox: configure least-privilege database users, TLS, firewall rules, and human
 approval for sensitive writes. See [Database Integrations](docs/DATABASE_INTEGRATIONS.md).
+
+
+
+## Persistent memory
+
+ULTK now includes an optional SQLite-backed memory pack with session-scoped working context,
+long-term episodic/semantic/procedural records, namespace isolation, hybrid vector/lexical recall,
+update/forget operations and duplicate consolidation. The host binds a memory namespace to the
+authenticated user and can inject a trusted semantic embedding callable. See
+[Persistent Memory](docs/PERSISTENT_MEMORY.md) for installation, capabilities and privacy boundaries.
